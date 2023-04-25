@@ -1,4 +1,5 @@
 #include <ACAN2515.h>
+#include "src/shared/SerialProtocol.h"
 
 // CAN interface
 static const int MCP2515_CS_PIN  = 5;
@@ -8,90 +9,33 @@ static bool canAvailable = false;
 
 ACAN2515 can (MCP2515_CS_PIN, SPI, MCP2515_INT_PIN);
 
-void setup() {
-  Serial.begin(57600);
-  SPI.begin();
+SerialProtocol serial { processReceivedLine };
 
-  Serial.println("READY");
-}
+void processReceivedLine(const char* line) {
+  const char* start = line;
+  char* end = nullptr;
 
-void loop() {
-  readSerial(); yield();
-  
-  if (canAvailable) {
-    can.poll(); yield();
-
-    CANMessage frame;
-    while (can.receive(frame)) {
-      Serial.print("CANRX ");
-      Serial.print(frame.id | (frame.ext << 31) | (frame.rtr << 30));
-      Serial.print(" ");
-      Serial.print(frame.len);
-      Serial.print(" ");
-      for (size_t i = 0u; i < frame.len; ++i) {
-        Serial.print(frame.data[i], DEC);
-        Serial.print(" ");
-      }
-      Serial.println();
-  
-      yield();
+  if (strncmp(start, "SETUP ", 6) == 0) {
+    auto bitrate = strtol(start + 6, &end, 16);
+    if (end == start) {
+      serial.send("SETUP ENVAL %s", start + 6);
+      return;
     }
-  }  
-}
-
-const size_t RECEIVE_BUFFER_SIZE = 256;
-char receiveBuffer[RECEIVE_BUFFER_SIZE];
-size_t receiveIndex = 0u;
-
-void readSerial() {
-  auto bytesAvailable = Serial.available();
-  if (bytesAvailable <= 0) {
-    return;
-  }
-
-  while (bytesAvailable > 0) {
-    auto receivedByte = Serial.read();
-    if (receivedByte == '\n' && receiveIndex > 0 && receiveBuffer[receiveIndex - 1] == '\r') {
-      // \r\n received, process line
-      receiveBuffer[receiveIndex - 1] = '\0';
-      String line (receiveBuffer);
-      
-      processReceivedLine(line);
-
-      receiveIndex = 0;
-    } else {
-      receiveBuffer[receiveIndex] = receivedByte;
-      receiveIndex += 1;
-    }
-
-    receiveIndex = receiveIndex % RECEIVE_BUFFER_SIZE;
-    
-    bytesAvailable -= 1;
-  }
-}
-
-void processReceivedLine(const String& line) {
-  auto type = line.substring(0, 5);
-  if (type == "SETUP") {
-    auto bitrateEndIndex = line.indexOf(' ', 6);
-    auto bitrate = line.substring(6, bitrateEndIndex).toInt();
+    start = end;
 
     ACAN2515Settings settings (CAN_QUARTZ_FREQUENCY, bitrate);
     
-    auto modeEndIndex = line.indexOf(' ', bitrateEndIndex + 1);
-    auto mode = line.substring(bitrateEndIndex + 1, modeEndIndex);
-
-    if (mode.equals("NormalMode")) {
+    if (strcmp(start, " NOR") == 0) {
       settings.mRequestedMode = ACAN2515Settings::NormalMode;
-    } else if (mode.equals("LoopBackMode")) {
+    } else if (strcmp(start, " LOP") == 0) {
       settings.mRequestedMode = ACAN2515Settings::LoopBackMode;
-    } else if (mode.equals("SleepMode")) {
+    } else if (strcmp(start, " SLP") == 0) {
       settings.mRequestedMode = ACAN2515Settings::SleepMode;
-    } else if (mode.equals("ListenOnlyMode")) {
+    } else if (strcmp(start, " LIS") == 0) {
       settings.mRequestedMode = ACAN2515Settings::ListenOnlyMode;
     } else {
-      settings.mRequestedMode = ACAN2515Settings::LoopBackMode;
-      // TODO abort and report error?
+      serial.send("SETUP ENVAL %s", start);
+      return;
     }
 
     if (canAvailable) {
@@ -103,61 +47,98 @@ void processReceivedLine(const String& line) {
     canAvailable = errorCode == 0;
   
     if (canAvailable) {
-      Serial.print("SETUP OK ");
-      Serial.print(line.substring(6));
-      Serial.print(": mRequestedMode="); Serial.print(settings.mRequestedMode);
-      Serial.print(" mBitRatePrescaler="); Serial.print(settings.mBitRatePrescaler);
-      Serial.print(" mPropagationSegment="); Serial.print(settings.mPropagationSegment);
-      Serial.print(" mPhaseSegment1="); Serial.print(settings.mPhaseSegment1);
-      Serial.print(" mPhaseSegment2="); Serial.print(settings.mPhaseSegment2);
-      Serial.print(" mSJW="); Serial.print(settings.mSJW);
-      Serial.print(" mTripleSampling="); Serial.print(settings.mTripleSampling);
-      Serial.print(" actualBitRate="); Serial.print((unsigned long)settings.actualBitRate());
-      Serial.print(" exactBitRate="); Serial.print(settings.exactBitRate());
-      Serial.print(" samplePointFromBitStart="); Serial.print((unsigned long)settings.samplePointFromBitStart());
-      Serial.println();
+      serial.send("SETUP OK RM=%u BRP=%u PRS=%u PS1=%u PS2=%u SJW=%u TRS=%u ABR=%u SPS=%u",
+        settings.mRequestedMode,
+        settings.mBitRatePrescaler,
+        settings.mPropagationSegment,
+        settings.mPhaseSegment1,
+        settings.mPhaseSegment2,
+        settings.mSJW,
+        settings.mTripleSampling,
+        (unsigned long)settings.actualBitRate(),
+        settings.exactBitRate(),
+        (unsigned long)settings.samplePointFromBitStart()
+      );
+      return;
     } else {
-      Serial.print("SETUP ERROR ");
-      Serial.print(line.substring(6));
-      Serial.print(": 0x");
-      Serial.println(errorCode, HEX);
+      serial.send("SETUP E%04X: %s", errorCode, line + 6);
+      return;
     }
-  } else if (type == "CANTX") {
+  } else if (strncmp(start, "CANTX ", 6) == 0) {
     if (!canAvailable) {
-      Serial.print("CANTX ENOAV ");
-      Serial.print(line.substring(6));
-      Serial.println();
+      serial.send("CANTX ENOAV %s", start + 6);
+      return;
     }
     
-    auto idEndIndex = line.indexOf(' ', 6);
-    auto id = line.substring(6, idEndIndex).toInt();
-    auto lenEndIndex = line.indexOf(' ', idEndIndex + 1);
-    auto len = line.substring(idEndIndex + 1, lenEndIndex).toInt();
+    auto id = strtol(start + 6, &end, 16);
+    if (end == start) {
+      serial.send("CANTX ENVAL %s", start + 6);
+      return;
+    }
+    start = end;
+
+    auto len = strtol(start, &end, 10);
+    if (end == start) {
+      serial.send("CANTX ENVAL %s", start);
+      return;
+    }
+    start = end;
+
     CANMessage message;
     message.id = id & 0x1FFFFFFFu;
     message.ext = (id & 0x80000000u) != 0;
     message.rtr = (id & 0x40000000u) != 0;
     message.len = len;
 
-    auto prevDataEndIndex = lenEndIndex;
     for (size_t i = 0; i < message.len; ++i) {
-      auto dataEndIndex = line.indexOf(' ', prevDataEndIndex + 1);
-      message.data[i] = line.substring(prevDataEndIndex + 1, dataEndIndex).toInt();
-      prevDataEndIndex = dataEndIndex;
+      message.data[i] = strtol(start, &end, 16);
+      if (end == start) {
+        serial.send("CANTX ENVAL %s", start);
+        return;
+      }
+      start = end;
     }
 
     if (can.tryToSend(message)) {
-      Serial.print("CANTX OK ");
-      Serial.print(line.substring(6));
-      Serial.println();
+      serial.send("CANTX OK %s", line + 6);
+      return;
     } else {
-      Serial.print("CANTX ESEND ");
-      Serial.print(line.substring(6));
-      Serial.println();
+      serial.send("CANTX ESEND %s", line + 6);
+      return;
     }
   } else {
-    Serial.print("ERROR ");
-    Serial.print(line);
-    Serial.println();
+    serial.send("ERROR %s", line);
+    return;
   }
+}
+
+void setup() {
+  serial.setup();
+  SPI.begin();
+  serial.send("READY");
+}
+
+void loop() {
+  serial.receive();
+  
+  if (canAvailable) {
+    can.poll();
+
+    CANMessage frame;
+    while (can.receive(frame)) {
+      yield();
+      serial.send("CANRX %08X %u %02X %02X %02X %02X %02X %02X %02X %02X",
+        frame.id | (frame.ext << 31) | (frame.rtr << 30),
+        frame.len,
+        frame.data[0],
+        frame.data[1],
+        frame.data[2],
+        frame.data[3],
+        frame.data[4],
+        frame.data[5],
+        frame.data[6],
+        frame.data[7]
+      );
+    }
+  }  
 }

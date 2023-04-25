@@ -2,6 +2,7 @@
 
 #include "NodeBase.h"
 #include "CanInterface.h"
+#include "src/shared/SerialProtocol.h"
 
 class SerialCan final : public IConfigurable {
 private:
@@ -11,8 +12,8 @@ private:
   NodeBase& _node;
   DigitalOutput& _resetPin;
   DigitalInput& _listenModePin;
-  unsigned long _lastResetMs;
   bool _canAvailable;
+  IntervalTimer _resetInterval;
   std::function<void()> _readyHandler;
   std::function<void(const CanMessage& message)> _messageHandler;
   
@@ -20,14 +21,16 @@ private:
   CanLogLevel _logLevel = CanLogLevel::Status;
   CanCounters _counters;
 
+  SerialProtocol _serial;
+
 public:
   SerialCan(NodeBase& node, DigitalOutput& resetPin, DigitalInput& listenModePin) :
     _node(node),
     _resetPin(resetPin),
     _listenModePin(listenModePin),
-    _lastResetMs(0),
     _canAvailable(false),
-    _counters()
+    _counters(),
+    _serial([this] (const char* line) { processReceivedLine(line); })
   {
     node.logLevel("can", (int)_logLevel);
   }
@@ -53,8 +56,7 @@ public:
 
   void setup() {
     if (_logLevel >= CanLogLevel::Status) _node.log("can", "Initializing SerialCan.");
-    Serial.begin(57600);
-    Serial.setTimeout(1);
+    _serial.setup();
     delay(100);
     _node.addConfigurable("can", this);
     reset();
@@ -62,9 +64,9 @@ public:
 
   void loop() {
     _logLevel = (CanLogLevel)_node.logLevel("can");
-    readSerial();
+    _serial.receive();
 
-    if (!ready() && (_lastResetMs + 30000) < millis()) {
+    if (!ready() && _resetInterval.elapsed()) {
       if (_logLevel >= CanLogLevel::Error) _node.log("can", "Timeout: resetting CAN module.");
       resetInternal();
     }
@@ -72,7 +74,6 @@ public:
 
   void reset() {
     if (_logLevel >= CanLogLevel::Status) _node.log("can", "Resetting CAN module.");
-    
     resetInternal();
   }
 
@@ -100,9 +101,8 @@ public:
       if (_logLevel >= CanLogLevel::Tx) {
         logCanMessage("TX", message);
       }
-      
-      static char BUFFER[96];
-      size_t length = snprintf(BUFFER, 96, "CANTX %u %u %u %u %u %u %u %u %u %u \r\n",
+
+      _serial.send("CANTX %08X %u %02X %02X %02X %02X %02X %02X %02X %02X",
         message.id | (message.ext << 31) | (message.rtr << 30),
         message.len,
         message.data[0],
@@ -114,12 +114,7 @@ public:
         message.data[6],
         message.data[7]
       );
-      if (length > 96) {
-        return;
-      }
 
-      Serial.write(BUFFER, length);
-      
       _counters.tx += 1;
     }
   }
@@ -128,71 +123,51 @@ public:
     return _counters;
   }
 
-private:
-  static const size_t RECEIVE_BUFFER_SIZE = 256;
-  char _receiveBuffer[RECEIVE_BUFFER_SIZE];
-  size_t _receiveIndex = 0u;
-
+private: 
   void resetInternal() {
     _canAvailable = false;
-    _receiveIndex = 0;
-    _receiveBuffer[0] = '\0';
     _counters = CanCounters{};
 
-    _resetPin.trigger(true, 100);
-
-    _lastResetMs = millis();
-  }
-  
-  void readSerial() {
-    auto bytesAvailable = Serial.available();
+    _resetPin = true;
+    delay(100);
+    _serial.reset();
+    _resetPin = false;
     
-    while (bytesAvailable > 0) {
-      auto receivedByte = Serial.read();
-      if (receivedByte == '\n' && _receiveIndex > 0 && _receiveBuffer[_receiveIndex - 1] == '\r') {
-        // \r\n received, process line
-        _receiveBuffer[_receiveIndex - 1] = '\0';
-        String line (_receiveBuffer);
-        
-        processReceivedLine(line);
-  
-        _receiveIndex = 0;
-      } else {
-        _receiveBuffer[_receiveIndex] = receivedByte;
-        _receiveIndex += 1;
+    _resetInterval.restart();
+  }
+
+  void processReceivedLine(const char* line) {
+    const char* start = line;
+    char* end = nullptr;
+
+    if (strncmp(start, "CANRX ", 6) == 0) {
+      auto id = strtol(start + 6, &end, 16);
+      if (end == start) {
+        _counters.err += 1;
+        return;
       }
+      start = end;
 
-      _receiveIndex = _receiveIndex % RECEIVE_BUFFER_SIZE;
-      
-      bytesAvailable -= 1;
-    }
-  }
+      auto len = strtol(start, &end, 10);
+      if (end == start) {
+        _counters.err += 1;
+        return;
+      }
+      start = end;
 
-  void processReceivedLine(const String& line) {
-    _node.lyield();
-    
-    if (line.length() < 5) {
-       return;
-    }
-
-    auto type = line.substring(0, 5);
-    if (type == "CANRX") {
-      auto idEndIndex = line.indexOf(' ', 6);
-      auto id = line.substring(6, idEndIndex).toInt();
-      auto lenEndIndex = line.indexOf(' ', idEndIndex + 1);
-      auto len = line.substring(idEndIndex + 1, lenEndIndex).toInt();
-      
       CanMessage message;
       message.id = id & 0x1FFFFFFFu;
       message.ext = (id & 0x80000000u) != 0;
       message.rtr = (id & 0x40000000u) != 0;
       message.len = len;
-  
-      auto prevDataEndIndex = lenEndIndex;
+
       for (size_t i = 0; i < message.len; ++i) {
-        auto dataEndIndex = line.indexOf(' ', prevDataEndIndex + 1);
-        message.data[i] = line.substring(prevDataEndIndex + 1, dataEndIndex).toInt();
-        prevDataEndIndex = dataEndIndex;
+        message.data[i] = strtol(start, &end, 16);
+        if (end == start) {
+          _counters.err += 1;
+          return;
+        }
+        start = end;
       }
 
       if (_logLevel >= CanLogLevel::Rx) {
@@ -202,48 +177,24 @@ private:
       if (_messageHandler) _messageHandler(message);
 
       _counters.rx += 1;
-    } else if (type == "CANTX") {
-      auto resultEndIndex = line.indexOf(' ', 6);
-      auto result = line.substring(6, resultEndIndex);
-  
-      if (result != "OK") {
+    } else if (strncmp(start, "CANTX ", 6) == 0) {
+      if (strncmp(start + 6, "OK ", 3) != 0) {
         _counters.err += 1;
-        
-        if (_logLevel >= CanLogLevel::Error) _node.log("can", line.c_str());
+        if (_logLevel >= CanLogLevel::Error) _node.log("can", line);
       }
-    } else if (type == "READY") {
-      Serial.print("SETUP ");
-      Serial.print(CAN_BITRATE, DEC);
-      switch (effectiveMode())
-      {
-      case CanMode::ListenOnly:
-        Serial.println(" ListenOnlyMode ");
-        break;
-      case CanMode::Normal:
-        Serial.println(" NormalMode ");
-        break;
-      default:
-        Serial.println("  ");
-        break;
-      }
-    } else if (type == "SETUP") {
-      auto resultEndIndex = line.indexOf(' ', 6);
-      auto result = line.substring(6, resultEndIndex);
-      
-      if (result == "OK") {
-        if (_logLevel >= CanLogLevel::Status) _node.log("can", line.c_str());
-        
-        _canAvailable = true;
+    } else if (strncmp(start, "READY", 5) == 0) {
+      _serial.send("SETUP %X %s", CAN_BITRATE, toSetupModeString(effectiveMode()));
+    } else if (strncmp(start, "SETUP ", 6) == 0) {
+      _canAvailable = strncmp(start + 6, "OK ", 3) == 0;
+      if (_canAvailable) {
+        if (_logLevel >= CanLogLevel::Status) _node.log("can", line);
         if (_readyHandler) _readyHandler();
       } else {
-        if (_logLevel >= CanLogLevel::Error) _node.log("can", line.c_str());
-        
-        _canAvailable = false;
+        if (_logLevel >= CanLogLevel::Error) _node.log("can", line);
       }
     } else {
       _counters.err += 1;
-      
-      if (_logLevel >= CanLogLevel::Error) _node.log("can", line.c_str());
+      if (_logLevel >= CanLogLevel::Error) _node.log("can", line);
     }
 
     if (_counters.err > MAX_ERR_COUNT) {
@@ -268,5 +219,17 @@ private:
     }
     
     _node.log("can", logMessage);
+  }
+
+  const char* toSetupModeString(CanMode mode) const {
+    switch (effectiveMode())
+    {
+    case CanMode::ListenOnly:
+      return "LIS";
+    case CanMode::Normal:
+      return "NOR";
+    default:
+      return "ERR";
+    }
   }
 };
