@@ -30,3 +30,8 @@
 *.exe
 *.out
 *.app
+
+# Temporary directories
+build/
+out/
+dist/
