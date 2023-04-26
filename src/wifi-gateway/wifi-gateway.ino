@@ -9,7 +9,7 @@ NodeBase node ("fzDL9RKdPAhAhFu7");
 
 SerialCan can (node, 5);
 
-StiebelEltronProtocol protocol (node, can, 0u);
+StiebelEltronProtocol protocol (node, can);
 
 DateTimeSource timeSource (node, protocol);
 

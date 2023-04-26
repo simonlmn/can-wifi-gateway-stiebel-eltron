@@ -31,6 +31,11 @@ enum struct CanLogLevel : uint8_t {
   Tx = 4
 };
 
+enum struct CanMode : uint8_t {
+  Normal = 0,
+  ListenOnly = 1,
+};
+
 struct CanCounters {
   uint32_t rx = 0;
   uint32_t tx = 0;

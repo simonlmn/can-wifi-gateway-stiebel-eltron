@@ -7,47 +7,13 @@
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
 #include <Arduino_JSON.h>
+#include "Config.h"
 #include "Logger.h"
 #include <map>
 #include <functional>
 
 // Enable measurement of chip's VCC
 ADC_MODE(ADC_VCC);
-
-class ConfigParser {
-  static constexpr char SEPARATOR = '=';
-  static constexpr char END = ';';
-  char* _config;
-
-public:
-  ConfigParser(char* config) : _config(config) {}  
-  
-  bool parse(std::function<bool(const char*, const char*)> handler) const {
-    char* start = _config;
-    char* separator = nullptr;
-    char* end = nullptr;
-
-    while((separator = strchr(start, SEPARATOR)) != nullptr) {
-      if ((end = strchr(separator, END)) == nullptr) {
-        break;
-      }
-
-      *separator = '\0';
-      *end = '\0';
-      bool success = handler(start, separator + 1);
-      *separator = SEPARATOR;
-      *end = END;
-        
-      if (!success) {
-        break;
-      }
-
-      start = end + 1;
-    }
-
-    return *start == '\0';
-  }
-};
 
 enum struct ConnectionStatus {
   Disconnected,
@@ -63,7 +29,7 @@ class NodeBase {
 
   JSONVar _diagnostics;
 
-  std::map<String, std::function<bool(const char*, const char*)>> _configHandlers;
+  std::map<String, IConfigurable*> _configurables;
 
   std::map<String, int> _logLevels;
   Logger _logger;
@@ -81,7 +47,7 @@ class NodeBase {
   
 public:
   NodeBase(const char* otaPassword)
-    : _otaPassword(otaPassword), _wifiManager(), _diagnostics(), _configHandlers(), _logLevels(), _logger(), _setup(), _loop(), _stopped(false) {}
+    : _otaPassword(otaPassword), _wifiManager(), _diagnostics(), _configurables(), _logLevels(), _logger(), _setup(), _loop(), _stopped(false) {}
 
   void init(std::function<void(bool)> setup, std::function<void(ConnectionStatus)> loop) {
     _setup = setup;
@@ -177,18 +143,22 @@ public:
     return WiFi.status() == WL_CONNECTED;
   }
 
-  void addConfigHandler(String category, std::function<bool(const char*, const char*)> handler) {
-    _configHandlers[category] = handler;
-    // TODO send stored config directly?
+  void addConfigurable(String category, IConfigurable* configurable) {
+    _configurables[category] = configurable;
+    restoreConfiguration(category);
   }
 
   bool configure(String category, ConfigParser const& config) {
-    auto target = _configHandlers.find(category);
-    if (target == _configHandlers.end()) {
+    auto target = _configurables.find(category);
+    if (target == _configurables.end()) {
       return false;
     }
-    return config.parse(target->second);
-    // TODO obtain and store new config from target?
+    if (config.parse(target->second)) {
+      persistConfiguration(category);
+      return true;
+    } else {
+      return false;
+    }
   }
 
   int logLevel(String category) {
@@ -257,5 +227,30 @@ private:
       lastToggleState = !lastToggleState;
       lastToggleMs = currentMs;
     }
+  }
+
+  void restoreConfiguration(String category) {
+    auto configurable = _configurables.find(category);
+    if (configurable == _configurables.end()) {
+      log("node", format("restore config failed: '%s' is not configurable.", category.c_str()));
+      return;
+    }
+
+    ConfigParser parser = readConfigFile(format("/config/%s", category.c_str()));
+    if (parser.parse(configurable->second)) {
+      log("node", format("restored config for '%s'.", category.c_str()));
+    } else {
+      log("node", format("failed to restore config for '%s'.", category.c_str()));
+    }
+  }
+
+  void persistConfiguration(String category) {
+    auto configurable = _configurables.find(category);
+    if (configurable == _configurables.end()) {
+      log("node", format("persist config failed: '%s' is not configurable.", category.c_str()));
+      return;
+    }
+
+    writeConfigFile(format("/config/%s", category.c_str()), configurable->second);
   }
 };

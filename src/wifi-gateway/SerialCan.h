@@ -3,7 +3,7 @@
 #include "NodeBase.h"
 #include "CanInterface.h"
 
-class SerialCan {
+class SerialCan final : public IConfigurable {
 private:
   static const uint32_t CAN_BITRATE = 20UL * 1000UL; // 20 kbit/s
   static constexpr uint32_t MAX_ERR_COUNT = 5;
@@ -15,6 +15,7 @@ private:
   std::function<void()> _readyHandler;
   std::function<void(const CanMessage& message)> _messageHandler;
   
+  CanMode _mode = CanMode::ListenOnly;
   CanLogLevel _logLevel = CanLogLevel::Status;
   CanCounters _counters;
 
@@ -23,12 +24,28 @@ public:
     node.logLevel("can", (int)_logLevel);
   }
 
+  bool configure(const char* name, const char* value) override {
+    if (strcmp(name, "mode") == 0) return setMode(CanMode(strtol(value, nullptr, 10)));
+    return false;
+  }
+
+  void getConfig(std::function<void(const char*, const char*)> writer) const override {
+    writer("mode", toConstStr(uint8_t(_mode), 10));
+  }
+
+  bool setMode(CanMode mode) {
+    _mode = mode;
+    reset();
+    return true;
+  }
+
   void setup() {
     if (_logLevel >= CanLogLevel::Status) _node.log("can", "Initializing SerialCan.");
     Serial.begin(57600);
     Serial.setTimeout(1);
     delay(100);
     pinMode(_resetPin, OUTPUT);
+    _node.addConfigurable("can", this);
     reset();
   }
 
@@ -64,6 +81,10 @@ public:
   }
 
   void sendCanMessage(const CanMessage& message) {
+    if (_mode == CanMode::ListenOnly) {
+      return;
+    }
+
     if (_canAvailable) {
       if (_logLevel >= CanLogLevel::Tx) {
         logCanMessage("TX", message);
@@ -92,7 +113,7 @@ public:
     }
   }
 
-  CanCounters counters() const {
+  CanCounters const& counters() const {
     return _counters;
   }
 
@@ -184,7 +205,18 @@ private:
     } else if (type == "READY") {
       Serial.print("SETUP ");
       Serial.print(CAN_BITRATE, DEC);
-      Serial.println(" NormalMode ");
+      switch (_mode)
+      {
+      case CanMode::ListenOnly:
+        Serial.println(" ListenOnlyMode ");
+        break;
+      case CanMode::Normal:
+        Serial.println(" NormalMode ");
+        break;
+      default:
+        Serial.println("  ");
+        break;
+      }
     } else if (type == "SETUP") {
       auto resultEndIndex = line.indexOf(' ', 6);
       auto result = line.substring(6, resultEndIndex);

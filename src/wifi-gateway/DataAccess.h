@@ -37,7 +37,7 @@ enum struct DataCaptureMode : uint8_t {
   Any = 3, // Store any data, even if no ValueDefinition exists.
 };
 
-class DataAccess {
+class DataAccess final : public IConfigurable {
 public:
   using DataKey = std::pair<DeviceId, ValueId>;
   using DataMap = std::map<DataKey, DataEntry>;
@@ -60,15 +60,25 @@ public:
     _mode(DataCaptureMode::Configured),
     _data(),
     _dataIterator(_data.begin()),
-    _updateHandler() {}
+    _updateHandler()
+  { }
 
-  bool configure(const char* name, const char* value) {
+  bool configure(const char* name, const char* value) override {
     if (strcmp(name, "mode") == 0) return setMode(DataCaptureMode(strtol(value, nullptr, 10)));
     return false;
   }
 
+  void getConfig(std::function<void(const char*, const char*)> writer) const override {
+    writer("mode", toConstStr(uint8_t(_mode), 10));
+  }
+
+  bool setMode(DataCaptureMode mode) {
+    _mode = mode;
+    return true;
+  }
+
   void setup() {
-    _node.addConfigHandler("dta", [this](const char* name, const char* value){ return configure(name, value); });
+    _node.addConfigurable("dta", this);
 
     restoreSubscriptions();
     restoreWritables();
@@ -92,11 +102,6 @@ public:
     } else {
       _updateHandler = updateHandler;
     }
-  }
-
-  bool setMode(DataCaptureMode mode) {
-    _mode = mode;
-    return true;
   }
 
   const DataMap& getData() const {

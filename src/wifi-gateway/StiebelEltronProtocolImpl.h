@@ -137,10 +137,11 @@ const uint8_t BROADCAST_DISPLAY_ADDRESS = 0x3Cu;
 namespace impl {
 
 template<typename NodeInterface, typename CanInterface>
-class StiebelEltronProtocol {
+class StiebelEltronProtocol final : public IConfigurable {
 private:
   NodeInterface& _node;
   CanInterface& _can;
+  uint8_t _displayIndex;
   DeviceId _deviceId;
   uint32_t _canId;
   bool _ready;
@@ -149,16 +150,45 @@ private:
   std::function<void(WriteData const& data)> _writeHandler;
   
 public:
-  StiebelEltronProtocol(NodeInterface& node, CanInterface& can, uint8_t displayIndex = 0u)
+  StiebelEltronProtocol(NodeInterface& node, CanInterface& can)
     : _node(node),
     _can(can),
-    _deviceId(DeviceType::Display, DISPLAY_ADDRESSES[displayIndex]),
-    _canId(toCanId(_deviceId)),
+    _displayIndex(),
+    _deviceId(),
+    _canId(0u),
     _ready(false),
     _responseHandler(),
-    _writeHandler() {}
+    _writeHandler()
+  { }
 
+  bool configure(const char* name, const char* value) override {
+    if (strcmp(name, "display") == 0) return setDisplayIndex(strtol(value, nullptr, 10));
+    return false;
+  }
+
+  void getConfig(std::function<void(const char*, const char*)> writer) const override {
+    writer("display", toConstStr(_displayIndex, 10));
+  }
+
+  bool setDisplayIndex(uint8_t displayIndex) {
+    if (displayIndex >= std::size(DISPLAY_ADDRESSES)) {
+      return false;
+    }
+
+    _displayIndex = displayIndex;
+    _deviceId = {DeviceType::Display, DISPLAY_ADDRESSES[displayIndex]};
+    _canId = toCanId(_deviceId);
+
+    if (_ready) {
+      registerDisplay();
+    }
+
+    return true;
+  }
+  
   void setup() {
+    _node.addConfigurable("sep", this);
+
     _can.onReady([this] () {
       registerDisplay();
       _ready = true;
@@ -177,6 +207,10 @@ public:
   }
 
   void request(RequestData const& data) {
+    if (!_ready || _canId == 0u) {
+      return;
+    }
+
     if (!data.targetId.isExact()) {
       return;
     }
@@ -203,6 +237,10 @@ public:
   }
 
   void write(WriteData const& data) {
+    if (!_ready || _canId == 0u) {
+      return;
+    }
+
     if (!data.targetId.isExact()) {
       return;
     }
@@ -247,7 +285,12 @@ public:
 
 private:
   void registerDisplay() {
-    // TODO is that really needed? The official displays do not seem to do this...
+    if (!_ready || _canId == 0u) {
+      return;
+    }
+
+    // TODO is that really needed? The official display on the LWZ 5S+ does not seem to do this...
+    //      there are however screenshots of other models where a list of CAN bus nodes is shown.
     // TODO maybe check/listen first if the ID is alread in use?
     CanMessage message;
     message.id = _canId;
