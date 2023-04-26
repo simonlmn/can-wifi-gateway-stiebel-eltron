@@ -65,20 +65,28 @@ public:
     } while (true);
   }
 
+  void plainChar(char c) {
+    if (_size >= BUFFER_SIZE) {
+      flush();
+    }
+    _buffer[_size] = c;
+    _size += 1u;
+  }
+
   void jsonObjectOpen() {
-    plainText(F("{"));
+    plainChar('{');
   }
 
   void jsonObjectClose() {
-    plainText(F("}"));
+    plainChar('}');
   }
 
   void jsonListOpen() {
-    plainText(F("["));
+    plainChar('[');
   }
 
   void jsonListClose() {
-    plainText(F("]"));
+    plainChar(']');
   }
 
   template<typename X>
@@ -86,9 +94,8 @@ public:
   
   template<typename U>
   void jsonPropertyStart(ConstString<U> name) {
-    plainText(F("\""));
-    plainText(name);
-    plainText(F("\":"));
+    jsonString(name);
+    plainChar(':');
   }
 
   template<typename X, typename Y>
@@ -114,12 +121,12 @@ public:
   
   template<typename V>
   void jsonString(ConstString<V> value) {
-    plainText(F("\""));
+    plainChar('"');
     plainText(value);
-    plainText(F("\""));
+    plainChar('"');
   }
 
   void jsonSeparator() {
-    plainText(F(","));
+    plainChar(',');
   }
 };

@@ -47,6 +47,7 @@ private:
   StiebelEltronProtocol& _protocol;
   DateTimeSource& _dateTimeSource;
   DataCaptureMode _mode;
+  bool _readOnly;
   DataMap _data;
   DataMap::iterator _dataIterator;
 
@@ -58,6 +59,7 @@ public:
     _protocol(protocol),
     _dateTimeSource(dateTimeSource),
     _mode(DataCaptureMode::Configured),
+    _readOnly(true),
     _data(),
     _dataIterator(_data.begin()),
     _updateHandler()
@@ -65,15 +67,22 @@ public:
 
   bool configure(const char* name, const char* value) override {
     if (strcmp(name, "mode") == 0) return setMode(DataCaptureMode(strtol(value, nullptr, 10)));
+    if (strcmp(name, "readOnly") == 0) return setReadOnly(strcmp(value, "true") == 0);
     return false;
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
     writer("mode", toConstStr(uint8_t(_mode), 10));
+    writer("readOnly", _readOnly ? "true" : "false");
   }
 
   bool setMode(DataCaptureMode mode) {
     _mode = mode;
+    return true;
+  }
+
+  bool setReadOnly(bool readOnly) {
+    _readOnly = readOnly;
     return true;
   }
 
@@ -148,6 +157,10 @@ public:
   }
 
   bool write(DataKey const& key, uint16_t rawValue, ValueAccessMode accessMode) {
+    if (_readOnly) {
+      return false;
+    }
+
     DataEntry* entry = getEntryInternal(key);
     if (entry != nullptr && entry->writable && entry->definition->accessMode == accessMode) {
       entry->toWrite = rawValue;

@@ -329,9 +329,7 @@ private:
         if (logLevel > 0) {
           bool isNotTargetedAtThis = !target.includes(_deviceId);
           if (logLevel > 1 || isNotTargetedAtThis) {
-            static char logMessage[42]; // "XXX t:XXX/XXX s:XXX/XXX XX id:XXXX v:XXXX";
-            snprintf(logMessage, 42, "%c%s t:%s/%u s:%s/%u %02X id:%04X v:%04X", isNotTargetedAtThis ? '*' : '+', messageTypeName(type), deviceTypeName(target.type), target.address, deviceTypeName(source.type), source.address, fix, valueId, value);
-            _node.log("sep", logMessage);
+            _node.log("sep", format("%c%s t:%s/%u s:%s/%u %02X id:%04X v:%04X", isNotTargetedAtThis ? '*' : '+', messageTypeName(type), deviceTypeName(target.type), target.address, deviceTypeName(source.type), source.address, fix, valueId, value));
           }
         }
         

@@ -163,6 +163,44 @@ public:
       _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), String((int)_node.logLevel(category)));
     });
 
+    _server.on(F("/node/config"), HTTP_GET, [this]() {
+      if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
+        _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
+        return;
+      }
+
+      _node.getAllConfig([&] (const char* category, const char* name, const char* value) {
+        _buffer.plainText(category);
+        _buffer.plainChar('.');
+        _buffer.plainText(name);
+        _buffer.plainChar(ConfigParser::SEPARATOR);
+        _buffer.plainText(value);
+        _buffer.plainChar(ConfigParser::END);
+        _buffer.plainChar('\n');
+      });
+
+      _buffer.end();
+    });
+
+    _server.on(UriBraces(F("/node/config/{}")), HTTP_GET, [this]() {
+      const auto& category = _server.pathArg(0);
+
+      if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
+        _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
+        return;
+      }
+
+      _node.getConfig(category, [&] (const char* name, const char* value) {
+        _buffer.plainText(name);
+        _buffer.plainChar(ConfigParser::SEPARATOR);
+        _buffer.plainText(value);
+        _buffer.plainChar(ConfigParser::END);
+        _buffer.plainChar('\n');
+      });
+
+      _buffer.end();
+    });
+
     _server.on(UriBraces(F("/node/config/{}")), HTTP_PUT, [this]() {
       const auto& category = _server.pathArg(0);
       const char* body = _server.arg("plain").c_str();

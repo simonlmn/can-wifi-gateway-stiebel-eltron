@@ -149,15 +149,32 @@ public:
   }
 
   bool configure(String category, ConfigParser const& config) {
-    auto target = _configurables.find(category);
-    if (target == _configurables.end()) {
+    auto configurable = _configurables.find(category);
+    if (configurable == _configurables.end()) {
       return false;
     }
-    if (config.parse(target->second)) {
+    if (config.parse(configurable->second)) {
       persistConfiguration(category);
       return true;
     } else {
       return false;
+    }
+  }
+
+  void getConfig(String category, std::function<void(const char*, const char*)> writer) const {
+    auto configurable = _configurables.find(category);
+    if (configurable == _configurables.end()) {
+      return;
+    }
+
+    configurable->second->getConfig(writer);
+  }
+
+  void getAllConfig(std::function<void(const char*, const char*, const char*)> writer) const {
+    for (auto &&configurable : _configurables) {
+      configurable.second->getConfig([&] (const char* name, const char* value) {
+        writer(configurable.first.c_str(), name, value);
+      });  
     }
   }
 
