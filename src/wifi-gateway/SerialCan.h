@@ -9,7 +9,8 @@ private:
   static constexpr uint32_t MAX_ERR_COUNT = 5;
 
   NodeBase& _node;
-  uint8_t _resetPin;
+  DigitalOutput& _resetPin;
+  DigitalInput& _listenModePin;
   unsigned long _lastResetMs;
   bool _canAvailable;
   std::function<void()> _readyHandler;
@@ -20,7 +21,14 @@ private:
   CanCounters _counters;
 
 public:
-  SerialCan(NodeBase& node, uint8_t resetPin) : _node(node), _resetPin(resetPin), _lastResetMs(0), _canAvailable(false), _counters() {
+  SerialCan(NodeBase& node, DigitalOutput& resetPin, DigitalInput& listenModePin) :
+    _node(node),
+    _resetPin(resetPin),
+    _listenModePin(listenModePin),
+    _lastResetMs(0),
+    _canAvailable(false),
+    _counters()
+  {
     node.logLevel("can", (int)_logLevel);
   }
 
@@ -39,12 +47,15 @@ public:
     return true;
   }
 
+  CanMode effectiveMode() const {
+    return _listenModePin ? CanMode::ListenOnly : _mode;
+  }
+
   void setup() {
     if (_logLevel >= CanLogLevel::Status) _node.log("can", "Initializing SerialCan.");
     Serial.begin(57600);
     Serial.setTimeout(1);
     delay(100);
-    pinMode(_resetPin, OUTPUT);
     _node.addConfigurable("can", this);
     reset();
   }
@@ -81,7 +92,7 @@ public:
   }
 
   void sendCanMessage(const CanMessage& message) {
-    if (_mode == CanMode::ListenOnly) {
+    if (effectiveMode() == CanMode::ListenOnly) {
       return;
     }
 
@@ -128,9 +139,7 @@ private:
     _receiveBuffer[0] = '\0';
     _counters = CanCounters{};
 
-    digitalWrite(_resetPin, LOW);
-    delay(100);
-    digitalWrite(_resetPin, HIGH);
+    _resetPin.trigger(true, 100);
 
     _lastResetMs = millis();
   }
@@ -205,7 +214,7 @@ private:
     } else if (type == "READY") {
       Serial.print("SETUP ");
       Serial.print(CAN_BITRATE, DEC);
-      switch (_mode)
+      switch (effectiveMode())
       {
       case CanMode::ListenOnly:
         Serial.println(" ListenOnlyMode ");

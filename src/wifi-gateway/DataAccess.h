@@ -46,6 +46,7 @@ private:
   NodeBase& _node;
   StiebelEltronProtocol& _protocol;
   DateTimeSource& _dateTimeSource;
+  DigitalInput& _writeEnablePin;
   DataCaptureMode _mode;
   bool _readOnly;
   DataMap _data;
@@ -54,10 +55,11 @@ private:
   std::function<void(DataEntry const& entry)> _updateHandler;
 
 public:
-  DataAccess(NodeBase& node, StiebelEltronProtocol& protocol, DateTimeSource& dateTimeSource)
+  DataAccess(NodeBase& node, StiebelEltronProtocol& protocol, DateTimeSource& dateTimeSource, DigitalInput& writeEnablePin)
     : _node(node),
     _protocol(protocol),
     _dateTimeSource(dateTimeSource),
+    _writeEnablePin(writeEnablePin),
     _mode(DataCaptureMode::Configured),
     _readOnly(true),
     _data(),
@@ -84,6 +86,10 @@ public:
   bool setReadOnly(bool readOnly) {
     _readOnly = readOnly;
     return true;
+  }
+
+  bool effectiveReadOnly() const {
+    return !_writeEnablePin ? true : _readOnly;
   }
 
   void setup() {
@@ -157,7 +163,7 @@ public:
   }
 
   bool write(DataKey const& key, uint16_t rawValue, ValueAccessMode accessMode) {
-    if (_readOnly) {
+    if (effectiveReadOnly()) {
       return false;
     }
 

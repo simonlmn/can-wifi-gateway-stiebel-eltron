@@ -7,6 +7,7 @@
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
 #include <Arduino_JSON.h>
+#include "src/shared/Pins.h"
 #include "Config.h"
 #include "Logger.h"
 #include <map>
@@ -24,6 +25,11 @@ enum struct ConnectionStatus {
 
 class NodeBase {
   const char* _otaPassword;
+
+  DigitalOutput& _statusLedPin;
+  DigitalInput& _otaEnablePin;
+  DigitalInput& _updatePin;
+  DigitalInput& _factoryResetPin;
 
   WiFiManager _wifiManager;
 
@@ -46,8 +52,21 @@ class NodeBase {
   bool _stopped;
   
 public:
-  NodeBase(const char* otaPassword)
-    : _otaPassword(otaPassword), _wifiManager(), _diagnostics(), _configurables(), _logLevels(), _logger(), _setup(), _loop(), _stopped(false) {}
+  NodeBase(const char* otaPassword, DigitalOutput& statusLedPin, DigitalInput& otaEnablePin, DigitalInput& updatePin, DigitalInput& factoryResetPin)
+    : _otaPassword(otaPassword),
+    _statusLedPin(statusLedPin),
+    _otaEnablePin(otaEnablePin),
+    _updatePin(updatePin),
+    _factoryResetPin(factoryResetPin),
+    _wifiManager(),
+    _diagnostics(),
+    _configurables(),
+    _logLevels(),
+    _logger(),
+    _setup(),
+    _loop(),
+    _stopped(false)
+  {}
 
   void init(std::function<void(bool)> setup, std::function<void(ConnectionStatus)> loop) {
     _setup = setup;
@@ -55,9 +74,7 @@ public:
   }
 
   void setup() {
-    pinMode(BUILTIN_LED, OUTPUT);
-    digitalWrite(BUILTIN_LED, LOW);
-
+    _statusLedPin = true;
     LittleFS.begin();
 
     // Set static data which does not change during operation only once
@@ -69,7 +86,9 @@ public:
     _wifiManager.setConfigPortalBlocking(false);
     bool connected = _wifiManager.autoConnect();
 
-    setupOTA();
+    if (_otaEnablePin) {
+      setupOTA();
+    }
     
     log("node", "internal setup done.");
 
@@ -77,7 +96,7 @@ public:
 
     log("node", "all setup done.");
     
-    digitalWrite(BUILTIN_LED, HIGH);
+    _statusLedPin = false;
   }
 
   void loop() {
@@ -86,6 +105,10 @@ public:
     updateTimeAndEpoch();
 
     lyield();
+
+    if (_factoryResetPin && _factoryResetPin.hasNotChangedFor(5000ul)) {
+      factoryReset();
+    }
     
     if (connected()) {
       ConnectionStatus status = ConnectionStatus::Connected;      
@@ -95,6 +118,8 @@ public:
         status = ConnectionStatus::Connecting;
       }
       
+      _statusLedPin = false;
+
       lyield();
       
       _loop(status);
@@ -119,7 +144,9 @@ public:
   void lyield() {
     yield();
     _wifiManager.process();
-    ArduinoOTA.handle();
+    if (_otaEnablePin) {
+      ArduinoOTA.handle();
+    }
     yield();
   }
 
@@ -137,6 +164,12 @@ public:
     _loop = [this](ConnectionStatus) { blinkMedium(); };
 
     log("node", "STOP!");
+  }
+
+  void factoryReset() {
+    LittleFS.format();
+    _wifiManager.erase(true);
+    reset();
   }
 
   bool connected() const {
@@ -216,34 +249,18 @@ private:
   
   void setupOTA() {
     ArduinoOTA.setPassword(_otaPassword);
-    ArduinoOTA.onStart([this] () { stop(); LittleFS.end(); log("node", "starting OTA update..."); digitalWrite(BUILTIN_LED, HIGH); });
-    ArduinoOTA.onEnd([this] () { digitalWrite(BUILTIN_LED, LOW); log("node", "OTA update finished."); });
-    ArduinoOTA.onProgress([] (unsigned int progress, unsigned int total) { digitalWrite(BUILTIN_LED, LOW); delay(10); digitalWrite(BUILTIN_LED, HIGH); });
-    ArduinoOTA.begin();  
+    ArduinoOTA.onStart([this] () { stop(); LittleFS.end(); log("node", "starting OTA update..."); _statusLedPin = true; });
+    ArduinoOTA.onEnd([this] () { _statusLedPin = false; log("node", "OTA update finished."); });
+    ArduinoOTA.onProgress([this] (unsigned int progress, unsigned int total) { _statusLedPin.trigger(true, 10); });
+    ArduinoOTA.begin();
   }
 
   void blinkSlow() {
-    static bool lastToggleState = false;
-    static unsigned long lastToggleMs = 0ul;
-
-    auto currentMs = millis();
-    if (currentMs > lastToggleMs + 1000ul) {
-      digitalWrite(BUILTIN_LED, lastToggleState ? HIGH : LOW);
-      lastToggleState = !lastToggleState;
-      lastToggleMs = currentMs;
-    }
+    _statusLedPin.toggleIfUnchangedFor(1000ul);
   }
 
   void blinkMedium() {
-    static bool lastToggleState = false;
-    static unsigned long lastToggleMs = 0ul;
-
-    auto currentMs = millis();
-    if (currentMs > lastToggleMs + 500ul) {
-      digitalWrite(BUILTIN_LED, lastToggleState ? HIGH : LOW);
-      lastToggleState = !lastToggleState;
-      lastToggleMs = currentMs;
-    }
+    _statusLedPin.toggleIfUnchangedFor(500ul);
   }
 
   void restoreConfiguration(String category) {
