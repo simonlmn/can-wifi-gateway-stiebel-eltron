@@ -1,0 +1,539 @@
+UID: http:url:86e0ce0d8e
+label: Stiebel Eltron LWZ 5S plus
+thingTypeUID: http:url
+configuration:
+  authMode: BASIC
+  ignoreSSLErrors: false
+  baseURL: http://<deviceAddress>:8080/data
+  delay: 0
+  stateMethod: GET
+  refresh: 30
+  commandMethod: PUT
+  contentType: text/plain
+  timeout: 3000
+  bufferSize: 2048
+location: <locationOfDevice>
+channels:
+  - id: "12"
+    channelTypeUID: http:number
+    label: Außentemperatur
+    description: ""
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["12"].value + " " +
+        value_json.items["SYS"]["0"]["12"].unit}}
+  - id: "13"
+    channelTypeUID: http:number
+    label: Vorlauftemperatur
+    description: ""
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["13"].value + " " +
+        value_json.items["SYS"]["0"]["13"].unit}}
+  - id: "22"
+    channelTypeUID: http:number
+    label: Rücklauftemperatur
+    description: ""
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["22"].value + " " +
+        value_json.items["SYS"]["0"]["22"].unit}}
+  - id: "14"
+    channelTypeUID: http:number
+    label: Warmwasser Temperatur
+    description: ""
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["14"].value + " " +
+        value_json.items["SYS"]["0"]["14"].unit}}
+  - id: "474"
+    channelTypeUID: http:number
+    label: Volumenstrom
+    description: ""
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["474"].value + " l/min"}}
+      unit: l/min
+  - id: "3"
+    channelTypeUID: http:number
+    label: Warmwasser Solltemperatur
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["3"].value + " " +
+        value_json.items["SYS"]["0"]["3"].unit}}
+  - id: "274"
+    channelTypeUID: http:string
+    label: Operating Mode
+    description: ""
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{ value_json.items["SYS"]["0"]["274"].value }}
+  - id: 374_AUTO
+    channelTypeUID: http:switch
+    label: "Betriebsstatus: Automatik"
+    description: ""
+    configuration:
+      mode: READONLY
+      onValue: "true"
+      offValue: "false"
+      stateTransformation: JINJA:{{ value_json.items["SYS"]["0"]["374"].value.AUTO }}
+  - id: 374_COMPR
+    channelTypeUID: http:switch
+    label: "Betriebsstatus: Verdichter"
+    description: ""
+    configuration:
+      mode: READONLY
+      onValue: "true"
+      offValue: "false"
+      stateTransformation: JINJA:{{ value_json.items["SYS"]["0"]["374"].value.COMPR }}
+  - id: 374_HEAT
+    channelTypeUID: http:switch
+    label: "Betriebsstatus: Heizen"
+    description: null
+    configuration:
+      mode: READONLY
+      onValue: "true"
+      offValue: "false"
+      stateTransformation: JINJA:{{ value_json.items["SYS"]["0"]["374"].value.HEAT }}
+  - id: 374_COOL
+    channelTypeUID: http:switch
+    label: "Betriebsstatus: Kühlen"
+    description: null
+    configuration:
+      mode: READONLY
+      onValue: "true"
+      offValue: "false"
+      stateTransformation: JINJA:{{ value_json.items["SYS"]["0"]["374"].value.COOL }}
+  - id: 374_DHW
+    channelTypeUID: http:switch
+    label: "Betriebsstatus: Warmwasser"
+    description: null
+    configuration:
+      mode: READONLY
+      onValue: "true"
+      offValue: "false"
+      stateTransformation: JINJA:{{ value_json.items["SYS"]["0"]["374"].value.DHW }}
+  - id: 374_ELHEAT
+    channelTypeUID: http:switch
+    label: "Betriebsstatus: El. Zusatzheizung"
+    description: null
+    configuration:
+      mode: READONLY
+      onValue: "true"
+      offValue: "false"
+      stateTransformation: JINJA:{{ value_json.items["SYS"]["0"]["374"].value.ELHEAT }}
+  - id: 374_SERV
+    channelTypeUID: http:switch
+    label: "Betriebsstatus: Wartung"
+    description: null
+    configuration:
+      mode: READONLY
+      onValue: "true"
+      offValue: "false"
+      stateTransformation: JINJA:{{ value_json.items["SYS"]["0"]["374"].value.SERV }}
+  - id: 374_HCPUMP
+    channelTypeUID: http:switch
+    label: "Betriebsstatus: Heizkreispumpe"
+    description: null
+    configuration:
+      mode: READONLY
+      onValue: "true"
+      offValue: "false"
+      stateTransformation: JINJA:{{ value_json.items["SYS"]["0"]["374"].value.HCPUMP }}
+  - id: 374_DEFROS
+    channelTypeUID: http:switch
+    label: "Betriebsstatus: Abtauen"
+    description: null
+    configuration:
+      mode: READONLY
+      onValue: "true"
+      offValue: "false"
+      stateTransformation: JINJA:{{ value_json.items["SYS"]["0"]["374"].value.DEFROS }}
+  - id: 374_VENT
+    channelTypeUID: http:switch
+    label: "Betriebsstatus: Außerplan. Lüften"
+    description: null
+    configuration:
+      mode: READONLY
+      onValue: "true"
+      offValue: "false"
+      stateTransformation: JINJA:{{ value_json.items["SYS"]["0"]["374"].value.VENT }}
+  - id: "613"
+    channelTypeUID: http:number
+    label: Heißgastemperatur
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["613"].value + " " +
+        value_json.items["SYS"]["0"]["613"].unit}}
+  - id: "1436"
+    channelTypeUID: http:number
+    label: Verflüssigertemperatur
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1436"].value + " " +
+        value_json.items["SYS"]["0"]["1436"].unit}}
+  - id: 49396_49397
+    channelTypeUID: http:number
+    label: Verdichterstarts
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["49396"].value +
+        (value_json.items["SYS"]["0"]["49397"].value * 1000)}}
+  - id: "1690"
+    channelTypeUID: http:number
+    label: Relative Heizleistung
+    description: ""
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1690"].value + " " +
+        value_json.items["SYS"]["0"]["1690"].unit}}
+  - id: "1691"
+    channelTypeUID: http:number
+    label: Verdichter Sollwert
+    description: ""
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1691"].value + " " +
+        value_json.items["SYS"]["0"]["1691"].unit}}
+  - id: "1431"
+    channelTypeUID: http:number
+    label: Zuluft Lüfterdrehzahl
+    description: ""
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1431"].value + " " +
+        value_json.items["SYS"]["0"]["1431"].unit}}
+  - id: "1433"
+    channelTypeUID: http:number
+    label: Abluft Lüfterdrehzahl
+    description: ""
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1433"].value + " " +
+        value_json.items["SYS"]["0"]["1433"].unit}}
+  - id: "1435"
+    channelTypeUID: http:number
+    label: Fortluft Lüfterdrehzahl
+    description: ""
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1435"].value + " " +
+        value_json.items["SYS"]["0"]["1435"].unit}}
+  - id: 2334_2335
+    channelTypeUID: http:number
+    label: Leistungsaufnahme Heizung (Tag)
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["2334"].value +
+        (value_json.items["SYS"]["0"]["2335"].value * 1000) + " " +
+        value_json.items["SYS"]["0"]["2334"].unit}}
+  - id: 2336_2337
+    channelTypeUID: http:number
+    label: Leistungsaufnahme Heizung (Gesamt)
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["2336"].value +
+        (value_json.items["SYS"]["0"]["2337"].value * 1000) + " " +
+        value_json.items["SYS"]["0"]["2336"].unit}}
+  - id: 2330_2331
+    channelTypeUID: http:number
+    label: Leistungsaufnahme WW (Tag)
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["2330"].value +
+        (value_json.items["SYS"]["0"]["2331"].value * 1000) + " " +
+        value_json.items["SYS"]["0"]["2330"].unit}}
+  - id: 2332_2333
+    channelTypeUID: http:number
+    label: Leistungsaufnahme WW (Gesamt)
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["2332"].value +
+        (value_json.items["SYS"]["0"]["2333"].value * 1000) + " " +
+        value_json.items["SYS"]["0"]["2332"].unit}}
+  - id: 2350_2351
+    channelTypeUID: http:number
+    label: Wärmemenge Heizung (Tag)
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["2350"].value +
+        (value_json.items["SYS"]["0"]["2351"].value * 1000) + " " +
+        value_json.items["SYS"]["0"]["2350"].unit}}
+  - id: 2352_2353
+    channelTypeUID: http:number
+    label: Wärmemenge Heizung (Gesamt)
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["2352"].value +
+        (value_json.items["SYS"]["0"]["2353"].value * 1000) + " " +
+        value_json.items["SYS"]["0"]["2352"].unit}}
+  - id: 2346_2347
+    channelTypeUID: http:number
+    label: Wärmemenge WW (Tag)
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["2346"].value +
+        (value_json.items["SYS"]["0"]["2347"].value * 1000) + " " +
+        value_json.items["SYS"]["0"]["2346"].unit}}
+  - id: 2348_2349
+    channelTypeUID: http:number
+    label: Wärmemenge WW (Gesamt)
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["2348"].value +
+        (value_json.items["SYS"]["0"]["2349"].value * 1000) + " " +
+        value_json.items["SYS"]["0"]["2348"].unit}}
+  - id: 942_943
+    channelTypeUID: http:number
+    label: Wärmemenge WRG (Tag)
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["942"].value +
+        (value_json.items["SYS"]["0"]["943"].value * 1000) + " " +
+        value_json.items["SYS"]["0"]["942"].unit}}
+  - id: 944_945
+    channelTypeUID: http:number
+    label: Wärmemenge WRG (Gesamt)
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["944"].value +
+        (value_json.items["SYS"]["0"]["945"].value * 1000) + " " +
+        value_json.items["SYS"]["0"]["944"].unit}}
+  - id: "1696"
+    channelTypeUID: http:number
+    label: Verdichter Leistung
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1696"].value + " " +
+        value_json.items["SYS"]["0"]["1696"].unit}}
+  - id: "1388"
+    channelTypeUID: http:number
+    label: Zuluft Stufe Tag
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1388?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1388"].value + " " +
+        value_json.items["SYS"]["0"]["1388"].unit}}
+  - id: "1389"
+    channelTypeUID: http:number
+    label: Zuluft Stufe Nacht
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1389?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1389"].value + " " +
+        value_json.items["SYS"]["0"]["1389"].unit}}
+  - id: "1391"
+    channelTypeUID: http:number
+    label: Zuluft Stufe Bereitschaft
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1391?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1391"].value + " " +
+        value_json.items["SYS"]["0"]["1391"].unit}}
+  - id: "1392"
+    channelTypeUID: http:number
+    label: Zuluft Stufe Party
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1392?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1392"].value + " " +
+        value_json.items["SYS"]["0"]["1392"].unit}}
+  - id: "1393"
+    channelTypeUID: http:number
+    label: Lüftungszeit Außerplanmäßig Stufe 0
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1393?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1393"].value + " " +
+        value_json.items["SYS"]["0"]["1393"].unit}}
+  - id: "1394"
+    channelTypeUID: http:number
+    label: Lüftungszeit Außerplanmäßig Stufe 1
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1394?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1394"].value + " " +
+        value_json.items["SYS"]["0"]["1394"].unit}}
+  - id: "1395"
+    channelTypeUID: http:number
+    label: Lüftungszeit Außerplanmäßig Stufe 2
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1395?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1395"].value + " " +
+        value_json.items["SYS"]["0"]["1395"].unit}}
+  - id: "1396"
+    channelTypeUID: http:number
+    label: Lüftungszeit Außerplanmäßig Stufe 3
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1396?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1396"].value + " " +
+        value_json.items["SYS"]["0"]["1396"].unit}}
+  - id: "1398"
+    channelTypeUID: http:number
+    label: Zuluftmenge Stufe 1
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1398?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1398"].value + " " +
+        value_json.items["SYS"]["0"]["1398"].unit}}
+  - id: "1399"
+    channelTypeUID: http:number
+    label: Zuluftmenge Stufe 2
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1399?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1399"].value + " " +
+        value_json.items["SYS"]["0"]["1399"].unit}}
+  - id: "1400"
+    channelTypeUID: http:number
+    label: Zuluftmenge Stufe 3
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1400?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1400"].value + " " +
+        value_json.items["SYS"]["0"]["1400"].unit}}
+  - id: "1401"
+    channelTypeUID: http:number
+    label: Abluftmenge Stufe 1
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1401?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1401"].value + " " +
+        value_json.items["SYS"]["0"]["1401"].unit}}
+  - id: "1402"
+    channelTypeUID: http:number
+    label: Abluftmenge Stufe 2
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1402?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1402"].value + " " +
+        value_json.items["SYS"]["0"]["1402"].unit}}
+  - id: "1403"
+    channelTypeUID: http:number
+    label: Abluftmenge Stufe 3
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1403?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1403"].value + " " +
+        value_json.items["SYS"]["0"]["1403"].unit}}
+  - id: "1501"
+    channelTypeUID: http:number
+    label: Außerplanmäßige Lüftungsstufe
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /SYS/0/1501?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["SYS"]["0"]["1501"].value + " " +
+        value_json.items["SYS"]["0"]["1501"].unit}}
+  - id: "4"
+    channelTypeUID: http:number
+    label: Heizkreis Solltemperatur
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["HEA"]["1"]["4"].value + " " +
+        value_json.items["HEA"]["1"]["4"].unit}}
+  - id: "5"
+    channelTypeUID: http:number
+    label: Raum Solltemperatur Tag
+    description: null
+    configuration:
+      mode: READWRITE
+      commandTransformation: JINJA:{{ "%.1f °C" | format(value | replace(" °C", "") | float) }}
+      commandExtension: /HEA/1/5?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["HEA"]["1"]["5"].value + " " +
+        value_json.items["HEA"]["1"]["5"].unit}}
+  - id: "8"
+    channelTypeUID: http:number
+    label: Raum Solltemperatur Nacht
+    description: null
+    configuration:
+      mode: READWRITE
+      commandTransformation: JINJA:{{ "%.1f °C" | format(value | replace(" °C", "") | float) }}
+      commandExtension: /HEA/1/8?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["HEA"]["1"]["8"].value + " " +
+        value_json.items["HEA"]["1"]["8"].unit}}
+  - id: "15"
+    channelTypeUID: http:number
+    label: Heizkreistemperatur
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["HEA"]["1"]["15"].value + " " +
+        value_json.items["HEA"]["1"]["15"].unit}}
+  - id: "17"
+    channelTypeUID: http:number
+    label: Raumtemperatur
+    description: null
+    configuration:
+      mode: READWRITE
+      commandTransformation: JINJA:{{ "%.1f °C" | format(value | replace(" °C", "") | float) }}
+      commandExtension: /HEA/1/17?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["HEA"]["1"]["17"].value + " " +
+        value_json.items["HEA"]["1"]["17"].unit}}
+  - id: "18"
+    channelTypeUID: http:number
+    label: Raum Solltemperatur
+    description: null
+    configuration:
+      mode: READONLY
+      stateTransformation: JINJA:{{value_json.items["HEA"]["1"]["18"].value + " " +
+        value_json.items["HEA"]["1"]["18"].unit}}
+  - id: "270"
+    channelTypeUID: http:number
+    label: Heizkurvensteigung
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /HEA/1/270?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["HEA"]["1"]["270"].value + " " +
+        value_json.items["HEA"]["1"]["270"].unit}}
+  - id: "271"
+    channelTypeUID: http:number
+    label: Heizkreis Raumeinfluss
+    description: null
+    configuration:
+      mode: READWRITE
+      commandExtension: /HEA/1/271?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["HEA"]["1"]["271"].value + " " +
+        value_json.items["HEA"]["1"]["271"].unit}}
+  - id: "117"
+    channelTypeUID: http:number
+    label: Raum-Luftfeuchtigkeit
+    description: null
+    configuration:
+      mode: READWRITE
+      commandTransformation: JINJA:{{ "%.1f" | format(value | float) }}
+      commandExtension: /HEA/1/117?accessMode=Writable
+      stateTransformation: JINJA:{{value_json.items["HEA"]["1"]["117"].value + " %"}}

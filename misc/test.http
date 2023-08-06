@@ -1,0 +1,16 @@
+@deviceAddress = 192.168.1.162
+
+###
+GET http://{{deviceAddress}}:8080/node/status
+
+###
+GET http://{{deviceAddress}}:8080/node/logs
+
+###
+PUT http://{{deviceAddress}}:8080/node/log-level/api
+Content-Type: text/plain
+
+1
+
+###
+GET http://{{deviceAddress}}:8080/data
