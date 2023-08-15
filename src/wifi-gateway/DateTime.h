@@ -7,14 +7,14 @@
 #endif
 
 struct DateTime {
-  uint16_t ms;
-  uint8_t second;
-  uint8_t minute;
-  uint8_t hour;
-  uint8_t day;
-  uint8_t month;
   uint16_t year;
-
+  uint8_t month;
+  uint8_t day;
+  uint8_t hour;
+  uint8_t minute;
+  uint8_t second;
+  uint16_t ms;
+  
   DateTime() : year(0), month(0), day(0), hour(0), minute(0), second(0), ms(0) {}
 
   bool operator>(const DateTime& rhs) const {

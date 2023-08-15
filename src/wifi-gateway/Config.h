@@ -81,8 +81,6 @@ ConfigParser readConfigFile(const char* filename) {
 }
 
 void writeConfigFile(const char* filename, IConfigurable* configurable) {
-  char* buffer = nullptr;
-
   auto configFile = LittleFS.open(filename, "w");
   if (configFile) {
     configFile.write(CONFIG_FILE_HEADER);

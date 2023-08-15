@@ -32,7 +32,7 @@ public:
   }
 
   void log(const char* category, const char* message) {
-    snprintf(logEntry, LOG_ENTRY_SIZE, "[%u|%s] %s%c", millis(), category, message, LOG_ENTRY_SEPARATOR);
+    snprintf(logEntry, LOG_ENTRY_SIZE, "[%lu|%s] %s%c", millis(), category, message, LOG_ENTRY_SEPARATOR);
     logEntry[LOG_ENTRY_SIZE - 1u] = LOG_ENTRY_SEPARATOR;
     logEntry[LOG_ENTRY_SIZE] = '\0';
 
