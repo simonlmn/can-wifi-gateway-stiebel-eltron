@@ -149,6 +149,14 @@ public:
     return *this;
   }
 
+  operator bool() const {
+    return lastValue();
+  }
+
+  bool lastValue() const {
+    return _lastValue;
+  }
+
   void trigger(bool value, unsigned long durationMs) {
     write(value);
     delay(durationMs);

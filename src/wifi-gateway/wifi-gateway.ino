@@ -15,7 +15,7 @@ DigitalInput debugModePin { pins::esp8266::nodemcu::D7, InputMode::PullUp, Signa
 
 // Buttons
 DigitalInput updatePin { pins::esp8266::nodemcu::D3, InputMode::PullUp, SignalMode::Inverted }; // not used yet
-DigitalInput factoryResetPin { pins::esp8266::nodemcu::D8, InputMode::PullUp, SignalMode::Inverted };
+DigitalInput factoryResetPin { pins::esp8266::nodemcu::D8, InputMode::Normal, SignalMode::Normal };
 
 // Control lines
 DigitalOutput canResetPin { pins::esp8266::nodemcu::D1, false, SignalMode::Inverted };
