@@ -29,8 +29,9 @@ public:
     _resetPin(resetPin),
     _listenModePin(listenModePin),
     _canAvailable(false),
+    _resetInterval(30000),
     _counters(),
-    _serial([this] (const char* line) { processReceivedLine(line); })
+    _serial([this] (const char* line, SerialProtocol& serial) { processReceivedLine(line, serial); })
   {
     node.logLevel("can", (int)_logLevel);
   }
@@ -136,7 +137,7 @@ private:
     _resetInterval.restart();
   }
 
-  void processReceivedLine(const char* line) {
+  void processReceivedLine(const char* line, SerialProtocol& serial) {
     const char* start = line;
     char* end = nullptr;
 
@@ -183,7 +184,7 @@ private:
         if (_logLevel >= CanLogLevel::Error) _node.log("can", line);
       }
     } else if (strncmp(start, "READY", 5) == 0) {
-      _serial.send("SETUP %X %s", CAN_BITRATE, toSetupModeString(effectiveMode()));
+      serial.send("SETUP %X %s", CAN_BITRATE, toSetupModeString(effectiveMode()));
     } else if (strncmp(start, "SETUP ", 6) == 0) {
       _canAvailable = strncmp(start + 6, "OK ", 3) == 0;
       if (_canAvailable) {
