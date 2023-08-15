@@ -9,9 +9,7 @@ static bool canAvailable = false;
 
 ACAN2515 can (MCP2515_CS_PIN, SPI, MCP2515_INT_PIN);
 
-SerialProtocol serial { processReceivedLine };
-
-void processReceivedLine(const char* line) {
+void processReceivedLine(const char* line, SerialProtocol& serial) {
   const char* start = line;
   char* end = nullptr;
 
@@ -112,6 +110,8 @@ void processReceivedLine(const char* line) {
   }
 }
 
+SerialProtocol serial { processReceivedLine };
+
 void setup() {
   serial.setup();
   SPI.begin();
@@ -128,7 +128,7 @@ void loop() {
     while (can.receive(frame)) {
       yield();
       serial.send("CANRX %08X %u %02X %02X %02X %02X %02X %02X %02X %02X",
-        frame.id | (frame.ext << 31) | (frame.rtr << 30),
+        frame.id | (uint32_t(frame.ext) << 31) | (uint32_t(frame.rtr) << 30),
         frame.len,
         frame.data[0],
         frame.data[1],
