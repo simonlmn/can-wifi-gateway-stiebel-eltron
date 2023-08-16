@@ -93,6 +93,10 @@ public:
     _server.on(UriBraces(F("/writable/{}/{}/{}")), HTTP_DELETE, [this]() {
       doItem([&] (DataAccess::DataKey const& key, DataEntry const& entry) { _access.removeWritable(key); return true; });
     });
+
+    _server.on(F("/definitions"), HTTP_GET, [this]() {
+      getDefinitions();
+    });
     
     _server.on(F("/node/reset"), HTTP_POST, [this]() {
       _node.reset();
@@ -472,5 +476,41 @@ private:
     _buffer.jsonSeparator();
     _buffer.jsonPropertyRaw(F("writable"), entry.writable ? F("true") : F("false"));
     _buffer.jsonObjectClose();
+  }
+
+  void getDefinitions() {
+    if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_JSON))) {
+      _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
+      return;
+    }
+    
+    _buffer.jsonListOpen();
+
+    bool first = true;
+    for (auto& definition : DEFINITIONS) {
+        if (!first) {
+          _buffer.jsonSeparator();
+        }
+        first = false;
+
+        _buffer.jsonObjectOpen();
+
+        _buffer.jsonPropertyRaw(F("id"), toConstStr(definition.id, 10));
+        _buffer.jsonSeparator();
+        _buffer.jsonPropertyString(F("name"), definition.name);
+        _buffer.jsonSeparator();
+        _buffer.jsonPropertyString(F("unit"), getUnitSymbol(definition.unit));
+        _buffer.jsonSeparator();
+        _buffer.jsonPropertyString(F("accessMode"), getValueAccessModeString(definition.accessMode));
+        _buffer.jsonSeparator();
+        _buffer.jsonPropertyString(F("name"), definition.source.toString());
+        
+        _buffer.jsonObjectClose();
+
+        _node.lyield();
+    }
+
+    _buffer.jsonListClose();
+    _buffer.end();
   }
 };
