@@ -11,7 +11,7 @@ private:
 
   NodeBase& _node;
   DigitalOutput& _resetPin;
-  DigitalInput& _listenModePin;
+  DigitalInput& _txEnablePin;
   bool _canAvailable;
   IntervalTimer _resetInterval;
   std::function<void()> _readyHandler;
@@ -24,10 +24,10 @@ private:
   SerialProtocol _serial;
 
 public:
-  SerialCan(NodeBase& node, DigitalOutput& resetPin, DigitalInput& listenModePin) :
+  SerialCan(NodeBase& node, DigitalOutput& resetPin, DigitalInput& txEnablePin) :
     _node(node),
     _resetPin(resetPin),
-    _listenModePin(listenModePin),
+    _txEnablePin(txEnablePin),
     _canAvailable(false),
     _resetInterval(30000),
     _counters(),
@@ -52,7 +52,7 @@ public:
   }
 
   CanMode effectiveMode() const {
-    return _listenModePin ? CanMode::ListenOnly : _mode;
+    return _txEnablePin ? _mode : CanMode::ListenOnly;
   }
 
   void setup() {
