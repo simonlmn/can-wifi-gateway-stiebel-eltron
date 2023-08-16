@@ -24,9 +24,7 @@ using SerialReceiveCallback = std::function<void(const char* line, SerialProtoco
 // CANTX ENOAV FFFFFFFF 8 01 02 03 04 05 06 07 08 \r\n
 // ERROR\r\n
 
-class SerialProtocol {
-public:
-    
+class SerialProtocol final {
 private:
     static const size_t SERIAL_MESSAGE_SIZE = 96u; 
     char SERIAL_TX_MESSAGE[SERIAL_MESSAGE_SIZE];
@@ -43,3 +41,9 @@ public:
     void send(const char* fmt, ...);
     void receive();
 };
+
+// Helper functions to send CAN messages from both sides
+
+void sendTxMessage(SerialProtocol& serial, uint32_t id, bool ext, bool rtr, uint8_t length, const uint8_t (&data)[8]);
+
+void sendRxMessage(SerialProtocol& serial, uint32_t id, bool ext, bool rtr, uint8_t length, const uint8_t (&data)[8]);

@@ -45,7 +45,7 @@ void processReceivedLine(const char* line, SerialProtocol& serial) {
     canAvailable = errorCode == 0;
   
     if (canAvailable) {
-      serial.send("SETUP OK RM=%u BRP=%u PRS=%u PS1=%u PS2=%u SJW=%u TRS=%u ABR=%u SPS=%u",
+      serial.send("SETUP OK RM=%u BRP=%u PRS=%u PS1=%u PS2=%u SJW=%u TRS=%u ABR=%lu SPS=%lu",
         settings.mRequestedMode,
         settings.mBitRatePrescaler,
         settings.mPropagationSegment,
@@ -54,7 +54,6 @@ void processReceivedLine(const char* line, SerialProtocol& serial) {
         settings.mSJW,
         settings.mTripleSampling,
         (unsigned long)settings.actualBitRate(),
-        settings.exactBitRate(),
         (unsigned long)settings.samplePointFromBitStart()
       );
       return;
@@ -127,18 +126,7 @@ void loop() {
     CANMessage frame;
     while (can.receive(frame)) {
       yield();
-      serial.send("CANRX %08X %u %02X %02X %02X %02X %02X %02X %02X %02X",
-        frame.id | (uint32_t(frame.ext) << 31) | (uint32_t(frame.rtr) << 30),
-        frame.len,
-        frame.data[0],
-        frame.data[1],
-        frame.data[2],
-        frame.data[3],
-        frame.data[4],
-        frame.data[5],
-        frame.data[6],
-        frame.data[7]
-      );
+      sendRxMessage(serial, frame.id, frame.ext, frame.rtr, frame.len, frame.data);
     }
-  }  
+  }
 }

@@ -61,3 +61,27 @@ void SerialProtocol::receive() {
         _serialRxMessageEnd = newRxMessageEnd;
     }
 }
+
+void sendCanMessage(SerialProtocol& serial, const char* direction, uint32_t id, bool ext, bool rtr, uint8_t length, const uint8_t (&data)[8]) {
+    serial.send("CAN%s %08lX %u %02X %02X %02X %02X %02X %02X %02X %02X",
+        direction,
+        id | (uint32_t(ext) << 31) | (uint32_t(rtr) << 30),
+        length,
+        data[0],
+        data[1],
+        data[2],
+        data[3],
+        data[4],
+        data[5],
+        data[6],
+        data[7]
+      );
+}
+
+void sendTxMessage(SerialProtocol& serial, uint32_t id, bool ext, bool rtr, uint8_t length, const uint8_t (&data)[8]) {
+    sendCanMessage(serial, "TX", id, ext, rtr, length, data);
+}
+
+void sendRxMessage(SerialProtocol& serial, uint32_t id, bool ext, bool rtr, uint8_t length, const uint8_t (&data)[8]) {
+    sendCanMessage(serial, "RX", id, ext, rtr, length, data);
+}

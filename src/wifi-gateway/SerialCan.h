@@ -103,18 +103,7 @@ public:
         logCanMessage("TX", message);
       }
 
-      _serial.send("CANTX %08X %u %02X %02X %02X %02X %02X %02X %02X %02X",
-        message.id | (message.ext << 31) | (message.rtr << 30),
-        message.len,
-        message.data[0],
-        message.data[1],
-        message.data[2],
-        message.data[3],
-        message.data[4],
-        message.data[5],
-        message.data[6],
-        message.data[7]
-      );
+      sendTxMessage(_serial, message.id, message.ext, message.rtr, message.len, message.data);
 
       _counters.tx += 1;
     }
