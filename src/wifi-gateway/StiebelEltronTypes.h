@@ -84,6 +84,10 @@ struct DeviceId {
   const char* toString() const {
     static char string[8]; // "XXX/XXX";
     snprintf(string, 8, "%s/%u", deviceTypeName(type), address);
+    if (address == DEVICE_ADDR_ANY) {
+      string[4] = '*';
+      string[5] = '\0';
+    }
     return string;
   }
 
@@ -91,14 +95,20 @@ struct DeviceId {
     if (strnlen(string, 5) < 5) {
       return {};
     }
-    DeviceType type = deviceTypeFromString(string, 3);
-    if (type == DeviceType::Any) {
-      return {};
-    }
     if (string[3] != '/') {
       return {};
     }
-    DeviceAddress address = strtol(string + 4, end, 10);
+
+    DeviceType type = deviceTypeFromString(string, 3);
+    DeviceAddress address;
+    if (string[4] == '*') {
+      address = DEVICE_ADDR_ANY;
+      if (end != nullptr) {
+        *end = const_cast<char*>(&string[5]);
+      }
+    } else {
+      address = strtol(string + 4, end, 10);
+    }
     return DeviceId{type, address};
   }
 

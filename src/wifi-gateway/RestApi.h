@@ -503,7 +503,7 @@ private:
         _buffer.jsonSeparator();
         _buffer.jsonPropertyString(F("accessMode"), getValueAccessModeString(definition.accessMode));
         _buffer.jsonSeparator();
-        _buffer.jsonPropertyString(F("name"), definition.source.toString());
+        _buffer.jsonPropertyString(F("source"), definition.source.toString());
         
         _buffer.jsonObjectClose();
 
