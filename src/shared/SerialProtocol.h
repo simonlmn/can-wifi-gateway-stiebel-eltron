@@ -26,10 +26,10 @@ using SerialReceiveCallback = std::function<void(const char* line, SerialProtoco
 
 class SerialProtocol final {
 private:
-    static const size_t SERIAL_MESSAGE_SIZE = 96u; 
-    char SERIAL_TX_MESSAGE[SERIAL_MESSAGE_SIZE];
-    char SERIAL_RX_MESSAGE[SERIAL_MESSAGE_SIZE];
-    size_t _serialRxMessageEnd = 0u;
+    static const size_t SERIAL_MESSAGE_MAX_SIZE = 96u; 
+    char SERIAL_TX_MESSAGE[SERIAL_MESSAGE_MAX_SIZE];
+    char SERIAL_RX_MESSAGE[SERIAL_MESSAGE_MAX_SIZE];
+    size_t _serialRxMessageSize = 0u;
 
     SerialReceiveCallback _processReceivedLine;
 

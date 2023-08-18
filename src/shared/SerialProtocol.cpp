@@ -16,7 +16,7 @@ void SerialProtocol::setup() {
 }
 
 void SerialProtocol::reset() {
-    _serialRxMessageEnd = 0u;
+    _serialRxMessageSize = 0u;
     Serial.flush();
     size_t available = Serial.available();
     while (available-- > 0) {
@@ -28,37 +28,37 @@ void SerialProtocol::reset() {
 void SerialProtocol::send(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    size_t actualLength = vsnprintf(SERIAL_TX_MESSAGE, SERIAL_MESSAGE_SIZE, fmt, args);
+    size_t actualLength = vsnprintf(SERIAL_TX_MESSAGE, SERIAL_MESSAGE_MAX_SIZE, fmt, args);
     va_end(args);
-    actualLength = min(actualLength, SERIAL_MESSAGE_SIZE - 2);
+    actualLength = min(actualLength, SERIAL_MESSAGE_MAX_SIZE - 2);
     SERIAL_TX_MESSAGE[actualLength] = '\r';
     SERIAL_TX_MESSAGE[actualLength + 1] = '\n';
     Serial.write(SERIAL_TX_MESSAGE, actualLength + 2);
 }
 
 void SerialProtocol::receive() {
-    auto bytesRead = Serial.readBytes(SERIAL_RX_MESSAGE + _serialRxMessageEnd, SERIAL_MESSAGE_SIZE - _serialRxMessageEnd);
-    auto newRxMessageEnd = _serialRxMessageEnd + bytesRead;
+    auto bytesRead = Serial.readBytes(SERIAL_RX_MESSAGE + _serialRxMessageSize, SERIAL_MESSAGE_MAX_SIZE - _serialRxMessageSize);
+    auto newRxMessageSize = _serialRxMessageSize + bytesRead;
 
-    char* newLine = reinterpret_cast<char*>(memchr(SERIAL_RX_MESSAGE + _serialRxMessageEnd, '\n', bytesRead));
+    char* newLine = reinterpret_cast<char*>(memchr(SERIAL_RX_MESSAGE, '\n', newRxMessageSize));
     if (newLine != nullptr) {
-        if (newLine != SERIAL_RX_MESSAGE && *(newLine - 1) == '\r') {
+        if ((newLine != SERIAL_RX_MESSAGE) && *(newLine - 1) == '\r') {
             *(newLine - 1) = '\0';
             
             _processReceivedLine(SERIAL_RX_MESSAGE, *this);
 
-            size_t remainingCount = (SERIAL_RX_MESSAGE + newRxMessageEnd) - (newLine + 1);
+            size_t remainingCount = (SERIAL_RX_MESSAGE + newRxMessageSize) - (newLine + 1);
             memmove(SERIAL_RX_MESSAGE, newLine + 1, remainingCount);
-            _serialRxMessageEnd = remainingCount;
+            _serialRxMessageSize = remainingCount;
         } else {
             send("ERROR invalid line terminator");
-            _serialRxMessageEnd = 0u;
+            _serialRxMessageSize = 0u;
         }
-    } else if (newRxMessageEnd >= SERIAL_MESSAGE_SIZE) {
+    } else if (newRxMessageSize >= SERIAL_MESSAGE_MAX_SIZE) {
         send("ERROR no line terminator");
-        _serialRxMessageEnd = 0u;
+        _serialRxMessageSize = 0u;
     } else {
-        _serialRxMessageEnd = newRxMessageEnd;
+        _serialRxMessageSize = newRxMessageSize;
     }
 }
 
