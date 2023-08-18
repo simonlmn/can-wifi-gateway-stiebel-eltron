@@ -180,14 +180,14 @@ public:
     }
 
     _displayIndex = displayIndex;
-    _deviceId = {DeviceType::Display, DISPLAY_ADDRESSES[displayIndex]};
-    
+    _deviceId = {DeviceType::Display, DISPLAY_ADDRESSES[displayIndex]};  
     _canId = toCanId(_deviceId);
 
     _node.log("sep", format("Set display index '%u' (deviceId=%s, canId=%lX)", _displayIndex, _deviceId.toString(), _canId));
 
     if (_ready) {
       registerDisplay();
+      registerSensor();
     }
 
     return true;
@@ -198,6 +198,7 @@ public:
 
     _can.onReady([this] () {
       registerDisplay();
+      registerSensor();
       _ready = true;
     });
 
@@ -310,11 +311,37 @@ private:
     message.len = 7u;
     setTargetId(_deviceId, message.data);
     setMessageType(MessageType::Register, message.data);
-    message.data[2] = 0xFDu;
-    message.data[3] = 0x01u;
-    message.data[4] = 0x00u;
-    message.data[5] = 0x00u;
-    message.data[6] = 0x00u;
+    message.data[2] = 0xFDu; // TODO unclear what these values mean (they seem to be constant)
+    message.data[3] = 0x09u; // TODO unclear what these values mean (they seem to be constant)
+    message.data[4] = 0x00u; // TODO unclear what these values mean (they seem to be constant)
+    message.data[5] = 0x00u; // TODO unclear what these values mean (they seem to be constant)
+    message.data[6] = 0x00u; // TODO unclear what these values mean (they seem to be constant)
+    
+    _can.sendCanMessage(message);
+  }
+
+  // TODO the official display also registers as a sensor (?) but it is unclear how that is used
+  //      assumption: when using it as a room temperature/humidity sensor, it sends the data from that ID?
+  void registerSensor() {
+    if (!_ready || _canId == 0u) {
+      return;
+    }
+
+    DeviceId sensorId = {DeviceType::Sensor, _displayIndex + 1};
+    uint32_t sensorCanId = toCanId(sensorId);
+
+    CanMessage message;
+    message.id = sensorCanId;
+    message.ext = false;
+    message.rtr = false;
+    message.len = 7u;
+    setTargetId(sensorId, message.data);
+    setMessageType(MessageType::Register, message.data);
+    message.data[2] = 0xFDu; // TODO unclear what these values mean (they seem to be constant)
+    message.data[3] = 0x09u; // TODO unclear what these values mean (they seem to be constant)
+    message.data[4] = 0x00u; // TODO unclear what these values mean (they seem to be constant)
+    message.data[5] = 0x00u; // TODO unclear what these values mean (they seem to be constant)
+    message.data[6] = 0x00u; // TODO unclear what these values mean (they seem to be constant)
     
     _can.sendCanMessage(message);
   }
