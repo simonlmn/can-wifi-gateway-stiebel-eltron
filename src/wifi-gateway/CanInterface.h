@@ -36,6 +36,23 @@ enum struct CanMode : uint8_t {
   ListenOnly = 1,
 };
 
+const char* canModeName(CanMode mode) {
+  switch (mode) {
+    case CanMode::Normal:
+      return "Normal";
+    case CanMode::ListenOnly:
+      return "ListenOnly";
+    default:
+      return "?";
+  }
+}
+
+CanMode canModeFromString(const char* mode, size_t length = SIZE_MAX) {
+  if (strncmp(mode, "Normal", length) == 0) return CanMode::Normal;
+  if (strncmp(mode, "ListenOnly", length) == 0) return CanMode::ListenOnly;
+  return CanMode::ListenOnly;
+}
+
 struct CanCounters {
   uint32_t rx = 0;
   uint32_t tx = 0;

@@ -37,17 +37,18 @@ public:
   }
 
   bool configure(const char* name, const char* value) override {
-    if (strcmp(name, "mode") == 0) return setMode(CanMode(strtol(value, nullptr, 10)));
+    if (strcmp(name, "mode") == 0) return setMode(canModeFromString(value));
     return false;
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
-    writer("mode", toConstStr(uint8_t(_mode), 10));
+    writer("mode", canModeName(_mode));
   }
 
   bool setMode(CanMode mode) {
     _mode = mode;
     reset();
+    _node.log("can", format("Set mode '%s'.", canModeName(_mode)));
     return true;
   }
 

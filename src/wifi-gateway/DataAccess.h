@@ -37,6 +37,29 @@ enum struct DataCaptureMode : uint8_t {
   Any = 3, // Store any data, even if no ValueDefinition exists.
 };
 
+const char* dataCaptureModeName(DataCaptureMode mode) {
+  switch (mode) {
+    case DataCaptureMode::None:
+      return "None";
+    case DataCaptureMode::Configured:
+      return "Configured";
+    case DataCaptureMode::Defined:
+      return "Defined";
+    case DataCaptureMode::Any:
+      return "Any";
+    default:
+      return "?";
+  }
+}
+
+DataCaptureMode dataCaptureModeFromString(const char* mode, size_t length = SIZE_MAX) {
+  if (strncmp(mode, "None", length) == 0) return DataCaptureMode::None;
+  if (strncmp(mode, "Configured", length) == 0) return DataCaptureMode::Configured;
+  if (strncmp(mode, "Defined", length) == 0) return DataCaptureMode::Defined;
+  if (strncmp(mode, "Any", length) == 0) return DataCaptureMode::Any;
+  return DataCaptureMode::None;
+}
+
 class DataAccess final : public IConfigurable {
 public:
   using DataKey = std::pair<DeviceId, ValueId>;
@@ -68,23 +91,25 @@ public:
   { }
 
   bool configure(const char* name, const char* value) override {
-    if (strcmp(name, "mode") == 0) return setMode(DataCaptureMode(strtol(value, nullptr, 10)));
+    if (strcmp(name, "mode") == 0) return setMode(dataCaptureModeFromString(value));
     if (strcmp(name, "readOnly") == 0) return setReadOnly(strcmp(value, "true") == 0);
     return false;
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
-    writer("mode", toConstStr(uint8_t(_mode), 10));
+    writer("mode", dataCaptureModeName(_mode));
     writer("readOnly", _readOnly ? "true" : "false");
   }
 
   bool setMode(DataCaptureMode mode) {
     _mode = mode;
+    _node.log("dta", format("Set mode '%s'.", dataCaptureModeName(_mode)));
     return true;
   }
 
   bool setReadOnly(bool readOnly) {
     _readOnly = readOnly;
+    _node.log("dta", format("%s write access (%seffective).", _readOnly ? "Disabled" : "Enabled", effectiveReadOnly() == _readOnly ? "" : "NOT "));
     return true;
   }
 

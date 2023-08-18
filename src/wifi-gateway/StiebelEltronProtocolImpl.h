@@ -177,7 +177,10 @@ public:
 
     _displayIndex = displayIndex;
     _deviceId = {DeviceType::Display, DISPLAY_ADDRESSES[displayIndex]};
+    
     _canId = toCanId(_deviceId);
+
+    _node.log("sep", format("Set display index '%u' (deviceId=%s, canId=%lX)", _displayIndex, _deviceId.toString(), _canId));
 
     if (_ready) {
       registerDisplay();
