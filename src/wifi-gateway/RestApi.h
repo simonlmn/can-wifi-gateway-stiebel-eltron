@@ -3,6 +3,7 @@
 #include <ESP8266WebServer.h>
 #include <Arduino_JSON.h>
 #include <uri/UriBraces.h>
+#include <uri/UriGlob.h>
 #include "NodeBase.h"
 #include "DataAccess.h"
 #include "StiebelEltronProtocol.h"
@@ -35,6 +36,11 @@ public:
     _server.enableCORS(true);
     _server.collectHeaders(FPSTR(HEADER_ACCEPT));
     
+    _server.on(UriGlob(F("*")), HTTP_OPTIONS, [this]() {
+      _server.sendHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+      _server.send(204);
+    });
+
     _server.on(F("/data"), HTTP_GET, [this]() {
       if (_server.hasArg(FPSTR(ARG_ONLY_UNDEFINED))) {
         getItems([] (DataEntry const& entry) { return !entry.hasDefinition(); });
@@ -179,10 +185,8 @@ public:
         return;
       }
 
-      _node.getAllConfig([&] (const char* category, const char* name, const char* value) {
-        _buffer.plainText(category);
-        _buffer.plainChar('.');
-        _buffer.plainText(name);
+      _node.getAllConfig([&] (const char* path, const char* value) {
+        _buffer.plainText(path);
         _buffer.plainChar(ConfigParser::SEPARATOR);
         _buffer.plainText(value);
         _buffer.plainChar(ConfigParser::END);
@@ -190,6 +194,18 @@ public:
       });
 
       _buffer.end();
+    });
+
+    _server.on(F("/node/config"), HTTP_PUT, [this]() {
+      const char* body = _server.arg("plain").c_str();
+
+      ConfigParser config {const_cast<char*>(body)};
+
+      if (_node.configureAll(config)) {
+        _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), body);
+      } else {
+        _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), EMPTY_STRING);
+      }
     });
 
     _server.on(UriBraces(F("/node/config/{}")), HTTP_GET, [this]() {

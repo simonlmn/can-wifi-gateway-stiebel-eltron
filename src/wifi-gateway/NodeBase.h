@@ -186,7 +186,7 @@ public:
     if (configurable == _configurables.end()) {
       return false;
     }
-    if (config.parse(configurable->second)) {
+    if (config.parse([&] (char* name, const char* value) { return configurable->second->configure(name, value); })) {
       persistConfiguration(category);
       return true;
     } else {
@@ -203,10 +203,36 @@ public:
     configurable->second->getConfig(writer);
   }
 
-  void getAllConfig(std::function<void(const char*, const char*, const char*)> writer) const {
+  bool configureAll(ConfigParser const& config) {
+    if (config.parse([this] (char* path, const char* value) {
+      auto categoryEnd = strchr(path, '.');
+      if (categoryEnd == nullptr) {
+        return false;
+      }
+      *categoryEnd = '\0';
+      auto category = path;
+            
+      auto configurable = _configurables.find(category);
+      *categoryEnd = '.';
+
+      if (configurable == _configurables.end()) {
+        return false;
+      } else {
+        auto name = categoryEnd + 1;
+        return configurable->second->configure(name, value);
+      }
+    })) {
+      persistAllConfigurations();
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  void getAllConfig(std::function<void(const char*, const char*)> writer) const {
     for (auto &&configurable : _configurables) {
       configurable.second->getConfig([&] (const char* name, const char* value) {
-        writer(configurable.first.c_str(), name, value);
+        writer(format("%s.%s", configurable.first.c_str(), name), value);
       });  
     }
   }
@@ -271,7 +297,7 @@ private:
     }
 
     ConfigParser parser = readConfigFile(format("/config/%s", category.c_str()));
-    if (parser.parse(configurable->second)) {
+    if (parser.parse([&] (char* name, const char* value) { return configurable->second->configure(name, value); })) {
       log("node", format("restored config for '%s'.", category.c_str()));
     } else {
       log("node", format("failed to restore config for '%s'.", category.c_str()));
@@ -286,5 +312,11 @@ private:
     }
 
     writeConfigFile(format("/config/%s", category.c_str()), configurable->second);
+  }
+
+  void persistAllConfigurations() {
+    for (auto &&configurable : _configurables) {
+      persistConfiguration(configurable.first);
+    }
   }
 };

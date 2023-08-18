@@ -19,9 +19,9 @@ private:
 public:
   ConfigParser() : _config(nullptr) {}
 
-  ConfigParser(char* config) : _config(config) {}  
+  ConfigParser(char* config) : _config(config) {}
   
-  bool parse(IConfigurable* configurable) const {
+  bool parse(std::function<bool(char* name, const char* value)> processEntry) const {
     if (_config == nullptr) {
       return false;
     }
@@ -37,7 +37,7 @@ public:
 
       *separator = '\0';
       *end = '\0';
-      bool success = configurable->configure(start, separator + 1);
+      bool success = processEntry(start, separator + 1);
       *separator = SEPARATOR;
       *end = END;
         
@@ -46,6 +46,10 @@ public:
       }
 
       start = end + 1;
+
+      while (*start == '\n') {
+        start += 1;
+      }
     }
 
     return *start == '\0';
