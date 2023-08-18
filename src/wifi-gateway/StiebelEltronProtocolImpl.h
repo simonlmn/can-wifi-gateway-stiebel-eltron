@@ -8,6 +8,7 @@
 #include "StiebelEltronTypes.h"
 #include "CanInterface.h"
 #include <functional>
+#include <set>
 
 /*
  * NOTE: the protocol is actually based on the Elster-Kromschröder protocol,
@@ -146,6 +147,8 @@ private:
   uint32_t _canId;
   bool _ready;
 
+  std::set<DeviceId> _otherDevices;
+
   std::function<void(ResponseData const& data)> _responseHandler;
   std::function<void(WriteData const& data)> _writeHandler;
   
@@ -157,6 +160,7 @@ public:
     _deviceId(),
     _canId(0u),
     _ready(false),
+    _otherDevices(),
     _responseHandler(),
     _writeHandler()
   { }
@@ -207,6 +211,10 @@ public:
 
   bool ready() const {
     return _ready;
+  }
+
+  const std::set<DeviceId>& getOtherDevices() const {
+    return _otherDevices;
   }
 
   void request(RequestData const& data) {
@@ -316,23 +324,34 @@ private:
       _node.lyield();
 
       MessageType type = getMessageType(frame.data);
+      DeviceId target = getTargetId(frame.data);
+      DeviceId source = fromCanId(frame.id);
+      
+      if (target.type == DeviceType::Display && target.address == BROADCAST_DISPLAY_ADDRESS) {
+        target.address = DEVICE_ADDR_ANY;
+      }
+
+      if (target.isExact() && target != _deviceId) {
+        _otherDevices.insert(target);
+      }
+      if (source.isExact() && source != _deviceId) {
+        _otherDevices.insert(source);
+      }
+
+      if (type == MessageType::Register) {
+        _node.log("sep", format("%s t:%s s:%s %02X %02X %02X %02X %02X", messageTypeName(type), target.toString(), source.toString(), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]));
+      }
 
       if (type == MessageType::Write || type == MessageType::Response || type == MessageType::Request) {
-        DeviceId target = getTargetId(frame.data);
-        DeviceId source = fromCanId(frame.id);
         uint8_t fix = frame.data[2]; // this should always be 0xFAu
         ValueId valueId = getValueId(frame.data);
         uint16_t value = getValue(frame.data);
-
-        if (target.type == DeviceType::Display && target.address == BROADCAST_DISPLAY_ADDRESS) {
-          target.address = DEVICE_ADDR_ANY;
-        }
 
         int logLevel = _node.logLevel("sep");
         if (logLevel > 0) {
           bool isNotTargetedAtThis = !target.includes(_deviceId);
           if (logLevel > 1 || isNotTargetedAtThis) {
-            _node.log("sep", format("%c%s t:%s/%u s:%s/%u %02X id:%04X v:%04X", isNotTargetedAtThis ? '*' : '+', messageTypeName(type), deviceTypeName(target.type), target.address, deviceTypeName(source.type), source.address, fix, valueId, value));
+            _node.log("sep", format("%c%s t:%s s:%s %02X id:%04X v:%04X", isNotTargetedAtThis ? '*' : '+', messageTypeName(type), target.toString(), source.toString(), fix, valueId, value));
           }
         }
         

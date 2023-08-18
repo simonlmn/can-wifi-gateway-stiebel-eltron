@@ -5,6 +5,7 @@
 #include <uri/UriBraces.h>
 #include "NodeBase.h"
 #include "DataAccess.h"
+#include "StiebelEltronProtocol.h"
 #include "ResponseBuffer.h"
 
 static const char CONTENT_TYPE_PLAIN[] PROGMEM = "text/plain";
@@ -25,9 +26,10 @@ private:
 
   NodeBase& _node;
   DataAccess& _access;
+  StiebelEltronProtocol& _protocol;
   
 public:
-  RestApi(NodeBase& node, DataAccess& access) : _server(8080), _buffer(_server), _node(node), _access(access) {}
+  RestApi(NodeBase& node, DataAccess& access, StiebelEltronProtocol& protocol) : _server(8080), _buffer(_server), _node(node), _access(access), _protocol(protocol) {}
   
   void setup() {
     _server.enableCORS(true);
@@ -96,6 +98,10 @@ public:
 
     _server.on(F("/definitions"), HTTP_GET, [this]() {
       getDefinitions();
+    });
+
+    _server.on(F("/devices"), HTTP_GET, [this]() {
+      getDevices();
     });
     
     _server.on(F("/node/reset"), HTTP_POST, [this]() {
@@ -507,6 +513,30 @@ private:
         
         _buffer.jsonObjectClose();
 
+        _node.lyield();
+    }
+
+    _buffer.jsonListClose();
+    _buffer.end();
+  }
+
+  void getDevices() {
+    if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_JSON))) {
+      _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
+      return;
+    }
+    
+    _buffer.jsonListOpen();
+
+    bool first = true;
+    for (auto& deviceId : _protocol.getOtherDevices()) {
+        if (!first) {
+          _buffer.jsonSeparator();
+        }
+        first = false;
+
+        _buffer.jsonString(deviceId.toString());
+        
         _node.lyield();
     }
 

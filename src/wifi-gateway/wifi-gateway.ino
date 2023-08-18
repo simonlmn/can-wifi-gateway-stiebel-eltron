@@ -28,7 +28,7 @@ SerialCan can (node, io::canResetPin, io::txEnablePin);
 StiebelEltronProtocol protocol (node, can);
 DateTimeSource timeSource (node, protocol);
 DataAccess access (node, protocol, timeSource, io::writeEnablePin);
-RestApi api (node, access);
+RestApi api (node, access, protocol);
 
 void setup() {
   node.init(
