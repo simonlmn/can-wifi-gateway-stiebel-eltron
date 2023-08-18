@@ -526,10 +526,14 @@ private:
       return;
     }
     
+    _buffer.jsonObjectOpen();
+    _buffer.jsonPropertyString(F("this"), _protocol.getThisDeviceId().toString());
+    _buffer.jsonSeparator();
+    _buffer.jsonPropertyStart(F("others"));
     _buffer.jsonListOpen();
 
     bool first = true;
-    for (auto& deviceId : _protocol.getOtherDevices()) {
+    for (auto& deviceId : _protocol.getOtherDeviceIds()) {
         if (!first) {
           _buffer.jsonSeparator();
         }
@@ -541,6 +545,7 @@ private:
     }
 
     _buffer.jsonListClose();
+    _buffer.jsonObjectClose();
     _buffer.end();
   }
 };

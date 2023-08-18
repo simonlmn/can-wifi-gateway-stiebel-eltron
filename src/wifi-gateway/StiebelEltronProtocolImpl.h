@@ -147,7 +147,7 @@ private:
   uint32_t _canId;
   bool _ready;
 
-  std::set<DeviceId> _otherDevices;
+  std::set<DeviceId> _otherDeviceIds;
 
   std::function<void(ResponseData const& data)> _responseHandler;
   std::function<void(WriteData const& data)> _writeHandler;
@@ -160,7 +160,7 @@ public:
     _deviceId(),
     _canId(0u),
     _ready(false),
-    _otherDevices(),
+    _otherDeviceIds(),
     _responseHandler(),
     _writeHandler()
   { }
@@ -214,8 +214,12 @@ public:
     return _ready;
   }
 
-  const std::set<DeviceId>& getOtherDevices() const {
-    return _otherDevices;
+  const DeviceId& getThisDeviceId() const {
+    return _deviceId;
+  }
+
+  const std::set<DeviceId>& getOtherDeviceIds() const {
+    return _otherDeviceIds;
   }
 
   void request(RequestData const& data) {
@@ -359,10 +363,10 @@ private:
       }
 
       if (target.isExact() && target != _deviceId) {
-        _otherDevices.insert(target);
+        _otherDeviceIds.insert(target);
       }
       if (source.isExact() && source != _deviceId) {
-        _otherDevices.insert(source);
+        _otherDeviceIds.insert(source);
       }
 
       if (type == MessageType::Register) {
