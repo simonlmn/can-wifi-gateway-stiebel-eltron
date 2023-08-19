@@ -1,24 +1,56 @@
 # Test device
+@deviceAddress = 192.168.3.225
 
 ###
-GET http://192.168.3.225:8080/node/status
+GET http://{{deviceAddress}}/api/node/status
 
 ###
-GET http://192.168.3.225:8080/node/logs
+GET http://{{deviceAddress}}/api/node/logs
 
 ###
-GET http://192.168.3.225:8080/data
+GET http://{{deviceAddress}}/api/node/config/dta
 
 ###
-PUT http://192.168.3.225:8080/node/config/dta
-
-mode=1;
+GET http://{{deviceAddress}}/api/data
 
 ###
-GET http://192.168.3.225:8080/subscriptions
+GET http://{{deviceAddress}}/api/devices
 
 ###
-POST http://192.168.3.225:8080/subscriptions
+PUT http://{{deviceAddress}}/api/node/log-level/can
+
+2
+
+
+###
+PUT http://{{deviceAddress}}/api/node/config/sep
+
+display=2;
+
+###
+PUT http://{{deviceAddress}}/api/node/config/dta
+
+mode=Configured;
+readOnly=false;
+
+###
+PUT http://{{deviceAddress}}/api/node/config/can
+
+mode=Normal;
+
+###
+PUT http://{{deviceAddress}}/api/node/config
+
+dta.mode=Configured;
+dta.readOnly=false;
+sep.display=2;
+can.mode=Normal;
+
+###
+GET http://{{deviceAddress}}/api/subscriptions
+
+###
+POST http://{{deviceAddress}}/api/subscriptions
 Content-Type: text/plain
 
 3,
@@ -72,7 +104,7 @@ Content-Type: text/plain
 49397,
 
 ###
-POST http://192.168.3.225:8080/writable
+POST http://{{deviceAddress}}/api/writable
 Content-Type: text/plain
 
 17@HEA/1,
@@ -94,19 +126,19 @@ Content-Type: text/plain
 1501,
 
 ###
-DELETE http://192.168.3.225:8080/subscriptions/SYS/0/3
+DELETE http://{{deviceAddress}}/api/subscriptions/SYS/0/3
 
 ###
-GET http://192.168.3.225:8080/writable
+GET http://{{deviceAddress}}/api/writable
 
 ###
-DELETE http://192.168.3.225:8080/writable/SYS/0/3
+DELETE http://{{deviceAddress}}/api/writable/SYS/0/3
 
 ###
-DELETE http://192.168.3.225:8080/writable/HEA/1/5
+DELETE http://{{deviceAddress}}/api/writable/HEA/1/5
 
 ###
-PUT http://192.168.3.225:8080/data/SYS/0/1401?accessMode=Writable
+PUT http://{{deviceAddress}}/api/data/SYS/0/1401?accessMode=Writable
 Content-Type: text/plain
 
 21.5

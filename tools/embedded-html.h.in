@@ -1,0 +1,11 @@
+#ifndef __INCLUDE_GUARD__
+#define __INCLUDE_GUARD__
+
+namespace __namespace__ {
+  static const char HTML[] PROGMEM = {
+    /*BYTES*/
+  };
+  static const size_t HTML_SIZE = /*BYTES_SIZE*/;
+}
+
+#endif

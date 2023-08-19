@@ -9,6 +9,12 @@
 #include "StiebelEltronProtocol.h"
 #include "ResponseBuffer.h"
 
+#if __has_include("src/wifi-gateway-ui/wifi-gateway-ui.generated.h")
+#  include "src/wifi-gateway-ui/wifi-gateway-ui.generated.h"
+#else
+#  include "no-ui.generated.h"
+#endif
+
 static const char CONTENT_TYPE_PLAIN[] PROGMEM = "text/plain";
 static const char CONTENT_TYPE_HTML[] PROGMEM = "text/html";
 static const char CONTENT_TYPE_JSON[] PROGMEM = "application/json";
@@ -30,18 +36,27 @@ private:
   StiebelEltronProtocol& _protocol;
   
 public:
-  RestApi(NodeBase& node, DataAccess& access, StiebelEltronProtocol& protocol) : _server(8080), _buffer(_server), _node(node), _access(access), _protocol(protocol) {}
+  RestApi(NodeBase& node, DataAccess& access, StiebelEltronProtocol& protocol) : _server(80), _buffer(_server), _node(node), _access(access), _protocol(protocol) {}
   
   void setup() {
     _server.enableCORS(true);
     _server.collectHeaders(FPSTR(HEADER_ACCEPT));
-    
-    _server.on(UriGlob(F("*")), HTTP_OPTIONS, [this]() {
+
+    _server.on(UriGlob(F("*")), HTTP_OPTIONS, [this]() { // generic reply to make "pre-flight" checks work
       _server.sendHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
       _server.send(204);
     });
+    
+    _server.on(F("/"), HTTP_GET, [this]() {
+      _server.sendHeader("Content-Encoding", "gzip");
+      #ifdef WIFI_GATEWAY_UI_H
+        _server.send_P(200, CONTENT_TYPE_HTML, wifi_gateway_ui::HTML, wifi_gateway_ui::HTML_SIZE);
+      #else
+        _server.send_P(200, CONTENT_TYPE_HTML, no_ui::HTML, no_ui::HTML_SIZE);
+      #endif
+    });
 
-    _server.on(F("/data"), HTTP_GET, [this]() {
+    _server.on(F("/api/data"), HTTP_GET, [this]() {
       if (_server.hasArg(FPSTR(ARG_ONLY_UNDEFINED))) {
         getItems([] (DataEntry const& entry) { return !entry.hasDefinition(); });
       } else {
@@ -49,7 +64,7 @@ public:
       }
     });
 
-    _server.on(UriBraces(F("/data/{}/{}/{}")), HTTP_PUT, [this]() {
+    _server.on(UriBraces(F("/api/data/{}/{}/{}")), HTTP_PUT, [this]() {
       doItem([&] (DataAccess::DataKey const& key, DataEntry const& entry) {
         if (!entry.writable || !entry.hasDefinition()) {
           return false;
@@ -78,53 +93,53 @@ public:
       });
     });
 
-    _server.on(F("/subscriptions"), HTTP_GET, [this]() {
+    _server.on(F("/api/subscriptions"), HTTP_GET, [this]() {
       getItems([] (DataEntry const& entry) { return entry.subscribed; });
     });
 
-    _server.on(F("/subscriptions"), HTTP_POST, [this]() {      
+    _server.on(F("/api/subscriptions"), HTTP_POST, [this]() {      
       postItems([&] (DataAccess::DataKey const& key) { return _access.addSubscription(key); });
     });
 
-    _server.on(UriBraces(F("/subscriptions/{}/{}/{}")), HTTP_DELETE, [this]() {
+    _server.on(UriBraces(F("/api/subscriptions/{}/{}/{}")), HTTP_DELETE, [this]() {
       doItem([&] (DataAccess::DataKey const& key, DataEntry const& entry) { _access.removeSubscription(key); return true; });
     });
 
-    _server.on(F("/writable"), HTTP_GET, [this]() {
+    _server.on(F("/api/writable"), HTTP_GET, [this]() {
       getItems([](DataEntry const& entry) { return entry.writable; });
     });
 
-    _server.on(F("/writable"), HTTP_POST, [this]() {
+    _server.on(F("/api/writable"), HTTP_POST, [this]() {
       postItems([&] (DataAccess::DataKey const& key) { return _access.addWritable(key); });
     });
 
-    _server.on(UriBraces(F("/writable/{}/{}/{}")), HTTP_DELETE, [this]() {
+    _server.on(UriBraces(F("/api/writable/{}/{}/{}")), HTTP_DELETE, [this]() {
       doItem([&] (DataAccess::DataKey const& key, DataEntry const& entry) { _access.removeWritable(key); return true; });
     });
 
-    _server.on(F("/definitions"), HTTP_GET, [this]() {
+    _server.on(F("/api/definitions"), HTTP_GET, [this]() {
       getDefinitions();
     });
 
-    _server.on(F("/devices"), HTTP_GET, [this]() {
+    _server.on(F("/api/devices"), HTTP_GET, [this]() {
       getDevices();
     });
     
-    _server.on(F("/node/reset"), HTTP_POST, [this]() {
+    _server.on(F("/api/node/reset"), HTTP_POST, [this]() {
       _node.reset();
       _server.send(204);
     });
 
-    _server.on(F("/node/stop"), HTTP_POST, [this]() {
+    _server.on(F("/api/node/stop"), HTTP_POST, [this]() {
       _node.stop();
       _server.send(204);
     });
 
-    _server.on(F("/node/status"), HTTP_GET, [this]() {
+    _server.on(F("/api/node/status"), HTTP_GET, [this]() {
       _server.send(200, FPSTR(CONTENT_TYPE_JSON), JSON.stringify(_node.getDiagnostics()));
     });
 
-    _server.on(F("/node/logs"), HTTP_GET, [this]() {
+    _server.on(F("/api/node/logs"), HTTP_GET, [this]() {
       bool sendHtml = _server.hasHeader(FPSTR(HEADER_ACCEPT)) && _server.header(FPSTR(HEADER_ACCEPT)).startsWith(FPSTR(CONTENT_TYPE_HTML));
 
       if (!_buffer.begin(200, sendHtml ? FPSTR(CONTENT_TYPE_HTML) : FPSTR(CONTENT_TYPE_PLAIN))) {
@@ -170,7 +185,7 @@ public:
       _buffer.end();
     });
 
-    _server.on(UriBraces(F("/node/log-level/{}")), HTTP_PUT, [this]() {
+    _server.on(UriBraces(F("/api/node/log-level/{}")), HTTP_PUT, [this]() {
       const auto& category = _server.pathArg(0);
       auto logLevel = _server.arg("plain").toInt();
 
@@ -179,7 +194,7 @@ public:
       _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), String((int)_node.logLevel(category)));
     });
 
-    _server.on(F("/node/config"), HTTP_GET, [this]() {
+    _server.on(F("/api/node/config"), HTTP_GET, [this]() {
       if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
         _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
         return;
@@ -196,7 +211,7 @@ public:
       _buffer.end();
     });
 
-    _server.on(F("/node/config"), HTTP_PUT, [this]() {
+    _server.on(F("/api/node/config"), HTTP_PUT, [this]() {
       const char* body = _server.arg("plain").c_str();
 
       ConfigParser config {const_cast<char*>(body)};
@@ -208,7 +223,7 @@ public:
       }
     });
 
-    _server.on(UriBraces(F("/node/config/{}")), HTTP_GET, [this]() {
+    _server.on(UriBraces(F("/api/node/config/{}")), HTTP_GET, [this]() {
       const auto& category = _server.pathArg(0);
 
       if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
@@ -227,7 +242,7 @@ public:
       _buffer.end();
     });
 
-    _server.on(UriBraces(F("/node/config/{}")), HTTP_PUT, [this]() {
+    _server.on(UriBraces(F("/api/node/config/{}")), HTTP_PUT, [this]() {
       const auto& category = _server.pathArg(0);
       const char* body = _server.arg("plain").c_str();
 

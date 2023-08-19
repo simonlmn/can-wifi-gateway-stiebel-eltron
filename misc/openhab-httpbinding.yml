@@ -4,7 +4,7 @@ thingTypeUID: http:url
 configuration:
   authMode: BASIC
   ignoreSSLErrors: false
-  baseURL: http://<deviceAddress>:8080/data
+  baseURL: http://<deviceAddress>/api/data
   delay: 0
   stateMethod: GET
   refresh: 30

@@ -1,7 +1,7 @@
 @deviceAddress = 192.168.1.162
 
 ###
-POST http://{{deviceAddress}}:8080/subscriptions
+POST http://{{deviceAddress}}/api/subscriptions
 Content-Type: text/plain
 
 3,
@@ -56,7 +56,7 @@ Content-Type: text/plain
 49397,
 
 ###
-POST http://{{deviceAddress}}:8080/writable
+POST http://{{deviceAddress}}/api/writable
 Content-Type: text/plain
 
 5@HEA/1,

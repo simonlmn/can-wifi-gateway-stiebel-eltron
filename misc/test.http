@@ -1,16 +1,121 @@
-@deviceAddress = 192.168.1.162
+@deviceAddress = 192.168.3.225
 
 ###
-GET http://{{deviceAddress}}:8080/node/status
+POST http://{{deviceAddress}}/api/node/reset
 
 ###
-GET http://{{deviceAddress}}:8080/node/logs
+GET http://{{deviceAddress}}/api/node/status
 
 ###
-PUT http://{{deviceAddress}}:8080/node/log-level/api
+GET http://{{deviceAddress}}/api/node/logs
+
+###
+GET http://{{deviceAddress}}/api/node/config
 Content-Type: text/plain
 
-1
+###
+PUT http://{{deviceAddress}}/api/node/config/can
+Content-Type: text/plain
+
+mode=Normal;
 
 ###
-GET http://{{deviceAddress}}:8080/data
+PUT http://{{deviceAddress}}/api/node/config/dta
+Content-Type: text/plain
+
+mode=Configured;
+readOnly=false;
+
+###
+PUT http://{{deviceAddress}}/api/node/config/sep
+Content-Type: text/plain
+
+display=1;
+
+###
+GET http://{{deviceAddress}}/api/definitions
+
+###
+GET http://{{deviceAddress}}/api/data
+
+###
+POST http://{{deviceAddress}}/api/subscriptions
+Content-Type: text/plain
+
+3,
+4@HEA/1,
+12,
+13,
+14,
+15@HEA/1,
+18@HEA/1,
+22,
+274,
+374,
+474,
+613,
+833,
+942,
+943,
+944,
+945,
+1431,
+1433,
+1435,
+1436,
+1467,
+1611,
+1684,
+1690,
+1691,
+1696,
+2330,
+2331,
+2332,
+2333,
+2334,
+2335,
+2336,
+2337,
+2340,
+2341,
+2344,
+2345,
+2346,
+2347,
+2348,
+2349,
+2350,
+2351,
+2352,
+2353,
+49391,
+49396,
+49397,
+
+###
+POST http://{{deviceAddress}}/api/writable
+Content-Type: text/plain
+
+5@HEA/1,
+8@HEA/1,
+17@HEA/1,
+19,
+117@HEA/1,
+270@HEA/1,
+271@HEA/1,
+1388,
+1389,
+1391,
+1392,
+1393,
+1394,
+1395,
+1396,
+1398,
+1399,
+1400,
+1401,
+1402,
+1403,
+1501,
