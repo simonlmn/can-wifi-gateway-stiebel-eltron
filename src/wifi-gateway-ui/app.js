@@ -5,7 +5,16 @@ import { DefinitionsPage } from './pages/definitions.js';
 import { StatusPage } from './pages/status.js';
 import { ConfigPage } from './pages/config.js';
 
-const client = new HttpClient('http://192.168.3.225/api', 5000);
+// For development environments, the UI is loaded from a local dev server and not the gateway itself, so we need to obtain the gateway address.
+// We store that in the browsers local storage so it does not need to be entered with every reload.
+// For production environments, the gatewayAddress is always empty and therefore it uses the same address as the gateway automatically.
+let gatewayAddress = localStorage.getItem('gatewayAddress');
+if (!gatewayAddress && document.location.hostname === "127.0.0.1") {
+    gatewayAddress = `http://${prompt("Enter gateway address:")}`;
+    localStorage.setItem('gatewayAddress', gatewayAddress);
+}
+
+const client = new HttpClient(`${gatewayAddress}/api`, 5000);
 
 let navView = new ContainerView(document.querySelector('nav'));
 let pageView = new ContainerView(document.querySelector('main'));

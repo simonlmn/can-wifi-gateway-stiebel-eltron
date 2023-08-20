@@ -38,3 +38,6 @@ dist/
 
 # Generated files
 *.generated.*
+
+# Parcel
+.parcel-cache

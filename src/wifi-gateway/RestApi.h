@@ -9,8 +9,8 @@
 #include "StiebelEltronProtocol.h"
 #include "ResponseBuffer.h"
 
-#if __has_include("src/wifi-gateway-ui/wifi-gateway-ui.generated.h")
-#  include "src/wifi-gateway-ui/wifi-gateway-ui.generated.h"
+#if __has_include("src/wifi-gateway-ui/dist/wifi-gateway-ui.generated.h")
+#  include "src/wifi-gateway-ui/dist/wifi-gateway-ui.generated.h"
 #else
 #  include "no-ui.generated.h"
 #endif
