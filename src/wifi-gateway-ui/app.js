@@ -4,6 +4,7 @@ import { Navigation } from './navigation.js';
 import { DefinitionsPage } from './pages/definitions.js';
 import { StatusPage } from './pages/status.js';
 import { ConfigPage } from './pages/config.js';
+import { DataPage } from './pages/data.js';
 
 // For development environments, the UI is loaded from a local dev server and not the gateway itself, so we need to obtain the gateway address.
 // We store that in the browsers local storage so it does not need to be entered with every reload.
@@ -21,6 +22,7 @@ let pageView = new ContainerView(document.querySelector('main'));
 
 let navigation = new Navigation(navView, pageView);
 navigation.add('status', new StatusPage(client));
+navigation.add('data', new DataPage(client));
 navigation.add('config', new ConfigPage(client));
 navigation.add('definitions', new DefinitionsPage(client));
 
