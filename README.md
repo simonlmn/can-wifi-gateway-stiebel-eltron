@@ -3,6 +3,15 @@ Gateway to communicate with Stiebel Eltron heat pump controllers via an HTTP-bas
 
 For a schematic and PCB layout to build a device able to run this go to https://github.com/simonlmn/can-wifi-gateway-hardware.
 
+## Support
+
+If you want to support this project, you can:
+
+ * use it and provide feedback
+ * fix bugs
+ * develop improvements or new features
+ * [![Donate](https://img.shields.io/badge/Donate-with%20PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=BSKYG5C8S8HVU)
+
 ## Similar projects and references
 
 Of course, this is not the only or even the first attempt to reverse engineer the CAN bus protocol of Stiebel Eltron devices and to build a custom gateway to integrate these into various smart home solutions or similar things. What follows is a list in no particular order of websites, blog posts or forum discussions which in one way or another helped to build this solution:
