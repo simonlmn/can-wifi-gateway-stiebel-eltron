@@ -26,13 +26,13 @@ navigation.add('data', new DataPage(client));
 navigation.add('config', new ConfigPage(client));
 navigation.add('definitions', new DefinitionsPage(client));
 
-window.addEventListener('popstate', (event) => {
-    navigation.navigateTo(document.location.hash);
+window.addEventListener('popstate', async () => {
+    await navigation.navigateTo(document.location.hash);
 });
 
 if (document.location.hash) {
-    navigation.navigateTo(document.location.hash);
+    await navigation.navigateTo(document.location.hash);
 } else {
-    navigation.navigateTo('status');
+    await navigation.navigateTo('status');
 }
 

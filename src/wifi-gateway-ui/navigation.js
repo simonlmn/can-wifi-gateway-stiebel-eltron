@@ -10,11 +10,11 @@ class NotFoundPage {
         return '';
     }
 
-    enter(view) {
+    async enter(view) {
         view.p(`Page "${this.#id}" not found.`, { class: 'notice' });
     }
 
-    leave() {
+    async leave() {
     }
 }
 
@@ -34,14 +34,14 @@ export class Navigation {
         this.#navView.link(page.label, { href: `#${id}` });
     }
 
-    navigateTo(id) {
+    async navigateTo(id) {
         if (id.startsWith('#')) {
             id = id.substring(1);
         }
         document.location.hash = id;
-        this.currentPage?.leave();
+        await this.currentPage?.leave();
         this.#pageView.clear();
         this.currentPage = this.pages.has(id) ? this.pages.get(id) : new NotFoundPage(id);
-        this.currentPage.enter(this.#pageView);
+        await this.currentPage.enter(this.#pageView);
     }
 }

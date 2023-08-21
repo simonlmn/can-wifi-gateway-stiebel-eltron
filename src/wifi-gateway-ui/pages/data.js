@@ -1,4 +1,16 @@
 
+function formatValue(value) {
+    if (value instanceof Object) {
+        if (Array.isArray(value)) {
+            return value.join(', ');
+        } else {
+            return Object.entries(value).flatMap(([name, value]) => `${name}=${value}`).join('<br>\n');
+        }
+    } else {
+        return `${value}`;
+    }
+}
+
 export class DataPage {
     #client
 
@@ -10,37 +22,54 @@ export class DataPage {
         return 'Data';
     }
 
-    enter(view) {
+    async enter(view) {
         view.h1('Current data');
-        let table = view.table();
+        this.table = view.table();
+        this.state = view.p();
+        
+        this.state.attribute('class', null);
+        this.state.content(`<small>Loading...</small>`);
+        try {
+            const response = await this.#client.get('/data');
+            const data = await response.json();
+            this.table.clear();
 
-        this.#client.get('/data')
-            .then(async (response) => {
-                const data = await response.json();
-                table.clear();
-                table.addRow().addHeaders(['Source', 'ID', 'Name', 'Raw Value', 'Value', 'Unit', 'Last Update']);
-                for (let deviceType in data.items) {
-                    for (let deviceAddress in data.items[deviceType]) {
-                        for (let id in data.items[deviceType][deviceAddress]) {
-                            let datapoint = data.items[deviceType][deviceAddress][id];
-                            let value = datapoint.value;
-                            if (value instanceof Object) {
-                                if (Array.isArray(value)) {
-                                    value = value.join(', ');
-                                } else {
-                                    value = Object.entries(value).flatMap(([name, value]) => `${name}=${value}`).join('<br>\n');
-                                }
-                            }
-                            table.addRow().addColumns([datapoint.source, datapoint.id, datapoint.name, datapoint.rawValue, `${value}`, datapoint.unit, datapoint.lastUpdate]);
+            if (data.totalItems > 0) {
+                this.table.addRow().addHeaders([
+                    'Source',
+                    'ID',
+                    'Name',
+                    'Raw Value',
+                    'Value',
+                    'Unit',
+                    'Last Update'
+                ]);
+                for (const deviceType in data.items) {
+                    for (const deviceAddress in data.items[deviceType]) {
+                        for (const id in data.items[deviceType][deviceAddress]) {
+                            const datapoint = data.items[deviceType][deviceAddress][id];
+                            this.table.addRow().addColumns([
+                                datapoint.source,
+                                datapoint.id,
+                                datapoint.name,
+                                datapoint.rawValue,
+                                formatValue(datapoint.value),
+                                datapoint.unit,
+                                datapoint.lastUpdate
+                            ]);
                         }
                     }
                 }
-            })
-            .catch((err) => {
-                view.p(err, { class: 'notice' });
-            });
+            } else {
+                this.state.attribute('class', 'notice');
+                this.state.content('No data has been captured yet. You need to configure which datapoints shall be requested and/or captured.');
+            }
+        } catch (err) {
+            this.state.attribute('class', 'notice');
+            this.state.content(`${err}`);
+        }
     }
 
-    leave() {
+    async leave() {
     }
 }

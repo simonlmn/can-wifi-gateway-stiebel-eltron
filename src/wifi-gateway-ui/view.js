@@ -8,7 +8,7 @@ export function createElement(name, attributes, innerHTML) {
     return e;
 }
 
-class View {
+export class View {
     constructor(element) {
         this._element = element;
     }
@@ -27,7 +27,13 @@ class View {
     }
 
     addElement(name, attributes, innerHTML) {
-        return this._element.appendChild(createElement(name, attributes, innerHTML));
+        if (innerHTML instanceof View) {
+            const child = this._element.appendChild(createElement(name, attributes));
+            child.appendChild(innerHTML._element);
+            return child;
+        } else {
+            return this._element.appendChild(createElement(name, attributes, innerHTML));
+        }
     }
 
     attribute(name, value) {
@@ -110,7 +116,7 @@ export class ContainerView extends View {
     }
 }
 
-class FieldsetView extends ContainerView {
+export class FieldsetView extends ContainerView {
     constructor(legend, attributes) {
         super(createElement('fieldset', attributes));
         if (legend) {
@@ -127,7 +133,7 @@ class FieldsetView extends ContainerView {
     }
 }
 
-class LabelView extends View {
+export class LabelView extends View {
     #forView
 
     constructor(labelText, forView, attributes) {
@@ -150,7 +156,7 @@ class LabelView extends View {
     }
 }
 
-class CheckboxView extends View {
+export class CheckboxView extends View {
     constructor(label, attributes, callback) {
         super(createElement('input', attributes));
         this._element.type = 'checkbox';
@@ -170,7 +176,7 @@ class CheckboxView extends View {
     }
 }
 
-class NumberView extends View {
+export class NumberView extends View {
     constructor(label, attributes, callback) {
         super(createElement('input', attributes));
         this._element.type = 'number';
@@ -190,7 +196,7 @@ class NumberView extends View {
     }
 }
 
-class SelectView extends View {
+export class SelectView extends View {
     #options
 
     constructor(label, options, attributes, callback) {
@@ -216,7 +222,7 @@ class SelectView extends View {
     }
 }
 
-class ButtonView extends View {
+export class ButtonView extends View {
     constructor(text, attributes, callback) {
         super(createElement('button', attributes, text));
         this._element.type = 'button';
@@ -224,7 +230,7 @@ class ButtonView extends View {
     }
 }
 
-class DefinitionListView extends View {
+export class DefinitionListView extends View {
     constructor(attributes) {
         super(createElement('dl', attributes));
     }
@@ -235,7 +241,7 @@ class DefinitionListView extends View {
     }
 }
 
-class TableView extends View {
+export class TableView extends View {
     constructor(attributes) {
         super(createElement('table', attributes));
     }
@@ -245,7 +251,7 @@ class TableView extends View {
     }
 }
 
-class RowView extends View {
+export class RowView extends View {
     constructor(attributes) {
         super(createElement('tr', attributes));
     }

@@ -1,4 +1,6 @@
 
+import { CheckboxView, ButtonView } from '../view.js';
+
 function groupBy(list, keyGetter, valueGetter) {
     const map = new Map();
     list.forEach((item) => {
@@ -14,8 +16,8 @@ function groupBy(list, keyGetter, valueGetter) {
 }
 
 function parseConfig(data) {
-    let config = {};
-    for (let [category, values] of groupBy(data.split(';\n').filter(line => line.length > 0).map(line => line.split('=')).map(([path, value]) => path.split('.').concat(value)), ([category, name, value]) => category, ([category, name, value]) => [name, value])) {
+    const config = {};
+    for (const [category, values] of groupBy(data.split(';\n').filter(line => line.length > 0).map(line => line.split('=')).map(([path, value]) => path.split('.').concat(value)), ([category, name, value]) => category, ([category, name, value]) => [name, value])) {
         config[category] = Object.fromEntries(new Map(values));
     }
 
@@ -37,21 +39,29 @@ export class ConfigPage {
         return 'Configuration';
     }
 
-    enter(view) {
+    async enter(view) {
         view.h1('Configuration');
 
-        let fieldset = view.fieldset('Settings');
+        await this.#showSettings(view);
+        //await this.#showSubscriptions(view);
+    }
+
+    async leave() {
+    }
+
+    async #showSettings(view) {
+        const fieldset = view.fieldset('Settings');
         fieldset.disable();
 
-        let writeEnabled = fieldset.checkbox(fieldset.label('Enable write access'), { indeterminate: true }, (checked) => { });
-        let dataAccessMode = fieldset.select(fieldset.label('Data capture mode'), ['None', 'Configured', 'Defined', 'Any'], {}, (value) => { });
-        let displayAddress = fieldset.number(fieldset.label('Display address'), { min: 1, max: 4 }, (value) => { });
-        let canMode = fieldset.select(fieldset.label('CAN mode'), ['Normal', 'ListenOnly'], {}, (value) => { });
+        const writeEnabled = fieldset.checkbox(fieldset.label('Enable write access'), { indeterminate: true }, (checked) => { });
+        const dataAccessMode = fieldset.select(fieldset.label('Data capture mode'), ['None', 'Configured', 'Defined', 'Any'], {}, (value) => { });
+        const displayAddress = fieldset.number(fieldset.label('Display address'), { min: 1, max: 4 }, (value) => { });
+        const canMode = fieldset.select(fieldset.label('CAN mode'), ['Normal', 'ListenOnly'], {}, (value) => { });
 
-        fieldset.button('Save', {}, () => {
+        fieldset.button('Save', {}, async () => {
             fieldset.disable();
 
-            let config = {
+            const config = {
                 dta: {
                     mode: dataAccessMode.selected,
                     readOnly: writeEnabled.checked ? 'false' : 'true'
@@ -64,30 +74,81 @@ export class ConfigPage {
                 }
             };
 
-            this.#client.put('/node/config', serializeConfig(config))
-                .then(() => {
-                    fieldset.enable();
-                })
-                .catch((err) => {
-                    alert(err);
-                    fieldset.enable();
-                });
+            try {
+                await this.#client.put('/node/config', serializeConfig(config));
+            } catch (err) {
+                alert(err);
+            }
+            fieldset.enable();
         });
 
-        this.#client.get('/node/config')
-            .then(async (response) => {
-                let config = parseConfig(await response.text());
-                dataAccessMode.selected = config.dta.mode;
-                writeEnabled.checked = (config.dta.readOnly == "false");
-                displayAddress.value = parseInt(config.sep.display) + 1;
-                canMode.selected = config.can.mode;
-                fieldset.enable();
-            })
-            .catch((err) => {
-                alert(err);
-            });
+        try {
+            const response = await this.#client.get('/node/config');
+            const config = parseConfig(await response.text());
+            dataAccessMode.selected = config.dta.mode;
+            writeEnabled.checked = (config.dta.readOnly == "false");
+            displayAddress.value = parseInt(config.sep.display) + 1;
+            canMode.selected = config.can.mode;
+        } catch (err) {
+            alert(err);
+        }
+        fieldset.enable();
     }
 
-    leave() {
+    async #showSubscriptions(view) {
+        const fieldset = view.fieldset('Data configuration');
+        fieldset.disable();
+
+        const table = fieldset.table();
+        const add = fieldset.button('Add', {}, () => {
+            // TODO POST to /subscriptions and refresh table
+        });
+        const state = fieldset.p();
+        
+        state.attribute('class', null);
+        state.content(`<small>Loading...</small>`);
+        try {
+            const response = await this.#client.get('/data?onlyConfigured');
+            const data = await response.json();
+            table.clear();
+
+            if (data.totalItems > 0) {
+                table.addRow().addHeaders([
+                    'Source',
+                    'ID',
+                    'Name',
+                    'Unit',
+                    'Subscribed',
+                    'Writable'
+                ]);
+                for (const deviceType in data.items) {
+                    for (const deviceAddress in data.items[deviceType]) {
+                        for (const id in data.items[deviceType][deviceAddress]) {
+                            const datapoint = data.items[deviceType][deviceAddress][id];
+                            table.addRow().addColumns([
+                                datapoint.source,
+                                datapoint.id,
+                                datapoint.name,
+                                datapoint.unit,
+                                new CheckboxView(null, { checked: datapoint.subscribed }, (checked) => {
+                                    // TODO POST/DELETE to /subscriptions/...
+                                }),
+                                new CheckboxView(null, { checked: datapoint.writable }, (checked) => {
+                                    // TODO POST/DELETE to /writable/...
+                                })
+                            ]);
+                        }
+                    }
+                }
+            } else {
+                state.attribute('class', 'notice');
+                state.content('No data has been configured yet.');
+            }
+        } catch (err) {
+            state.attribute('class', 'notice');
+            state.content(`${err}`);
+        }
+
+        fieldset.enable();
     }
 }
