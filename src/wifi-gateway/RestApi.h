@@ -22,6 +22,7 @@ static const char HEADER_ACCEPT[] PROGMEM = "Accept";
 static const char ARG_PLAIN[] PROGMEM = "plain";
 static const char ARG_UPDATED_SINCE[] PROGMEM = "updatedSince";
 static const char ARG_ONLY_UNDEFINED[] PROGMEM = "onlyUndefined";
+static const char ARG_ONLY_CONFIGURED[] PROGMEM = "onlyConfigured";
 static const char ARG_NUMBERS_AS_DECIMALS[] PROGMEM = "numbersAsDecimals";
 static const char ARG_ACCESS_MODE[] PROGMEM = "accessMode";
 static const char ARG_VALIDATE_ONLY[] PROGMEM = "validateOnly";
@@ -59,6 +60,8 @@ public:
     _server.on(F("/api/data"), HTTP_GET, [this]() {
       if (_server.hasArg(FPSTR(ARG_ONLY_UNDEFINED))) {
         getItems([] (DataEntry const& entry) { return !entry.hasDefinition(); });
+      } else if (_server.hasArg(FPSTR(ARG_ONLY_CONFIGURED))) {
+        getItems([] (DataEntry const& entry) { return entry.isConfigured(); });
       } else {
         getItems();
       }
@@ -477,6 +480,8 @@ private:
     }
 
     _buffer.jsonObjectClose();
+    _buffer.jsonSeparator();
+    _buffer.jsonPropertyRaw(F("actualItems"), toConstStr(i, 10));
     _buffer.jsonObjectClose();
     _buffer.end();
   }

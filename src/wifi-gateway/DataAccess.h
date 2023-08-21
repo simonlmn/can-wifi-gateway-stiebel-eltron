@@ -23,6 +23,7 @@ struct DataEntry {
   const ValueDefinition* definition;
 
   bool hasDefinition() const { return definition != NULL && !definition->isUnknown(); }
+  bool isConfigured() const { return subscribed || writable; }
 
   DataEntry() : id(0), source(), rawValue(0), toWrite(0), lastUpdate(), lastUpdateMs(0), lastRequestMs(0), lastWriteMs(0), subscribed(false), writable(false), definition(NULL) {}
 };
