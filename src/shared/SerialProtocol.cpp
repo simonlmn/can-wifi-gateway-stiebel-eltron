@@ -11,7 +11,7 @@ using std::min;
 SerialProtocol::SerialProtocol(SerialReceiveCallback processReceivedLine) : _processReceivedLine(processReceivedLine) {}
 
 void SerialProtocol::setup() {
-    Serial.begin(115200);
+    Serial.begin(38400); // Could be higher if some flow control is implemented
     Serial.setTimeout(2);
 }
 
