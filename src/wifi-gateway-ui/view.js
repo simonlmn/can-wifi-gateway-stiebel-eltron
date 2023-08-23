@@ -26,6 +26,10 @@ export class View {
         }
     }
 
+    remove() {
+        this._element.remove();
+    }
+
     addElement(name, attributes, innerHTML) {
         if (innerHTML instanceof View) {
             const child = this._element.appendChild(createElement(name, attributes));
@@ -37,7 +41,7 @@ export class View {
     }
 
     attribute(name, value) {
-        if (value !== undefined || value !== null) {
+        if (value !== undefined && value !== null) {
             this._element.setAttribute(name, value);
         } else {
             this._element.removeAttribute(name);
@@ -111,8 +115,14 @@ export class ContainerView extends View {
         return this.addView(new ButtonView(text, attributes, callback));
     }
 
-    fieldset(attributes) {
-        return this.addView(new FieldsetView(attributes));
+    fieldset(legend, attributes) {
+        return this.addView(new FieldsetView(legend, attributes));
+    }
+
+    section(title, attributes) {
+        const view = this.addView(new ContainerView(attributes));
+        view.h2(title);
+        return view;
     }
 }
 
@@ -160,11 +170,19 @@ export class CheckboxView extends View {
     constructor(label, attributes, callback) {
         super(createElement('input', attributes));
         this._element.type = 'checkbox';
-        this._element.onchange = (e) => callback(e.target.checked);
+        this._element.onchange = (e) => callback(e.target.checked, this);
 
         if (label) {
             label.forView = this;
         }
+    }
+
+    disable() {
+        this._element.disabled = true;
+    }
+
+    enable() {
+        this._element.disabled = false;
     }
 
     set checked(checked) {
@@ -180,11 +198,19 @@ export class NumberView extends View {
     constructor(label, attributes, callback) {
         super(createElement('input', attributes));
         this._element.type = 'number';
-        this._element.onchange = (e) => callback(e.target.checked);
+        this._element.onchange = (e) => callback(e.target.value, this);
 
         if (label) {
             label.forView = this;
         }
+    }
+
+    disable() {
+        this._element.disabled = true;
+    }
+
+    enable() {
+        this._element.disabled = false;
     }
 
     set value(value) {
@@ -201,16 +227,19 @@ export class SelectView extends View {
 
     constructor(label, options, attributes, callback) {
         super(createElement('select', attributes));
-        this._element.onchange = (e) => callback(e.target.value);
-        this.#options = new Map();
-        for (let option of options) {
-            let e = this.addElement('option', { value: option }, option);
-            this.#options[option] = e;
-        }
-
+        this._element.onchange = (e) => callback(e.target.value, this);
+        this.options = options;
         if (label) {
             label.forView = this;
         }
+    }
+
+    disable() {
+        this._element.disabled = true;
+    }
+
+    enable() {
+        this._element.disabled = false;
     }
 
     set selected(option) {
@@ -220,13 +249,44 @@ export class SelectView extends View {
     get selected() {
         return this._element.value;
     }
+
+    set options(options) {
+        this.clear();
+        this.#options = new Map();
+        if (!options) {
+            return;
+        }
+
+        for (let option of options) {
+            let optionValue;
+            let optionLabel;
+            if (option instanceof Object) {
+                optionLabel = option.label;
+                optionValue = option.value;
+            } else if (Array.isArray(option)) {
+                [optionValue,optionLabel] = option;
+            } else {
+                optionValue = optionLabel = option;
+            }
+            let e = this.addElement('option', { value: optionValue }, optionLabel);
+            this.#options[optionValue] = e;
+        }
+    }
 }
 
 export class ButtonView extends View {
     constructor(text, attributes, callback) {
         super(createElement('button', attributes, text));
         this._element.type = 'button';
-        this._element.onclick = () => callback();
+        this._element.onclick = () => callback(this);
+    }
+
+    disable() {
+        this._element.disabled = true;
+    }
+
+    enable() {
+        this._element.disabled = false;
     }
 }
 
