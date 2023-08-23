@@ -34,6 +34,7 @@ enum struct CanLogLevel : uint8_t {
 enum struct CanMode : uint8_t {
   Normal = 0,
   ListenOnly = 1,
+  LoopBack = 2,
 };
 
 const char* canModeName(CanMode mode) {
@@ -42,6 +43,8 @@ const char* canModeName(CanMode mode) {
       return "Normal";
     case CanMode::ListenOnly:
       return "ListenOnly";
+    case CanMode::LoopBack:
+      return "LoopBack";
     default:
       return "?";
   }
@@ -50,6 +53,7 @@ const char* canModeName(CanMode mode) {
 CanMode canModeFromString(const char* mode, size_t length = SIZE_MAX) {
   if (strncmp(mode, "Normal", length) == 0) return CanMode::Normal;
   if (strncmp(mode, "ListenOnly", length) == 0) return CanMode::ListenOnly;
+  if (strncmp(mode, "LoopBack", length) == 0) return CanMode::LoopBack;
   return CanMode::ListenOnly;
 }
 

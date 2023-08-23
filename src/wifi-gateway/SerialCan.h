@@ -31,7 +31,7 @@ public:
     _canAvailable(false),
     _resetInterval(30000),
     _counters(),
-    _serial([this] (const char* line, SerialProtocol& serial) { processReceivedLine(line, serial); })
+    _serial([this] (const char* message, SerialProtocol& serial) { processReceived(message, serial); }, [this] (SerialErrorCode errorCode, SerialProtocol& serial) { handleError(errorCode, serial); })
   {
     node.logLevel("can", (int)_logLevel);
   }
@@ -66,10 +66,15 @@ public:
 
   void loop() {
     _logLevel = (CanLogLevel)_node.logLevel("can");
-    _serial.receive();
+    _serial.loop();
 
     if (!ready() && _resetInterval.elapsed()) {
       if (_logLevel >= CanLogLevel::Error) _node.log("can", "Timeout: resetting CAN module.");
+      resetInternal();
+    }
+
+    if (_counters.err > MAX_ERR_COUNT) {
+      if (_logLevel >= CanLogLevel::Error) _node.log("can", "Error threshold reached: resetting CAN module.");
       resetInternal();
     }
   }
@@ -104,7 +109,8 @@ public:
         logCanMessage("TX", message);
       }
 
-      sendTxMessage(_serial, message.id, message.ext, message.rtr, message.len, message.data);
+      // TODO check _serial.canQueue() and/or result from queueCanTxMessage()
+      queueCanTxMessage(_serial, message.id, message.ext, message.rtr, message.len, message.data);
 
       _counters.tx += 1;
     }
@@ -122,13 +128,19 @@ private:
     _resetPin = true;
     delay(100);
     _serial.reset();
+    delay(100);
     _resetPin = false;
     
     _resetInterval.restart();
   }
 
-  void processReceivedLine(const char* line, SerialProtocol& serial) {
-    const char* start = line;
+  void handleError(SerialErrorCode errorCode, SerialProtocol& serial) {
+    if (_logLevel >= CanLogLevel::Error) _node.log("can", format("Serial error %c: %s", static_cast<char>(errorCode), errorCodeDescription(errorCode)));
+    _counters.err += 1;
+  }
+
+  void processReceived(const char* message, SerialProtocol& serial) {
+    const char* start = message;
     char* end = nullptr;
 
     if (strncmp(start, "CANRX ", 6) == 0) {
@@ -171,26 +183,21 @@ private:
     } else if (strncmp(start, "CANTX ", 6) == 0) {
       if (strncmp(start + 6, "OK ", 3) != 0) {
         _counters.err += 1;
-        if (_logLevel >= CanLogLevel::Error) _node.log("can", line);
+        if (_logLevel >= CanLogLevel::Error) _node.log("can", message);
       }
     } else if (strncmp(start, "READY", 5) == 0) {
-      serial.send("SETUP %X %s", CAN_BITRATE, toSetupModeString(effectiveMode()));
+      serial.queue("SETUP %X %s", CAN_BITRATE, toSetupModeString(effectiveMode()));
     } else if (strncmp(start, "SETUP ", 6) == 0) {
       _canAvailable = strncmp(start + 6, "OK ", 3) == 0;
       if (_canAvailable) {
-        if (_logLevel >= CanLogLevel::Status) _node.log("can", line);
+        if (_logLevel >= CanLogLevel::Status) _node.log("can", message);
         if (_readyHandler) _readyHandler();
       } else {
-        if (_logLevel >= CanLogLevel::Error) _node.log("can", line);
+        if (_logLevel >= CanLogLevel::Error) _node.log("can", message);
       }
     } else {
       _counters.err += 1;
-      if (_logLevel >= CanLogLevel::Error) _node.log("can", line);
-    }
-
-    if (_counters.err > MAX_ERR_COUNT) {
-      if (_logLevel >= CanLogLevel::Error) _node.log("can", "Error threshold reached: resetting CAN module.");
-      resetInternal();
+      if (_logLevel >= CanLogLevel::Error) _node.log("can", message);
     }
   }
 
@@ -219,6 +226,8 @@ private:
       return "LIS";
     case CanMode::Normal:
       return "NOR";
+    case CanMode::LoopBack:
+      return "LOP";
     default:
       return "ERR";
     }

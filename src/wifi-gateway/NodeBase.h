@@ -74,6 +74,9 @@ public:
   }
 
   void setup() {
+#ifdef DEVELOPMENT_MODE
+    log("node", "DEVELOPMENT MODE");
+#endif
     _statusLedPin = true;
     LittleFS.begin();
 
@@ -121,6 +124,10 @@ public:
       _statusLedPin = false;
 
       lyield();
+
+#ifdef DEVELOPMENT_MODE
+      blinkFast();
+#endif
       
       _loop(status);
     } else {
@@ -287,6 +294,10 @@ private:
 
   void blinkMedium() {
     _statusLedPin.toggleIfUnchangedFor(500ul);
+  }
+
+  void blinkFast() {
+    _statusLedPin.toggleIfUnchangedFor(250ul);
   }
 
   void restoreConfiguration(String category) {
