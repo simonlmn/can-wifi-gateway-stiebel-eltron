@@ -1,4 +1,4 @@
-#define DEVELOPMENT_MODE
+//#define DEVELOPMENT_MODE
 
 #include "NodeBase.h"
 #include "SerialCan.h"
