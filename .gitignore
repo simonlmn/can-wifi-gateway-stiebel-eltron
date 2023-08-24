@@ -41,3 +41,12 @@ dist/
 
 # Parcel
 .parcel-cache
+
+# arduino-cli
+.arduino/inventory.yaml
+.arduino/*_index.json
+.arduino/*_index.json.sig
+.arduino/libraries/
+.arduino/staging/
+.arduino/packages/
+.arduino/tmp/
