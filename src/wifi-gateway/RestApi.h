@@ -27,6 +27,46 @@ static const char ARG_NUMBERS_AS_DECIMALS[] PROGMEM = "numbersAsDecimals";
 static const char ARG_ACCESS_MODE[] PROGMEM = "accessMode";
 static const char ARG_VALIDATE_ONLY[] PROGMEM = "validateOnly";
 
+template<typename JsonBuffer>
+class JsonDiagnosticsCollector final : public IDiagnosticsCollector {
+private:
+  JsonBuffer& _buffer;
+  bool _sectionOpen = false;
+  bool _hasValue = false;
+
+public:
+  JsonDiagnosticsCollector(JsonBuffer& buffer) : _buffer(buffer) {
+    _buffer.jsonObjectOpen();
+  };
+
+  ~JsonDiagnosticsCollector() {
+    if (_sectionOpen) {
+      _buffer.jsonObjectClose();  
+    }
+    _buffer.jsonObjectClose();
+  }
+
+  virtual void addSection(const char* name) override {
+    if (_sectionOpen) {
+      _buffer.jsonObjectClose();
+    }
+
+    _buffer.jsonPropertyStart(name);
+    _buffer.jsonObjectOpen();
+    _sectionOpen = true;
+    _hasValue = false;
+  }
+
+  virtual void addValue(const char* name, const char* value) {
+    if (_hasValue) {
+      _buffer.jsonSeparator();
+    }
+
+    _buffer.jsonPropertyString(name, value);
+    _hasValue = true;
+  }
+};
+
 class RestApi {
 private:
   ESP8266WebServer _server;
@@ -139,7 +179,17 @@ public:
     });
 
     _server.on(F("/api/node/status"), HTTP_GET, [this]() {
-      _server.send(200, FPSTR(CONTENT_TYPE_JSON), JSON.stringify(_node.getDiagnostics()));
+      if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
+        _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
+        return;
+      }
+      
+      {
+        JsonDiagnosticsCollector<ResponseBuffer<ESP8266WebServer>> collector {_buffer};
+        _node.getDiagnostics(collector);
+      }
+
+      _buffer.end();
     });
 
     _server.on(F("/api/node/logs"), HTTP_GET, [this]() {

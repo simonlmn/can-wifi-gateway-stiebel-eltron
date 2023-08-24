@@ -4,9 +4,7 @@
 #include <ESP8266WiFi.h>
 #include <strings_en.h>
 #include <WiFiManager.h>
-#include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
-#include <Arduino_JSON.h>
 #include "src/shared/Pins.h"
 #include "Config.h"
 #include "Logger.h"
@@ -15,6 +13,12 @@
 
 // Enable measurement of chip's VCC
 ADC_MODE(ADC_VCC);
+
+class IDiagnosticsCollector {
+public:
+  virtual void addSection(const char* name) = 0;
+  virtual void addValue(const char* name, const char* value) = 0;
+};
 
 enum struct ConnectionStatus {
   Disconnected,
@@ -32,8 +36,6 @@ class NodeBase {
   DigitalInput& _factoryResetPin;
 
   WiFiManager _wifiManager;
-
-  JSONVar _diagnostics;
 
   std::map<String, IConfigurable*> _configurables;
 
@@ -59,7 +61,6 @@ public:
     _updatePin(updatePin),
     _factoryResetPin(factoryResetPin),
     _wifiManager(),
-    _diagnostics(),
     _configurables(),
     _logLevels(),
     _logger(),
@@ -80,12 +81,6 @@ public:
     _statusLedPin = true;
     LittleFS.begin();
 
-    // Set static data which does not change during operation only once
-    _diagnostics["chipId"] = String(ESP.getChipId(), HEX);
-    _diagnostics["cpuFreq"] = ESP.getCpuFreqMHz();
-    _diagnostics["resetReason"] = ESP.getResetReason();
-    _diagnostics["sketchMD5"] = ESP.getSketchMD5();
-  
     _wifiManager.setConfigPortalBlocking(false);
     bool connected = _wifiManager.autoConnect();
 
@@ -259,16 +254,23 @@ public:
     lyield();
   }
 
-  const JSONVar& getDiagnostics() {
-    _diagnostics["epoch"] = _epoch;
-    _diagnostics["millis"] = millis();
-    _diagnostics["chipVcc"] = ESP.getVcc() / 1000.0;
-    _diagnostics["freeHeap"] = (unsigned long) ESP.getFreeHeap();
-    _diagnostics["heapFragmentation"] = ESP.getHeapFragmentation();
-    _diagnostics["maxFreeBlockSize"] = (long unsigned int)ESP.getMaxFreeBlockSize();
-    _diagnostics["wifiRssi"] = WiFi.RSSI();
-    _diagnostics["ip"] = WiFi.localIP().toString();
-    return _diagnostics;
+  void getDiagnostics(IDiagnosticsCollector& collector) const {
+    collector.addSection("node");
+    collector.addValue("chipId", format("%x", ESP.getChipId()));
+    collector.addValue("flashChipId", format("%x", ESP.getFlashChipId()));
+    collector.addValue("sketchMD5", ESP.getSketchMD5().c_str());
+    collector.addValue("coreVersion", ESP.getCoreVersion().c_str());
+    collector.addValue("sdkVersion", ESP.getSdkVersion());
+    collector.addValue("cpuFreq", format("%u", ESP.getCpuFreqMHz()));
+    collector.addValue("chipVcc", format("%1.2f", ESP.getVcc() / 1000.0));
+    collector.addValue("resetReason", ESP.getResetReason().c_str());
+    collector.addValue("epoch", format("%lu", _epoch));
+    collector.addValue("millis", format("%lu", millis()));
+    collector.addValue("freeHeap", format("%u", ESP.getFreeHeap()));
+    collector.addValue("heapFragmentation", format("%u", ESP.getHeapFragmentation()));
+    collector.addValue("maxFreeBlockSize", format("%u", ESP.getMaxFreeBlockSize()));
+    collector.addValue("wifiRssi", format("%i", WiFi.RSSI()));
+    collector.addValue("ip", WiFi.localIP().toString().c_str());
   }
 
 private:
