@@ -27,7 +27,7 @@ enum struct ConnectionStatus {
   Disconnecting,
 };
 
-class NodeBase {
+class ApplicationContainer {
   const char* _otaPassword;
 
   DigitalOutput& _statusLedPin;
@@ -54,7 +54,7 @@ class NodeBase {
   bool _stopped;
   
 public:
-  NodeBase(const char* otaPassword, DigitalOutput& statusLedPin, DigitalInput& otaEnablePin, DigitalInput& updatePin, DigitalInput& factoryResetPin)
+  ApplicationContainer(const char* otaPassword, DigitalOutput& statusLedPin, DigitalInput& otaEnablePin, DigitalInput& updatePin, DigitalInput& factoryResetPin)
     : _otaPassword(otaPassword),
     _statusLedPin(statusLedPin),
     _otaEnablePin(otaEnablePin),
@@ -76,7 +76,7 @@ public:
 
   void setup() {
 #ifdef DEVELOPMENT_MODE
-    log("node", "DEVELOPMENT MODE");
+    log("system", "DEVELOPMENT MODE");
 #endif
     _statusLedPin = true;
     LittleFS.begin();
@@ -88,11 +88,11 @@ public:
       setupOTA();
     }
     
-    log("node", "internal setup done.");
+    log("system", "internal setup done.");
 
     _setup(connected);
 
-    log("node", "all setup done.");
+    log("system", "all setup done.");
     
     _statusLedPin = false;
   }
@@ -111,7 +111,7 @@ public:
     if (connected()) {
       ConnectionStatus status = ConnectionStatus::Connected;      
       if (_disconnectedSinceMs > 0) {
-        log("node", format(F("reconnected after %u ms."), currentMs - _disconnectedSinceMs));
+        log("system", format(F("reconnected after %u ms."), currentMs - _disconnectedSinceMs));
         _disconnectedSinceMs = 0;
         status = ConnectionStatus::Connecting;
       }
@@ -129,7 +129,7 @@ public:
       ConnectionStatus status = ConnectionStatus::Disconnected;
       if (_disconnectedSinceMs == 0 || currentMs < _disconnectedSinceMs /* detect millis() wrap-around */) {
         _disconnectedSinceMs = currentMs;
-        log("node", "disconnected.");
+        log("system", "disconnected.");
         status = ConnectionStatus::Disconnecting;
       }
 
@@ -165,7 +165,7 @@ public:
     _setup = [](bool) { };
     _loop = [this](ConnectionStatus) { blinkMedium(); };
 
-    log("node", "STOP!");
+    log("system", "STOP!");
   }
 
   void factoryReset() {
@@ -255,7 +255,7 @@ public:
   }
 
   void getDiagnostics(IDiagnosticsCollector& collector) const {
-    collector.addSection("node");
+    collector.addSection("system");
     collector.addValue("chipId", format("%x", ESP.getChipId()));
     collector.addValue("flashChipId", format("%x", ESP.getFlashChipId()));
     collector.addValue("sketchMD5", ESP.getSketchMD5().c_str());
@@ -284,8 +284,8 @@ private:
   
   void setupOTA() {
     ArduinoOTA.setPassword(_otaPassword);
-    ArduinoOTA.onStart([this] () { stop(); LittleFS.end(); log("node", "starting OTA update..."); _statusLedPin = true; });
-    ArduinoOTA.onEnd([this] () { _statusLedPin = false; log("node", "OTA update finished."); });
+    ArduinoOTA.onStart([this] () { stop(); LittleFS.end(); log("system", "starting OTA update..."); _statusLedPin = true; });
+    ArduinoOTA.onEnd([this] () { _statusLedPin = false; log("system", "OTA update finished."); });
     ArduinoOTA.onProgress([this] (unsigned int progress, unsigned int total) { _statusLedPin.trigger(true, 10); });
     ArduinoOTA.begin();
   }
@@ -305,22 +305,22 @@ private:
   void restoreConfiguration(String category) {
     auto configurable = _configurables.find(category);
     if (configurable == _configurables.end()) {
-      log("node", format("restore config failed: '%s' is not configurable.", category.c_str()));
+      log("system", format("restore config failed: '%s' is not configurable.", category.c_str()));
       return;
     }
 
     ConfigParser parser = readConfigFile(format("/config/%s", category.c_str()));
     if (parser.parse([&] (char* name, const char* value) { return configurable->second->configure(name, value); })) {
-      log("node", format("restored config for '%s'.", category.c_str()));
+      log("system", format("restored config for '%s'.", category.c_str()));
     } else {
-      log("node", format("failed to restore config for '%s'.", category.c_str()));
+      log("system", format("failed to restore config for '%s'.", category.c_str()));
     }
   }
 
   void persistConfiguration(String category) {
     auto configurable = _configurables.find(category);
     if (configurable == _configurables.end()) {
-      log("node", format("persist config failed: '%s' is not configurable.", category.c_str()));
+      log("system", format("persist config failed: '%s' is not configurable.", category.c_str()));
       return;
     }
 

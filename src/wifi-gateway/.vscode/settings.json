@@ -11,7 +11,7 @@
         "__errc": "cpp",
         "__hash_table": "cpp",
         "__mutex_base": "cpp",
-        "__node_handle": "cpp",
+        "__system_handle": "cpp",
         "__nullptr": "cpp",
         "__split_buffer": "cpp",
         "__string": "cpp",

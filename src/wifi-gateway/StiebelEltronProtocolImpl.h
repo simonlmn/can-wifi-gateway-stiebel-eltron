@@ -140,7 +140,7 @@ namespace impl {
 template<typename NodeInterface, typename CanInterface>
 class StiebelEltronProtocol final : public IConfigurable {
 private:
-  NodeInterface& _node;
+  NodeInterface& _system;
   CanInterface& _can;
   uint8_t _displayIndex;
   DeviceId _deviceId;
@@ -153,8 +153,8 @@ private:
   std::function<void(WriteData const& data)> _writeHandler;
   
 public:
-  StiebelEltronProtocol(NodeInterface& node, CanInterface& can)
-    : _node(node),
+  StiebelEltronProtocol(NodeInterface& system, CanInterface& can)
+    : _system(system),
     _can(can),
     _displayIndex(),
     _deviceId(),
@@ -183,7 +183,7 @@ public:
     _deviceId = {DeviceType::Display, DISPLAY_ADDRESSES[displayIndex]};  
     _canId = toCanId(_deviceId);
 
-    _node.log("sep", format("Set display index '%u' (deviceId=%s, canId=%lX)", _displayIndex, _deviceId.toString(), _canId));
+    _system.log("sep", format("Set display index '%u' (deviceId=%s, canId=%lX)", _displayIndex, _deviceId.toString(), _canId));
 
     if (_ready) {
       registerDisplay();
@@ -194,7 +194,7 @@ public:
   }
   
   void setup() {
-    _node.addConfigurable("sep", this);
+    _system.addConfigurable("sep", this);
 
     _can.onReady([this] () {
       registerDisplay();
@@ -231,7 +231,7 @@ public:
       return;
     }
 
-    _node.lyield();
+    _system.lyield();
 
     CanMessage message;
     if (data.sourceId.isExact()) {
@@ -261,7 +261,7 @@ public:
       return;
     }
 
-    _node.lyield();
+    _system.lyield();
     
     CanMessage message;
     if (data.sourceId.isExact()) {
@@ -352,7 +352,7 @@ private:
 
   void processProtocol(CanMessage const& frame) {
     if (!frame.ext && !frame.rtr && frame.len == 7) {
-      _node.lyield();
+      _system.lyield();
 
       MessageType type = getMessageType(frame.data);
       DeviceId target = getTargetId(frame.data);
@@ -370,7 +370,7 @@ private:
       }
 
       if (type == MessageType::Register) {
-        _node.log("sep", format("%s t:%s s:%s %02X %02X %02X %02X %02X", messageTypeName(type), target.toString(), source.toString(), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]));
+        _system.log("sep", format("%s t:%s s:%s %02X %02X %02X %02X %02X", messageTypeName(type), target.toString(), source.toString(), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]));
       }
 
       if (type == MessageType::Write || type == MessageType::Response || type == MessageType::Request) {
@@ -378,11 +378,11 @@ private:
         ValueId valueId = getValueId(frame.data);
         uint16_t value = getValue(frame.data);
 
-        int logLevel = _node.logLevel("sep");
+        int logLevel = _system.logLevel("sep");
         if (logLevel > 0) {
           bool isNotTargetedAtThis = !target.includes(_deviceId);
           if (logLevel > 1 || isNotTargetedAtThis) {
-            _node.log("sep", format("%c%s t:%s s:%s %02X id:%04X v:%04X", isNotTargetedAtThis ? '*' : '+', messageTypeName(type), target.toString(), source.toString(), fix, valueId, value));
+            _system.log("sep", format("%c%s t:%s s:%s %02X id:%04X v:%04X", isNotTargetedAtThis ? '*' : '+', messageTypeName(type), target.toString(), source.toString(), fix, valueId, value));
           }
         }
         

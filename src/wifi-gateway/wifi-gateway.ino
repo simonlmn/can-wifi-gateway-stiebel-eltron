@@ -1,6 +1,6 @@
 //#define DEVELOPMENT_MODE
 
-#include "NodeBase.h"
+#include "ApplicationContainer.h"
 #include "SerialCan.h"
 #include "StiebelEltronProtocol.h"
 #include "DateTimeSource.h"
@@ -31,15 +31,15 @@ DigitalOutput canResetPin { pins::esp8266::nodemcu::D1, false, SignalMode::Inver
 DigitalOutput builtinLed { LED_BUILTIN, false, SignalMode::Inverted };
 }
 
-NodeBase node ("fzDL9RKdPAhAhFu7", io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin);
-SerialCan can (node, io::canResetPin, io::txEnablePin);
-StiebelEltronProtocol protocol (node, can);
-DateTimeSource timeSource (node, protocol);
-DataAccess access (node, protocol, timeSource, io::writeEnablePin);
-RestApi api (node, access, protocol);
+ApplicationContainer app ("fzDL9RKdPAhAhFu7", io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin);
+SerialCan can (app, io::canResetPin, io::txEnablePin);
+StiebelEltronProtocol protocol (app, can);
+DateTimeSource timeSource (app, protocol);
+DataAccess access (app, protocol, timeSource, io::writeEnablePin);
+RestApi api (app, access, protocol);
 
 void setup() {
-  node.init(
+  app.init(
     [] (bool connected) {
       can.setup(); yield();
       protocol.setup(); yield();
@@ -51,17 +51,17 @@ void setup() {
       }
     },
     [] (ConnectionStatus status) {
-      can.loop(); node.lyield();
-      protocol.loop(); node.lyield();
-      timeSource.loop(); node.lyield();
-      access.loop(); node.lyield();
+      can.loop(); app.lyield();
+      protocol.loop(); app.lyield();
+      timeSource.loop(); app.lyield();
+      access.loop(); app.lyield();
 
       switch (status) {
         case ConnectionStatus::Connecting:
           api.begin();
           break;
         case ConnectionStatus::Connected:
-          api.loop(); node.lyield();
+          api.loop(); app.lyield();
           break;
         case ConnectionStatus::Disconnecting:
           api.end();
@@ -69,9 +69,9 @@ void setup() {
       }
     });
 
-  node.setup();
+  app.setup();
 
-  node.log("ios", format("ota=%u write=%u tx=%u debug=%u",
+  app.log("ios", format("ota=%u write=%u tx=%u debug=%u",
     io::otaEnablePin.read(),
     io::writeEnablePin.read(),
     io::txEnablePin.read(),
@@ -80,5 +80,5 @@ void setup() {
 }
 
 void loop() {
-  node.loop();
+  app.loop();
 }

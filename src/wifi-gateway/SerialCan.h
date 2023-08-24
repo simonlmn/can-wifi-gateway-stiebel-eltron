@@ -1,6 +1,6 @@
 #pragma once
 
-#include "NodeBase.h"
+#include "ApplicationContainer.h"
 #include "CanInterface.h"
 #include "src/shared/SerialProtocol.h"
 
@@ -9,7 +9,7 @@ private:
   static const uint32_t CAN_BITRATE = 20UL * 1000UL; // 20 kbit/s
   static constexpr uint32_t MAX_ERR_COUNT = 5;
 
-  NodeBase& _node;
+  ApplicationContainer& _system;
   DigitalOutput& _resetPin;
   DigitalInput& _txEnablePin;
   bool _canAvailable;
@@ -24,8 +24,8 @@ private:
   SerialProtocol _serial;
 
 public:
-  SerialCan(NodeBase& node, DigitalOutput& resetPin, DigitalInput& txEnablePin) :
-    _node(node),
+  SerialCan(ApplicationContainer& system, DigitalOutput& resetPin, DigitalInput& txEnablePin) :
+    _system(system),
     _resetPin(resetPin),
     _txEnablePin(txEnablePin),
     _canAvailable(false),
@@ -33,7 +33,7 @@ public:
     _counters(),
     _serial([this] (const char* message, SerialProtocol& serial) { processReceived(message, serial); }, [this] (SerialErrorCode errorCode, SerialProtocol& serial) { handleError(errorCode, serial); })
   {
-    node.logLevel("can", (int)_logLevel);
+    system.logLevel("can", (int)_logLevel);
   }
 
   bool configure(const char* name, const char* value) override {
@@ -48,7 +48,7 @@ public:
   bool setMode(CanMode mode) {
     _mode = mode;
     reset();
-    _node.log("can", format("Set mode '%s'.", canModeName(_mode)));
+    _system.log("can", format("Set mode '%s'.", canModeName(_mode)));
     return true;
   }
 
@@ -57,30 +57,30 @@ public:
   }
 
   void setup() {
-    if (_logLevel >= CanLogLevel::Status) _node.log("can", "Initializing SerialCan.");
+    if (_logLevel >= CanLogLevel::Status) _system.log("can", "Initializing SerialCan.");
     _serial.setup();
     delay(100);
-    _node.addConfigurable("can", this);
+    _system.addConfigurable("can", this);
     reset();
   }
 
   void loop() {
-    _logLevel = (CanLogLevel)_node.logLevel("can");
+    _logLevel = (CanLogLevel)_system.logLevel("can");
     _serial.loop();
 
     if (!ready() && _resetInterval.elapsed()) {
-      if (_logLevel >= CanLogLevel::Error) _node.log("can", "Timeout: resetting CAN module.");
+      if (_logLevel >= CanLogLevel::Error) _system.log("can", "Timeout: resetting CAN module.");
       resetInternal();
     }
 
     if (_counters.err > MAX_ERR_COUNT) {
-      if (_logLevel >= CanLogLevel::Error) _node.log("can", "Error threshold reached: resetting CAN module.");
+      if (_logLevel >= CanLogLevel::Error) _system.log("can", "Error threshold reached: resetting CAN module.");
       resetInternal();
     }
   }
 
   void reset() {
-    if (_logLevel >= CanLogLevel::Status) _node.log("can", "Resetting CAN module.");
+    if (_logLevel >= CanLogLevel::Status) _system.log("can", "Resetting CAN module.");
     resetInternal();
   }
 
@@ -135,7 +135,7 @@ private:
   }
 
   void handleError(SerialErrorCode errorCode, SerialProtocol& serial) {
-    if (_logLevel >= CanLogLevel::Error) _node.log("can", format("Serial error %c: %s", static_cast<char>(errorCode), errorCodeDescription(errorCode)));
+    if (_logLevel >= CanLogLevel::Error) _system.log("can", format("Serial error %c: %s", static_cast<char>(errorCode), errorCodeDescription(errorCode)));
     _counters.err += 1;
   }
 
@@ -183,21 +183,21 @@ private:
     } else if (strncmp(start, "CANTX ", 6) == 0) {
       if (strncmp(start + 6, "OK ", 3) != 0) {
         _counters.err += 1;
-        if (_logLevel >= CanLogLevel::Error) _node.log("can", message);
+        if (_logLevel >= CanLogLevel::Error) _system.log("can", message);
       }
     } else if (strncmp(start, "READY", 5) == 0) {
       serial.queue("SETUP %X %s", CAN_BITRATE, toSetupModeString(effectiveMode()));
     } else if (strncmp(start, "SETUP ", 6) == 0) {
       _canAvailable = strncmp(start + 6, "OK ", 3) == 0;
       if (_canAvailable) {
-        if (_logLevel >= CanLogLevel::Status) _node.log("can", message);
+        if (_logLevel >= CanLogLevel::Status) _system.log("can", message);
         if (_readyHandler) _readyHandler();
       } else {
-        if (_logLevel >= CanLogLevel::Error) _node.log("can", message);
+        if (_logLevel >= CanLogLevel::Error) _system.log("can", message);
       }
     } else {
       _counters.err += 1;
-      if (_logLevel >= CanLogLevel::Error) _node.log("can", message);
+      if (_logLevel >= CanLogLevel::Error) _system.log("can", message);
     }
   }
 
@@ -216,7 +216,7 @@ private:
       insertPos += snprintf(logMessage + insertPos, 36 - insertPos, "%02X", message.data[i]);
     }
     
-    _node.log("can", logMessage);
+    _system.log("can", logMessage);
   }
 
   const char* toSetupModeString(CanMode mode) const {

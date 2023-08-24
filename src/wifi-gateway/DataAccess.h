@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ApplicationContainer.h"
 #include <utility>
 #include <map>
 #include <algorithm>
@@ -67,7 +68,7 @@ public:
   using DataMap = std::map<DataKey, DataEntry>;
 
 private:
-  NodeBase& _node;
+  ApplicationContainer& _system;
   StiebelEltronProtocol& _protocol;
   DateTimeSource& _dateTimeSource;
   DigitalInput& _writeEnablePin;
@@ -79,8 +80,8 @@ private:
   std::function<void(DataEntry const& entry)> _updateHandler;
 
 public:
-  DataAccess(NodeBase& node, StiebelEltronProtocol& protocol, DateTimeSource& dateTimeSource, DigitalInput& writeEnablePin)
-    : _node(node),
+  DataAccess(ApplicationContainer& system, StiebelEltronProtocol& protocol, DateTimeSource& dateTimeSource, DigitalInput& writeEnablePin)
+    : _system(system),
     _protocol(protocol),
     _dateTimeSource(dateTimeSource),
     _writeEnablePin(writeEnablePin),
@@ -104,13 +105,13 @@ public:
 
   bool setMode(DataCaptureMode mode) {
     _mode = mode;
-    _node.log("dta", format("Set mode '%s'.", dataCaptureModeName(_mode)));
+    _system.log("dta", format("Set mode '%s'.", dataCaptureModeName(_mode)));
     return true;
   }
 
   bool setReadOnly(bool readOnly) {
     _readOnly = readOnly;
-    _node.log("dta", format("%s write access (%seffective).", _readOnly ? "Disabled" : "Enabled", effectiveReadOnly() == _readOnly ? "" : "NOT "));
+    _system.log("dta", format("%s write access (%seffective).", _readOnly ? "Disabled" : "Enabled", effectiveReadOnly() == _readOnly ? "" : "NOT "));
     return true;
   }
 
@@ -119,7 +120,7 @@ public:
   }
 
   void setup() {
-    _node.addConfigurable("dta", this);
+    _system.addConfigurable("dta", this);
 
     restoreSubscriptions();
     restoreWritables();
@@ -258,7 +259,7 @@ private:
               DeviceId deviceId {DeviceType(entry[2]), entry[3]};
               addSubscriptionInternal({deviceId, valueId});
             }
-            _node.lyield();
+            _system.lyield();
           }
         } else {
           // Different file format or version, ignore for now.
@@ -283,7 +284,7 @@ private:
           };
           subscriptionsFile.write(entry, 4);
         }
-        _node.lyield();
+        _system.lyield();
       }
       subscriptionsFile.close();
     }
@@ -334,7 +335,7 @@ private:
               DeviceId deviceId {DeviceType(entry[2]), entry[3]};
               addWritableInternal({deviceId, valueId});
             }
-            _node.lyield();
+            _system.lyield();
           }
         } else {
           // Different file format or version, ignore for now.
@@ -359,7 +360,7 @@ private:
           };
           writablesFile.write(entry, 4);
         }
-        _node.lyield();
+        _system.lyield();
       }
       writablesFile.close();
     }
@@ -408,7 +409,7 @@ private:
         ++_dataIterator;
         --remainingDataEntries;
 
-        _node.lyield();
+        _system.lyield();
       }
 
       _maintenanceInterval.restart();
@@ -420,7 +421,7 @@ private:
       return;
     }
 
-    _node.lyield();
+    _system.lyield();
 
     auto& currentDateTime = getCurrentDateTime();
     if (currentDateTime.isSet()) {// Only process data if we have established the current date and time

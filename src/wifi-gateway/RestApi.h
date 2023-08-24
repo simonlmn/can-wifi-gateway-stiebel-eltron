@@ -1,10 +1,9 @@
 #pragma once
 
 #include <ESP8266WebServer.h>
-#include <Arduino_JSON.h>
 #include <uri/UriBraces.h>
 #include <uri/UriGlob.h>
-#include "NodeBase.h"
+#include "ApplicationContainer.h"
 #include "DataAccess.h"
 #include "StiebelEltronProtocol.h"
 #include "ResponseBuffer.h"
@@ -72,12 +71,12 @@ private:
   ESP8266WebServer _server;
   ResponseBuffer<ESP8266WebServer> _buffer;
 
-  NodeBase& _node;
+  ApplicationContainer& _system;
   DataAccess& _access;
   StiebelEltronProtocol& _protocol;
   
 public:
-  RestApi(NodeBase& node, DataAccess& access, StiebelEltronProtocol& protocol) : _server(80), _buffer(_server), _node(node), _access(access), _protocol(protocol) {}
+  RestApi(ApplicationContainer& system, DataAccess& access, StiebelEltronProtocol& protocol) : _server(80), _buffer(_server), _system(system), _access(access), _protocol(protocol) {}
   
   void setup() {
     _server.enableCORS(true);
@@ -120,7 +119,7 @@ public:
         if (space != nullptr) {
           const char* unitSymbol = getUnitSymbol(entry.definition->unit);
           if (strcmp(space + 1, unitSymbol) != 0) {
-            if (_node.logLevel("api") > 0) _node.log("api", format("PUT data: unit mismatch %s != %s", space + 1, unitSymbol));
+            if (_system.logLevel("api") > 0) _system.log("api", format("PUT data: unit mismatch %s != %s", space + 1, unitSymbol));
             return false;
           }
         }
@@ -128,7 +127,7 @@ public:
         uint32_t rawValue = entry.definition->toRaw(valueString, space);
 
         if (Codec::isError(rawValue)) {
-          if (_node.logLevel("api") > 0) _node.log("api", format("PUT data: value error %s", valueString));
+          if (_system.logLevel("api") > 0) _system.log("api", format("PUT data: value error %s", valueString));
           return false;
         }
   
@@ -168,17 +167,17 @@ public:
       getDevices();
     });
     
-    _server.on(F("/api/node/reset"), HTTP_POST, [this]() {
-      _node.reset();
+    _server.on(F("/api/system/reset"), HTTP_POST, [this]() {
+      _system.reset();
       _server.send(204);
     });
 
-    _server.on(F("/api/node/stop"), HTTP_POST, [this]() {
-      _node.stop();
+    _server.on(F("/api/system/stop"), HTTP_POST, [this]() {
+      _system.stop();
       _server.send(204);
     });
 
-    _server.on(F("/api/node/status"), HTTP_GET, [this]() {
+    _server.on(F("/api/system/status"), HTTP_GET, [this]() {
       if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
         _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
         return;
@@ -186,42 +185,42 @@ public:
       
       {
         JsonDiagnosticsCollector<ResponseBuffer<ESP8266WebServer>> collector {_buffer};
-        _node.getDiagnostics(collector);
+        _system.getDiagnostics(collector);
       }
 
       _buffer.end();
     });
 
-    _server.on(F("/api/node/logs"), HTTP_GET, [this]() {
+    _server.on(F("/api/system/logs"), HTTP_GET, [this]() {
       if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
         _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
         return;
       }
       
-      _node.getLogger().output([&] (const char* entry) {
+      _system.getLogger().output([&] (const char* entry) {
         _buffer.plainText(entry);
-        _node.lyield();
+        _system.lyield();
       });
 
       _buffer.end();
     });
 
-    _server.on(UriBraces(F("/api/node/log-level/{}")), HTTP_PUT, [this]() {
+    _server.on(UriBraces(F("/api/system/log-level/{}")), HTTP_PUT, [this]() {
       const auto& category = _server.pathArg(0);
       auto logLevel = _server.arg("plain").toInt();
 
-      _node.logLevel(category, logLevel);
+      _system.logLevel(category, logLevel);
       
-      _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), String((int)_node.logLevel(category)));
+      _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), String((int)_system.logLevel(category)));
     });
 
-    _server.on(F("/api/node/config"), HTTP_GET, [this]() {
+    _server.on(F("/api/system/config"), HTTP_GET, [this]() {
       if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
         _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
         return;
       }
 
-      _node.getAllConfig([&] (const char* path, const char* value) {
+      _system.getAllConfig([&] (const char* path, const char* value) {
         _buffer.plainText(path);
         _buffer.plainChar(ConfigParser::SEPARATOR);
         _buffer.plainText(value);
@@ -232,19 +231,19 @@ public:
       _buffer.end();
     });
 
-    _server.on(F("/api/node/config"), HTTP_PUT, [this]() {
+    _server.on(F("/api/system/config"), HTTP_PUT, [this]() {
       const char* body = _server.arg("plain").c_str();
 
       ConfigParser config {const_cast<char*>(body)};
 
-      if (_node.configureAll(config)) {
+      if (_system.configureAll(config)) {
         _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), body);
       } else {
         _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), EMPTY_STRING);
       }
     });
 
-    _server.on(UriBraces(F("/api/node/config/{}")), HTTP_GET, [this]() {
+    _server.on(UriBraces(F("/api/system/config/{}")), HTTP_GET, [this]() {
       const auto& category = _server.pathArg(0);
 
       if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
@@ -252,7 +251,7 @@ public:
         return;
       }
 
-      _node.getConfig(category, [&] (const char* name, const char* value) {
+      _system.getConfig(category, [&] (const char* name, const char* value) {
         _buffer.plainText(name);
         _buffer.plainChar(ConfigParser::SEPARATOR);
         _buffer.plainText(value);
@@ -263,13 +262,13 @@ public:
       _buffer.end();
     });
 
-    _server.on(UriBraces(F("/api/node/config/{}")), HTTP_PUT, [this]() {
+    _server.on(UriBraces(F("/api/system/config/{}")), HTTP_PUT, [this]() {
       const auto& category = _server.pathArg(0);
       const char* body = _server.arg("plain").c_str();
 
       ConfigParser config {const_cast<char*>(body)};
 
-      if (_node.configure(category, config)) {
+      if (_system.configure(category, config)) {
         _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), body);
       } else {
         _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), EMPTY_STRING);
@@ -302,7 +301,7 @@ private:
    * It is allowed to have spaces or other whitespace _after_ the commas.
    */
   void postItems(std::function<bool(DataAccess::DataKey const&)> itemOperation = {}) {
-    _node.lyield();
+    _system.lyield();
 
     const char* body = _server.arg(FPSTR(ARG_PLAIN)).c_str();
     char* next;
@@ -357,7 +356,7 @@ private:
       }
       body = next;
 
-      _node.lyield();
+      _system.lyield();
     }
 
     if (strlen(body) > 0) {
@@ -376,9 +375,9 @@ private:
    *  3. ValueId
    */
   void doItem(std::function<bool(DataAccess::DataKey const&, DataEntry const&)> itemOperation = {}) {
-    _node.lyield();
+    _system.lyield();
 
-    if (_node.logLevel("api") > 1) _node.log("api", format("doItem: %s", _server.arg(FPSTR(ARG_PLAIN)).c_str()));
+    if (_system.logLevel("api") > 1) _system.log("api", format("doItem: %s", _server.arg(FPSTR(ARG_PLAIN)).c_str()));
 
     bool validateOnly = _server.hasArg(FPSTR(ARG_VALIDATE_ONLY));
     
@@ -410,7 +409,7 @@ private:
       return;
     }
 
-    _node.lyield();
+    _system.lyield();
 
     if (validateOnly) {
       _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), _server.arg(FPSTR(ARG_PLAIN)));
@@ -418,7 +417,7 @@ private:
       if (itemOperation(key, *entry)) {
         _server.send(202, FPSTR(CONTENT_TYPE_PLAIN), EMPTY_STRING);
       } else {
-        if (_node.logLevel("api") > 0) _node.log("api", "doItem: operation failed");
+        if (_system.logLevel("api") > 0) _system.log("api", "doItem: operation failed");
         _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), F("operation failed"));
       }
     }
@@ -488,7 +487,7 @@ private:
 
         ++i;
 
-        _node.lyield();
+        _system.lyield();
       }
     }
 
@@ -567,7 +566,7 @@ private:
         
         _buffer.jsonObjectClose();
 
-        _node.lyield();
+        _system.lyield();
     }
 
     _buffer.jsonListClose();
@@ -595,7 +594,7 @@ private:
 
         _buffer.jsonString(deviceId.toString());
         
-        _node.lyield();
+        _system.lyield();
     }
 
     _buffer.jsonListClose();

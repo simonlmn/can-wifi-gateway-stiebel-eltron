@@ -302,7 +302,7 @@ export class ConfigPage {
             };
 
             try {
-                await this.#client.put('/node/config', serializeConfig(config));
+                await this.#client.put('/system/config', serializeConfig(config));
             } catch (err) {
                 alert(err);
             }
@@ -310,7 +310,7 @@ export class ConfigPage {
         });
 
         try {
-            const response = await this.#client.get('/node/config');
+            const response = await this.#client.get('/system/config');
             const config = parseConfig(await response.text());
             dataAccessMode.selected = config.dta.mode;
             writeEnabled.checked = (config.dta.readOnly == "false");

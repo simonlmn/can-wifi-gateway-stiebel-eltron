@@ -1,7 +1,7 @@
 #pragma once
 
 #include "DateTime.h"
-#include "NodeBase.h"
+#include "ApplicationContainer.h"
 #include "StiebelEltronProtocol.h"
 #include "ValueDefinitions.h"
 
@@ -26,15 +26,15 @@ struct DateTimeFields {
 
 class DateTimeSource {
 private:
-  NodeBase& _node;
+  ApplicationContainer& _system;
   StiebelEltronProtocol& _protocol;
   
   DateTimeFields _dateTimeFields;
   DateTime _currentDateTime;
 
 public:
-  DateTimeSource(NodeBase& node, StiebelEltronProtocol& protocol)
-    : _node(node),
+  DateTimeSource(ApplicationContainer& system, StiebelEltronProtocol& protocol)
+    : _system(system),
     _protocol(protocol),
     _dateTimeFields(),
     _currentDateTime() {}
@@ -101,12 +101,12 @@ private:
 
   void processData(ValueId valueId, uint16_t value) {
     if (isDateTimeField(valueId)) {
-      _node.lyield();
+      _system.lyield();
 
       bool availableBefore = available();
       updateDateTimeField(valueId, value);
       if (!availableBefore && available()) {
-        _node.log("dts", format(F("Date and time acquired: %s"), _currentDateTime.toString()));
+        _system.log("dts", format(F("Date and time acquired: %s"), _currentDateTime.toString()));
       }
     }
   }

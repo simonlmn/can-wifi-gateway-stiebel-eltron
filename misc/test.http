@@ -1,33 +1,33 @@
 @deviceAddress = 192.168.3.225
 
 ###
-POST http://{{deviceAddress}}/api/node/reset
+POST http://{{deviceAddress}}/api/system/reset
 
 ###
-GET http://{{deviceAddress}}/api/node/status
+GET http://{{deviceAddress}}/api/system/status
 
 ###
-GET http://{{deviceAddress}}/api/node/logs
+GET http://{{deviceAddress}}/api/system/logs
 
 ###
-GET http://{{deviceAddress}}/api/node/config
+GET http://{{deviceAddress}}/api/system/config
 Content-Type: text/plain
 
 ###
-PUT http://{{deviceAddress}}/api/node/config/can
+PUT http://{{deviceAddress}}/api/system/config/can
 Content-Type: text/plain
 
 mode=Normal;
 
 ###
-PUT http://{{deviceAddress}}/api/node/config/dta
+PUT http://{{deviceAddress}}/api/system/config/dta
 Content-Type: text/plain
 
 mode=Configured;
 readOnly=false;
 
 ###
-PUT http://{{deviceAddress}}/api/node/config/sep
+PUT http://{{deviceAddress}}/api/system/config/sep
 Content-Type: text/plain
 
 display=1;

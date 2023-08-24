@@ -2,13 +2,13 @@
 @deviceAddress = 192.168.3.225
 
 ###
-GET http://{{deviceAddress}}/api/node/status
+GET http://{{deviceAddress}}/api/system/status
 
 ###
-GET http://{{deviceAddress}}/api/node/logs
+GET http://{{deviceAddress}}/api/system/logs
 
 ###
-GET http://{{deviceAddress}}/api/node/config/dta
+GET http://{{deviceAddress}}/api/system/config/dta
 
 ###
 GET http://{{deviceAddress}}/api/data
@@ -17,29 +17,29 @@ GET http://{{deviceAddress}}/api/data
 GET http://{{deviceAddress}}/api/devices
 
 ###
-PUT http://{{deviceAddress}}/api/node/log-level/can
+PUT http://{{deviceAddress}}/api/system/log-level/can
 
 2
 
 
 ###
-PUT http://{{deviceAddress}}/api/node/config/sep
+PUT http://{{deviceAddress}}/api/system/config/sep
 
 display=2;
 
 ###
-PUT http://{{deviceAddress}}/api/node/config/dta
+PUT http://{{deviceAddress}}/api/system/config/dta
 
 mode=Configured;
 readOnly=false;
 
 ###
-PUT http://{{deviceAddress}}/api/node/config/can
+PUT http://{{deviceAddress}}/api/system/config/can
 
 mode=Normal;
 
 ###
-PUT http://{{deviceAddress}}/api/node/config
+PUT http://{{deviceAddress}}/api/system/config
 
 dta.mode=Configured;
 dta.readOnly=false;

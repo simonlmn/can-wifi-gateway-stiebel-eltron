@@ -30,9 +30,9 @@ int main() {
 
     uint32_t expectedCanId = 0x69Fu; // (DeviceType::Display << 7) | DISPLAY_ADDRESSES[1u]
 
-    NodeBaseMock node;
+    NodeBaseMock system;
     CanMock can;
-    StiebelEltronProtocol protocol {node, can, 1u};
+    StiebelEltronProtocol protocol {system, can, 1u};
     std::vector<ResponseData> responses;
     protocol.onResponse([&](ResponseData const& response){
         responses.push_back(response);
