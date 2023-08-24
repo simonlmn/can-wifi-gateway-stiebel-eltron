@@ -143,47 +143,15 @@ public:
     });
 
     _server.on(F("/api/node/logs"), HTTP_GET, [this]() {
-      bool sendHtml = _server.hasHeader(FPSTR(HEADER_ACCEPT)) && _server.header(FPSTR(HEADER_ACCEPT)).startsWith(FPSTR(CONTENT_TYPE_HTML));
-
-      if (!_buffer.begin(200, sendHtml ? FPSTR(CONTENT_TYPE_HTML) : FPSTR(CONTENT_TYPE_PLAIN))) {
+      if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
         _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
         return;
       }
-
-      if (sendHtml) {
-        _buffer.plainText(F(
-          "<!DOCTYPE html>\n"
-          "<html><head><title>Node Logs</title></head><body>"
-          "<pre id=\"log\"></pre>"
-          "<div id=\"status\"></div>"
-          "<script>"
-            "function status(s){"
-              "document.getElementById(\"status\").innerText = s;"
-            "}"
-            "function refresh(){"
-              "status(\"Loading...\");"
-              "fetch(\"http://")); _buffer.plainText(WiFi.localIP().toString().c_str()); _buffer.plainText(F(":8080/node/logs\")"
-              ".then(r => r.text())"
-              ".then(t => {"
-                "document.getElementById(\"log\").innerHTML = t;"
-                "window.scrollTo(0, document.body.scrollHeight);"
-                "status(\"Updated: \" + (new Date()).toISOString());"
-                "setTimeout(refresh, 5000);"
-              "})"
-              ".catch(e => {"
-                "status(\"Error: \" + e);"
-                "setTimeout(refresh, 5000);"
-              "});"
-            "}"
-            "refresh();"
-          "</script>"
-        "</body></html>"));
-      } else {
-        _node.getLogger().output([&] (const char* entry) {
-          _buffer.plainText(entry);
-          _node.lyield();
-        });
-      }
+      
+      _node.getLogger().output([&] (const char* entry) {
+        _buffer.plainText(entry);
+        _node.lyield();
+      });
 
       _buffer.end();
     });
