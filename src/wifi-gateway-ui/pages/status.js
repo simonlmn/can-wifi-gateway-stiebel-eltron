@@ -1,4 +1,16 @@
 
+function mapToCondition(value) {
+    if (value < 15) {
+        return 'excellent';
+    } else if (value < 30) {
+        return 'good';
+    } else if (value < 50) {
+        return 'fair';
+    } else {
+        return 'poor';
+    }
+}
+
 export class StatusPage {
     #client
 
@@ -67,7 +79,7 @@ export class StatusPage {
             this.statusList.add('Supply voltage', `${data.chipVcc} V`);
             this.statusList.add('Free heap', `${data.freeHeap} B`);
             this.statusList.add('Max. free block size', `${data.maxFreeBlockSize} B`);
-            this.statusList.add('Heap fragmentation', `<progress value="${data.heapFragmentation}" max="100">${data.heapFragmentation} %</progress>`);
+            this.statusList.add('Heap fragmentation', `<progress value="${data.heapFragmentation}" max="100" class="condition-${mapToCondition(data.heapFragmentation)}">${data.heapFragmentation}%</progress>`);
             this.statusList.add('WiFI RSSI', data.wifiRssi);
             this.statusList.add('IP address', data.ip);
             this.statusState.attribute('class', null);

@@ -24,6 +24,34 @@
             vertical-align: middle;
         }
 
+        progress.condition-excellent::-moz-progress-bar,
+        progress.condition-excellent::-webkit-progress-value,
+        progress.condition-excellent::-webkit-progress-bar
+        {
+            background-color: green;
+        }
+
+        progress.condition-good::-moz-progress-bar,
+        progress.condition-good::-webkit-progress-value,
+        progress.condition-good::-webkit-progress-bar
+        {
+            background-color: yellow;
+        }
+
+        progress.condition-fair::-moz-progress-bar,
+        progress.condition-fair::-webkit-progress-value,
+        progress.condition-fair::-webkit-progress-bar
+        {
+            background-color: orange;
+        }
+
+        progress.condition-poor::-moz-progress-bar,
+        progress.condition-poor::-webkit-progress-value,
+        progress.condition-poor::-webkit-progress-bar
+        {
+            background-color: red;
+        }
+
         fieldset {
             display: grid;
             grid-template-columns: max-content max-content;
