@@ -201,7 +201,7 @@ class DataConfigurationView extends ContainerView {
     #refreshTable() {
         this.table.clear();
 
-        if (this.#dataConfigs.totalItems > 0) {
+        if (this.#dataConfigs.actualItems > 0) {
             this.table.addRow().addHeaders([
                 'Source',
                 'ID',
