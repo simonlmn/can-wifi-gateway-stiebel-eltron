@@ -48,6 +48,7 @@ public:
   virtual void addSection(const char* name) override {
     if (_sectionOpen) {
       _buffer.jsonObjectClose();
+      _buffer.jsonSeparator();
     }
 
     _buffer.jsonPropertyStart(name);
@@ -66,19 +67,33 @@ public:
   }
 };
 
-class RestApi {
+class RestApi final : public IApplicationComponent {
 private:
   ESP8266WebServer _server;
   ResponseBuffer<ESP8266WebServer> _buffer;
 
-  ApplicationContainer& _system;
+  Logger& _logger;
+  ISystem& _system;
+  IApplicationContainer& _application;
   DataAccess& _access;
   StiebelEltronProtocol& _protocol;
   
 public:
-  RestApi(ApplicationContainer& system, DataAccess& access, StiebelEltronProtocol& protocol) : _server(80), _buffer(_server), _system(system), _access(access), _protocol(protocol) {}
+  RestApi(ISystem& system, IApplicationContainer& application, DataAccess& access, StiebelEltronProtocol& protocol)
+  :_server(80), _buffer(_server), _logger(system.logger()), _system(system), _application(application), _access(access), _protocol(protocol) {}
   
-  void setup() {
+  const char* name() const override {
+    return "api";
+  }
+
+  bool configure(const char* /*name*/, const char* /*value*/) override {
+    return false;
+  }
+
+  void getConfig(std::function<void(const char*, const char*)> /*writer*/) const override {
+  }
+
+  void setup(bool /*connected*/) override {
     _server.enableCORS(true);
     _server.collectHeaders(FPSTR(HEADER_ACCEPT));
 
@@ -119,7 +134,7 @@ public:
         if (space != nullptr) {
           const char* unitSymbol = getUnitSymbol(entry.definition->unit);
           if (strcmp(space + 1, unitSymbol) != 0) {
-            if (_system.logLevel("api") > 0) _system.log("api", format("PUT data: unit mismatch %s != %s", space + 1, unitSymbol));
+            _logger.logIf(LogLevel::Warning, "api", [&] () { return format("PUT data: unit mismatch %s != %s", space + 1, unitSymbol); });
             return false;
           }
         }
@@ -127,7 +142,7 @@ public:
         uint32_t rawValue = entry.definition->toRaw(valueString, space);
 
         if (Codec::isError(rawValue)) {
-          if (_system.logLevel("api") > 0) _system.log("api", format("PUT data: value error %s", valueString));
+          _logger.logIf(LogLevel::Warning, "api", [&] () { return format("PUT data: value error %s", valueString); });
           return false;
         }
   
@@ -185,7 +200,7 @@ public:
       
       {
         JsonDiagnosticsCollector<ResponseBuffer<ESP8266WebServer>> collector {_buffer};
-        _system.getDiagnostics(collector);
+        _application.getDiagnostics(collector);
       }
 
       _buffer.end();
@@ -197,7 +212,7 @@ public:
         return;
       }
       
-      _system.getLogger().output([&] (const char* entry) {
+      _logger.output([&] (const char* entry) {
         _buffer.plainText(entry);
         _system.lyield();
       });
@@ -207,11 +222,11 @@ public:
 
     _server.on(UriBraces(F("/api/system/log-level/{}")), HTTP_PUT, [this]() {
       const auto& category = _server.pathArg(0);
-      auto logLevel = _server.arg("plain").toInt();
+      LogLevel logLevel = logLevelFromString(_server.arg("plain").c_str());
 
-      _system.logLevel(category, logLevel);
+      _logger.logLevel(category.c_str(), logLevel);
       
-      _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), String((int)_system.logLevel(category)));
+      _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), logLevelName(_logger.logLevel(category.c_str())));
     });
 
     _server.on(F("/api/system/config"), HTTP_GET, [this]() {
@@ -220,7 +235,7 @@ public:
         return;
       }
 
-      _system.getAllConfig([&] (const char* path, const char* value) {
+      _application.getAllConfig([&] (const char* path, const char* value) {
         _buffer.plainText(path);
         _buffer.plainChar(ConfigParser::SEPARATOR);
         _buffer.plainText(value);
@@ -236,7 +251,7 @@ public:
 
       ConfigParser config {const_cast<char*>(body)};
 
-      if (_system.configureAll(config)) {
+      if (_application.configureAll(config)) {
         _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), body);
       } else {
         _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), EMPTY_STRING);
@@ -251,7 +266,7 @@ public:
         return;
       }
 
-      _system.getConfig(category, [&] (const char* name, const char* value) {
+      _application.getConfig(category.c_str(), [&] (const char* name, const char* value) {
         _buffer.plainText(name);
         _buffer.plainChar(ConfigParser::SEPARATOR);
         _buffer.plainText(value);
@@ -268,7 +283,7 @@ public:
 
       ConfigParser config {const_cast<char*>(body)};
 
-      if (_system.configure(category, config)) {
+      if (_application.configure(category.c_str(), config)) {
         _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), body);
       } else {
         _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), EMPTY_STRING);
@@ -276,16 +291,24 @@ public:
     });
   }
 
-  void begin() {
-    _server.begin();
+  void loop(ConnectionStatus status) override {
+    switch (status) {
+      case ConnectionStatus::Reconnected:
+        _server.begin();
+        break;
+      case ConnectionStatus::Connected:
+        _server.handleClient();
+        break;
+      case ConnectionStatus::Disconnecting:
+        _server.close();
+        break;
+      case ConnectionStatus::Disconnected:
+        // do nothing
+        break;
+    }
   }
 
-  void end() {
-    _server.close();
-  }
-
-  void loop() {
-    _server.handleClient();
+  void getDiagnostics(IDiagnosticsCollector& /*collector*/) const override {
   }
 
 private:
@@ -377,7 +400,7 @@ private:
   void doItem(std::function<bool(DataAccess::DataKey const&, DataEntry const&)> itemOperation = {}) {
     _system.lyield();
 
-    if (_system.logLevel("api") > 1) _system.log("api", format("doItem: %s", _server.arg(FPSTR(ARG_PLAIN)).c_str()));
+    _logger.logIf(LogLevel::Debug, "api", [&] () { return format("doItem: %s", _server.arg(FPSTR(ARG_PLAIN)).c_str()); });
 
     bool validateOnly = _server.hasArg(FPSTR(ARG_VALIDATE_ONLY));
     
@@ -417,7 +440,7 @@ private:
       if (itemOperation(key, *entry)) {
         _server.send(202, FPSTR(CONTENT_TYPE_PLAIN), EMPTY_STRING);
       } else {
-        if (_system.logLevel("api") > 0) _system.log("api", "doItem: operation failed");
+        _logger.logIf(LogLevel::Warning, name(), [] () { return "doItem: operation failed"; });
         _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), F("operation failed"));
       }
     }

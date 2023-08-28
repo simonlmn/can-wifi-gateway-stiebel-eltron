@@ -23,14 +23,6 @@ struct CanMessage {
   }
 };
 
-enum struct CanLogLevel : uint8_t {
-  None = 0,
-  Error = 1,
-  Status = 2,
-  Rx = 3,
-  Tx = 4
-};
-
 enum struct CanMode : uint8_t {
   Normal = 0,
   ListenOnly = 1,

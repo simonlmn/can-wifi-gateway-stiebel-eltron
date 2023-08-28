@@ -62,13 +62,14 @@ DataCaptureMode dataCaptureModeFromString(const char* mode, size_t length = SIZE
   return DataCaptureMode::None;
 }
 
-class DataAccess final : public IConfigurable {
+class DataAccess final : public IApplicationComponent {
 public:
   using DataKey = std::pair<DeviceId, ValueId>;
   using DataMap = std::map<DataKey, DataEntry>;
 
 private:
-  ApplicationContainer& _system;
+  Logger& _logger;
+  ISystem& _system;
   StiebelEltronProtocol& _protocol;
   DateTimeSource& _dateTimeSource;
   DigitalInput& _writeEnablePin;
@@ -80,8 +81,9 @@ private:
   std::function<void(DataEntry const& entry)> _updateHandler;
 
 public:
-  DataAccess(ApplicationContainer& system, StiebelEltronProtocol& protocol, DateTimeSource& dateTimeSource, DigitalInput& writeEnablePin)
-    : _system(system),
+  DataAccess(ISystem& system, StiebelEltronProtocol& protocol, DateTimeSource& dateTimeSource, DigitalInput& writeEnablePin)
+    : _logger(system.logger()),
+    _system(system),
     _protocol(protocol),
     _dateTimeSource(dateTimeSource),
     _writeEnablePin(writeEnablePin),
@@ -91,6 +93,10 @@ public:
     _dataIterator(_data.begin()),
     _updateHandler()
   { }
+
+  const char* name() const override {
+    return "dta";
+  }
 
   bool configure(const char* name, const char* value) override {
     if (strcmp(name, "mode") == 0) return setMode(dataCaptureModeFromString(value));
@@ -105,13 +111,13 @@ public:
 
   bool setMode(DataCaptureMode mode) {
     _mode = mode;
-    _system.log("dta", format("Set mode '%s'.", dataCaptureModeName(_mode)));
+    _logger.log(name(), format("Set mode '%s'.", dataCaptureModeName(_mode)));
     return true;
   }
 
   bool setReadOnly(bool readOnly) {
     _readOnly = readOnly;
-    _system.log("dta", format("%s write access (%seffective).", _readOnly ? "Disabled" : "Enabled", effectiveReadOnly() == _readOnly ? "" : "NOT "));
+    _logger.log(name(), format("%s write access (%seffective).", _readOnly ? "Disabled" : "Enabled", effectiveReadOnly() == _readOnly ? "" : "NOT "));
     return true;
   }
 
@@ -119,9 +125,7 @@ public:
     return !_writeEnablePin ? true : _readOnly;
   }
 
-  void setup() {
-    _system.addConfigurable("dta", this);
-
+  void setup(bool /*connected*/) override {
     restoreSubscriptions();
     restoreWritables();
 
@@ -129,12 +133,15 @@ public:
     _protocol.onWrite([this] (WriteData const& data) { processData({data.targetId.isExact() ? data.targetId : data.sourceId, data.valueId}, data.value); });
   }
 
-  void loop() {
+  void loop(ConnectionStatus /*status*/) override {
     if (!_protocol.ready() || !_dateTimeSource.available()) {
       return;
     }
     
     maintainData();
+  }
+
+  void getDiagnostics(IDiagnosticsCollector& /*collector*/) const override {
   }
 
   void onUpdate(std::function<void(DataEntry const& entry)> updateHandler) {
@@ -255,7 +262,7 @@ private:
           uint8_t entry[4] = {0};
           while (subscriptionsFile.available()) {
             if (subscriptionsFile.read(entry, 4) == 4) {
-              ValueId valueId {(entry[0]) << 8 | entry[1]};
+              ValueId valueId {(entry[0] << 8) | entry[1]};
               DeviceId deviceId {DeviceType(entry[2]), entry[3]};
               addSubscriptionInternal({deviceId, valueId});
             }
@@ -277,7 +284,7 @@ private:
       for (auto& data : _data) {
         if (data.second.subscribed) {
           uint8_t entry[4] = {
-            data.second.id >> 8 & 0xFFu,
+            (data.second.id >> 8) & 0xFFu,
             data.second.id & 0xFFu,
             static_cast<uint8_t>(data.second.source.type),
             data.second.source.address
@@ -331,7 +338,7 @@ private:
           uint8_t entry[4] = {0};
           while (writablesFile.available()) {
             if (writablesFile.read(entry, 4) == 4) {
-              ValueId valueId {(entry[0]) << 8 | entry[1]};
+              ValueId valueId {(entry[0] << 8) | entry[1]};
               DeviceId deviceId {DeviceType(entry[2]), entry[3]};
               addWritableInternal({deviceId, valueId});
             }
@@ -353,7 +360,7 @@ private:
       for (auto& data : _data) {
         if (data.second.writable) {
           uint8_t entry[4] = {
-            data.second.id >> 8 & 0xFFu,
+            (data.second.id >> 8) & 0xFFu,
             data.second.id & 0xFFu,
             static_cast<uint8_t>(data.second.source.type),
             data.second.source.address

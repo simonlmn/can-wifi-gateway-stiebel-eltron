@@ -4,6 +4,7 @@
 #include <functional>
 
 struct IConfigurable {
+  virtual const char* name() const = 0;
   virtual bool configure(const char* name, const char* value) = 0;
   virtual void getConfig(std::function<void(const char*, const char*)> writer) const = 0;
 };

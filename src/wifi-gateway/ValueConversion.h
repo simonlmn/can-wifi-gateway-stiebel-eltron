@@ -163,11 +163,11 @@ struct ValueConverter { // Contract
   }
 
   // should return a string representation which can be directly used as a JSON value
-  static const char* fromRaw(int32_t value) {
+  static const char* fromRaw(int32_t /*value*/) {
     return ERROR_STRING_VALUE;
   }
   
-  static int32_t toRaw(const char* value, const char* end = nullptr) {
+  static int32_t toRaw(const char* /*value*/, const char* /*end*/ = nullptr) {
     return ERROR_RAW_VALUE;
   }
 

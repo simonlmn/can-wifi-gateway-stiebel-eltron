@@ -14,7 +14,40 @@ static const char LOG_ENTRY_SEPARATOR = '\n';
 static const unsigned short LOG_BUFFER_SIZE = 4096u;
 static char logEntry[LOG_ENTRY_SIZE + 1];
 
-class Logger {
+enum struct LogLevel : uint8_t {
+  Always = 0,
+  Error = 1,
+  Warning = 2,
+  Info = 3,
+  Debug = 4,
+  Trace = 5,
+};
+
+const char* logLevelName(LogLevel level) {
+  switch (level) {
+    case LogLevel::Always: return "ALW";
+    case LogLevel::Error: return "ERR";
+    case LogLevel::Warning: return "WRN";
+    case LogLevel::Info: return "INF";
+    case LogLevel::Debug: return "DBG";
+    case LogLevel::Trace: return "TRC";
+    default: return "???";
+  }
+}
+
+LogLevel logLevelFromString(const char* level, size_t length = SIZE_MAX) {
+  if (strncmp(level, "ALW", length) == 0) return LogLevel::Always;
+  if (strncmp(level, "ERR", length) == 0) return LogLevel::Error;
+  if (strncmp(level, "WRN", length) == 0) return LogLevel::Warning;
+  if (strncmp(level, "INF", length) == 0) return LogLevel::Info;
+  if (strncmp(level, "DBG", length) == 0) return LogLevel::Debug;
+  if (strncmp(level, "TRC", length) == 0) return LogLevel::Trace;
+  return LogLevel::Always;
+}
+
+class Logger final {
+  static const LogLevel DEFAULT_LOG_LEVEL = LogLevel::Info;
+  ConstStrMap<LogLevel> _logLevels = {};
   char _logBuffer[LOG_BUFFER_SIZE] = {};
   unsigned short _logBufferStart = 0u;
   unsigned short _logBufferEnd = 0u;
@@ -31,8 +64,21 @@ public:
     memset(_logBuffer, LOG_ENTRY_SEPARATOR, LOG_BUFFER_SIZE);
   }
 
-  void log(const char* category, const char* message) {
-    snprintf(logEntry, LOG_ENTRY_SIZE, "[%lu|%s] %s%c", millis(), category, message, LOG_ENTRY_SEPARATOR);
+  LogLevel logLevel(const char* category) {
+    auto entry = _logLevels.find(category);
+    if (entry == _logLevels.end()) {
+      return DEFAULT_LOG_LEVEL;
+    } else {
+      return entry->second;
+    }
+  }
+
+  void logLevel(const char* category, LogLevel level) {
+    _logLevels[category] = level;
+  }
+
+  void log(LogLevel level, const char* category, const char* message) {
+    snprintf(logEntry, LOG_ENTRY_SIZE, "[%lu|%s|%s] %s%c", millis(), category, logLevelName(level), message, LOG_ENTRY_SEPARATOR);
     logEntry[LOG_ENTRY_SIZE - 1u] = LOG_ENTRY_SEPARATOR;
     logEntry[LOG_ENTRY_SIZE] = '\0';
 
@@ -50,6 +96,24 @@ public:
       _logBufferEnd += 1u;
     }
   }
+
+  void log(const char* category, const char* message) {
+    log(LogLevel::Always, category, message);
+  }
+
+  void logIf(LogLevel level, const char* category, const char* message) {
+    if (level <= logLevel(category)) {
+      log(category, message);
+    }
+  };
+
+  template<typename MessageFunction>
+  void logIf(LogLevel level, const char* category, MessageFunction messageFunction) {
+    if (level <= logLevel(category)) {
+      const char* message = messageFunction();
+      log(category, message);
+    }
+  };
 
   void output(std::function<void(const char* entry)> handler) const {
     if (_logBuffer[_logBufferStart] != LOG_ENTRY_SEPARATOR) {

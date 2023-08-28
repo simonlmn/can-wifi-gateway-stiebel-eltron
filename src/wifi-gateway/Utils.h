@@ -19,6 +19,7 @@ char* ultoa (unsigned long val, char *s, int radix) { radix == 10 ? sprintf(s, "
 #endif
 
 #include <algorithm>
+#include <map>
 
 class IntervalTimer {
   unsigned long _intervalDurationMs;
@@ -179,3 +180,14 @@ const char* toConstStr(unsigned long value, unsigned char base)
   ultoa(value, NUMBER_STRING_BUFFER, base);
   return NUMBER_STRING_BUFFER;
 }
+
+struct str_less_than
+{
+   bool operator()(char const *a, char const *b) const
+   {
+      return strcmp(a, b) < 0;
+   }
+};
+
+template<typename T>
+using ConstStrMap = std::map<const char*, T, str_less_than>;

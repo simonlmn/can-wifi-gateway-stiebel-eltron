@@ -8,11 +8,29 @@
 #include "src/shared/Pins.h"
 #include "Config.h"
 #include "Logger.h"
-#include <map>
+#include <vector>
 #include <functional>
 
 // Enable measurement of chip's VCC
 ADC_MODE(ADC_VCC);
+
+enum struct ConnectionStatus {
+  Disconnected,
+  Reconnected,
+  Connected,
+  Disconnecting,
+};
+
+class ISystem {
+public:
+  virtual void reset() = 0;
+  virtual void stop() = 0;
+  virtual void factoryReset() = 0;
+  virtual ConnectionStatus connectionStatus() const = 0;
+  virtual bool connected() const = 0;
+  virtual Logger& logger() = 0;
+  virtual void lyield() = 0;
+};
 
 class IDiagnosticsCollector {
 public:
@@ -20,63 +38,62 @@ public:
   virtual void addValue(const char* name, const char* value) = 0;
 };
 
-enum struct ConnectionStatus {
-  Disconnected,
-  Connecting,
-  Connected,
-  Disconnecting,
+class IDiagnosticsProvider {
+public:
+  virtual void getDiagnostics(IDiagnosticsCollector& collector) const = 0;
 };
 
-class ApplicationContainer {
-  const char* _otaPassword;
+class IApplicationContainer : public IDiagnosticsProvider {
+public:
+  virtual bool configure(const char* category, ConfigParser const& config) = 0;
+  virtual void getConfig(const char* category, std::function<void(const char*, const char*)> writer) const = 0;
+  virtual bool configureAll(ConfigParser const& config) = 0;
+  virtual void getAllConfig(std::function<void(const char*, const char*)> writer) const = 0;
+};
 
+class IApplicationComponent : public IConfigurable, public IDiagnosticsProvider {
+public:
+  virtual const char* name() const = 0;
+  virtual void setup(bool connected) = 0;
+  virtual void loop(ConnectionStatus status) = 0;
+};
+
+class System final : public ISystem, public IApplicationContainer {
+  Logger _logger {};
+  WiFiManager _wifiManager {};
+  std::vector<IApplicationComponent*> _components {};
+
+  const char* _otaPassword;
   DigitalOutput& _statusLedPin;
   DigitalInput& _otaEnablePin;
   DigitalInput& _updatePin;
   DigitalInput& _factoryResetPin;
 
-  WiFiManager _wifiManager;
+  bool _stopped = false;
 
-  std::map<String, IConfigurable*> _configurables;
-
-  std::map<String, int> _logLevels;
-  Logger _logger;
-
-  std::function<void(bool)> _setup;
-  std::function<void(ConnectionStatus)> _loop;
-
-  unsigned long _lastMillis = 0u;
   unsigned long _epoch = 0u;
-  
+  unsigned long _lastMillis = 0u;
   unsigned long _disconnectedSinceMs = 1u;
   unsigned long _disconnectedResetTimeoutMs = 1u * 60u * 1000u; // 1 minute
 
-  bool _stopped;
-  
+  ConnectionStatus _status = ConnectionStatus::Disconnected;
+
 public:
-  ApplicationContainer(const char* otaPassword, DigitalOutput& statusLedPin, DigitalInput& otaEnablePin, DigitalInput& updatePin, DigitalInput& factoryResetPin)
+  System(const char* otaPassword, DigitalOutput& statusLedPin, DigitalInput& otaEnablePin, DigitalInput& updatePin, DigitalInput& factoryResetPin)
     : _otaPassword(otaPassword),
     _statusLedPin(statusLedPin),
     _otaEnablePin(otaEnablePin),
     _updatePin(updatePin),
-    _factoryResetPin(factoryResetPin),
-    _wifiManager(),
-    _configurables(),
-    _logLevels(),
-    _logger(),
-    _setup(),
-    _loop(),
-    _stopped(false)
+    _factoryResetPin(factoryResetPin)
   {}
 
-  void init(std::function<void(bool)> setup, std::function<void(ConnectionStatus)> loop) {
-    _setup = setup;
-    _loop = loop;
+  void addComponent(IApplicationComponent* component) {
+    _components.emplace_back(component);
   }
 
   void setup() {
 #ifdef DEVELOPMENT_MODE
-    log("system", "DEVELOPMENT MODE");
+    _logger.log("sys", "DEVELOPMENT MODE");
 #endif
     _statusLedPin = true;
     LittleFS.begin();
@@ -88,11 +105,14 @@ public:
       setupOTA();
     }
     
-    log("system", "internal setup done.");
+    _logger.log("sys", "internal setup done.");
 
-    _setup(connected);
+    for (auto component : _components) {
+      restoreConfiguration(component);
+      component->setup(connected);
+    }
 
-    log("system", "all setup done.");
+    _logger.log("sys", "all setup done.");
     
     _statusLedPin = false;
   }
@@ -109,41 +129,52 @@ public:
     }
     
     if (connected()) {
-      ConnectionStatus status = ConnectionStatus::Connected;      
+      _status = ConnectionStatus::Connected;      
       if (_disconnectedSinceMs > 0) {
-        log("system", format(F("reconnected after %u ms."), currentMs - _disconnectedSinceMs));
+        _logger.log("sys", format(F("reconnected after %u ms."), currentMs - _disconnectedSinceMs));
         _disconnectedSinceMs = 0;
-        status = ConnectionStatus::Connecting;
+        _status = ConnectionStatus::Reconnected;
       }
-      
-      _statusLedPin = false;
 
-      lyield();
-
+      if (_stopped) {
+        blinkMedium();
+      } else {
 #ifdef DEVELOPMENT_MODE
-      blinkFast();
+        blinkFast();
+#else
+        _statusLedPin = false;
 #endif
-      
-      _loop(status);
+        for (auto component : _components) {
+          component->loop(_status);
+          lyield();
+        }
+      }
     } else {
-      ConnectionStatus status = ConnectionStatus::Disconnected;
+      _status = ConnectionStatus::Disconnected;
       if (_disconnectedSinceMs == 0 || currentMs < _disconnectedSinceMs /* detect millis() wrap-around */) {
         _disconnectedSinceMs = currentMs;
-        log("system", "disconnected.");
-        status = ConnectionStatus::Disconnecting;
+        _logger.log("sys", "disconnected.");
+        _status = ConnectionStatus::Disconnecting;
       }
 
       if (currentMs > _disconnectedSinceMs + _disconnectedResetTimeoutMs) {
         reset();
       }
       
-      blinkSlow();
+      if (_stopped) {
+        blinkMedium();
+      } else {
+        blinkSlow();
       
-      _loop(status);
+        for (auto component : _components) {
+          component->loop(_status);
+          lyield();
+        }
+      }
     }
   }
 
-  void lyield() {
+  void lyield() override {
     yield();
     _wifiManager.process();
     if (_otaEnablePin) {
@@ -152,60 +183,57 @@ public:
     yield();
   }
 
-  void reset() {
+  void reset() override {
     ESP.restart();
   }
 
-  void stop() {
+  void stop() override {
     if (_stopped) {
       return;
     }
     
     _stopped = true;
-    _setup = [](bool) { };
-    _loop = [this](ConnectionStatus) { blinkMedium(); };
 
-    log("system", "STOP!");
+    _logger.log("sys", "STOP!");
   }
 
-  void factoryReset() {
+  void factoryReset() override {
     LittleFS.format();
     _wifiManager.erase(true);
     reset();
   }
 
-  bool connected() const {
+  bool connected() const override {
     return WiFi.status() == WL_CONNECTED;
   }
 
-  void addConfigurable(String category, IConfigurable* configurable) {
-    _configurables[category] = configurable;
-    restoreConfiguration(category);
+  ConnectionStatus connectionStatus() const override {
+    return _status;
   }
 
-  bool configure(String category, ConfigParser const& config) {
-    auto configurable = _configurables.find(category);
-    if (configurable == _configurables.end()) {
+  bool configure(const char* category, ConfigParser const& config) override {
+    auto component = findComponentByName(category);
+    if (component == nullptr) {
       return false;
     }
-    if (config.parse([&] (char* name, const char* value) { return configurable->second->configure(name, value); })) {
-      persistConfiguration(category);
+    if (config.parse([&] (char* name, const char* value) { return component->configure(name, value); })) {
+      persistConfiguration(component);
       return true;
     } else {
       return false;
     }
   }
 
-  void getConfig(String category, std::function<void(const char*, const char*)> writer) const {
-    auto configurable = _configurables.find(category);
-    if (configurable == _configurables.end()) {
+  void getConfig(const char* category, std::function<void(const char*, const char*)> writer) const override {
+    auto component = findComponentByName(category);
+    if (component == nullptr) {
       return;
     }
 
-    configurable->second->getConfig(writer);
+    component->getConfig(writer);
   }
 
-  bool configureAll(ConfigParser const& config) {
+  bool configureAll(ConfigParser const& config) override {
     if (config.parse([this] (char* path, const char* value) {
       auto categoryEnd = strchr(path, '.');
       if (categoryEnd == nullptr) {
@@ -214,14 +242,14 @@ public:
       *categoryEnd = '\0';
       auto category = path;
             
-      auto configurable = _configurables.find(category);
+      auto component = findComponentByName(category);
       *categoryEnd = '.';
 
-      if (configurable == _configurables.end()) {
+      if (component == nullptr) {
         return false;
       } else {
         auto name = categoryEnd + 1;
-        return configurable->second->configure(name, value);
+        return component->configure(name, value);
       }
     })) {
       persistAllConfigurations();
@@ -231,30 +259,17 @@ public:
     }
   }
 
-  void getAllConfig(std::function<void(const char*, const char*)> writer) const {
-    for (auto &&configurable : _configurables) {
-      configurable.second->getConfig([&] (const char* name, const char* value) {
-        writer(format("%s.%s", configurable.first.c_str(), name), value);
+  void getAllConfig(std::function<void(const char*, const char*)> writer) const override {
+    for (auto component : _components) {
+      component->getConfig([&] (const char* name, const char* value) {
+        writer(format("%s.%s", component->name(), name), value);
       });  
     }
   }
 
-  int logLevel(String category) {
-    return _logLevels[category];
-  }
+  Logger& logger() override { return _logger; }
 
-  void logLevel(String category, int level) {
-    _logLevels[category] = level;
-  }
-
-  Logger& getLogger() { return _logger; }
-
-  void log(const char* category, const char* message) {
-    _logger.log(category, message);
-    lyield();
-  }
-
-  void getDiagnostics(IDiagnosticsCollector& collector) const {
+  void getDiagnostics(IDiagnosticsCollector& collector) const override {
     collector.addSection("system");
     collector.addValue("chipId", format("%x", ESP.getChipId()));
     collector.addValue("flashChipId", format("%x", ESP.getFlashChipId()));
@@ -271,9 +286,32 @@ public:
     collector.addValue("maxFreeBlockSize", format("%u", ESP.getMaxFreeBlockSize()));
     collector.addValue("wifiRssi", format("%i", WiFi.RSSI()));
     collector.addValue("ip", WiFi.localIP().toString().c_str());
+
+    for (auto component : _components) {
+      collector.addSection(component->name());
+      component->getDiagnostics(collector);
+    }
   }
 
 private:
+  IApplicationComponent* findComponentByName(const char* name) {
+    for (auto component : _components) {
+      if (strcmp(component->name(), name) == 0) {
+        return component;
+      }
+    }
+    return nullptr;
+  }
+
+  IApplicationComponent const* findComponentByName(const char* name) const {
+    for (auto component : _components) {
+      if (strcmp(component->name(), name) == 0) {
+        return component;
+      }
+    }
+    return nullptr;
+  }
+
   void updateTimeAndEpoch() {
     auto currentMs = millis();
     if (currentMs < _lastMillis) {
@@ -284,9 +322,9 @@ private:
   
   void setupOTA() {
     ArduinoOTA.setPassword(_otaPassword);
-    ArduinoOTA.onStart([this] () { stop(); LittleFS.end(); log("system", "starting OTA update..."); _statusLedPin = true; });
-    ArduinoOTA.onEnd([this] () { _statusLedPin = false; log("system", "OTA update finished."); });
-    ArduinoOTA.onProgress([this] (unsigned int progress, unsigned int total) { _statusLedPin.trigger(true, 10); });
+    ArduinoOTA.onStart([this] () { stop(); LittleFS.end(); _logger.log("sys", "starting OTA update..."); _statusLedPin = true; });
+    ArduinoOTA.onEnd([this] () { _statusLedPin = false; _logger.log("sys", "OTA update finished."); });
+    ArduinoOTA.onProgress([this] (unsigned int /*progress*/, unsigned int /*total*/) { _statusLedPin.trigger(true, 10); });
     ArduinoOTA.begin();
   }
 
@@ -302,34 +340,22 @@ private:
     _statusLedPin.toggleIfUnchangedFor(250ul);
   }
 
-  void restoreConfiguration(String category) {
-    auto configurable = _configurables.find(category);
-    if (configurable == _configurables.end()) {
-      log("system", format("restore config failed: '%s' is not configurable.", category.c_str()));
-      return;
-    }
-
-    ConfigParser parser = readConfigFile(format("/config/%s", category.c_str()));
-    if (parser.parse([&] (char* name, const char* value) { return configurable->second->configure(name, value); })) {
-      log("system", format("restored config for '%s'.", category.c_str()));
+  void restoreConfiguration(IConfigurable* configurable) {
+    ConfigParser parser = readConfigFile(format("/config/%s", configurable->name()));
+    if (parser.parse([&] (char* name, const char* value) { return configurable->configure(name, value); })) {
+      _logger.log("sys", format("restored config for '%s'.", configurable->name()));
     } else {
-      log("system", format("failed to restore config for '%s'.", category.c_str()));
+      _logger.log("sys", format("failed to restore config for '%s'.", configurable->name()));
     }
   }
 
-  void persistConfiguration(String category) {
-    auto configurable = _configurables.find(category);
-    if (configurable == _configurables.end()) {
-      log("system", format("persist config failed: '%s' is not configurable.", category.c_str()));
-      return;
-    }
-
-    writeConfigFile(format("/config/%s", category.c_str()), configurable->second);
+  void persistConfiguration(IConfigurable* configurable) {
+    writeConfigFile(format("/config/%s", configurable->name()), configurable);
   }
 
   void persistAllConfigurations() {
-    for (auto &&configurable : _configurables) {
-      persistConfiguration(configurable.first);
+    for (auto component : _components) {
+      persistConfiguration(component);
     }
   }
 };

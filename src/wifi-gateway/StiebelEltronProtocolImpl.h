@@ -137,10 +137,11 @@ const uint8_t BROADCAST_DISPLAY_ADDRESS = 0x3Cu;
 
 namespace impl {
 
-template<typename NodeInterface, typename CanInterface>
-class StiebelEltronProtocol final : public IConfigurable {
+template<typename CanInterface>
+class StiebelEltronProtocol final : public IApplicationComponent {
 private:
-  NodeInterface& _system;
+  Logger& _logger;
+  ISystem& _system;
   CanInterface& _can;
   uint8_t _displayIndex;
   DeviceId _deviceId;
@@ -153,8 +154,9 @@ private:
   std::function<void(WriteData const& data)> _writeHandler;
   
 public:
-  StiebelEltronProtocol(NodeInterface& system, CanInterface& can)
-    : _system(system),
+  StiebelEltronProtocol(ISystem& system, CanInterface& can)
+    : _logger(system.logger()),
+    _system(system),
     _can(can),
     _displayIndex(),
     _deviceId(),
@@ -164,6 +166,10 @@ public:
     _responseHandler(),
     _writeHandler()
   { }
+
+  const char* name() const override {
+    return "sep";
+  }
 
   bool configure(const char* name, const char* value) override {
     if (strcmp(name, "display") == 0) return setDisplayIndex(strtol(value, nullptr, 10));
@@ -183,7 +189,7 @@ public:
     _deviceId = {DeviceType::Display, DISPLAY_ADDRESSES[displayIndex]};  
     _canId = toCanId(_deviceId);
 
-    _system.log("sep", format("Set display index '%u' (deviceId=%s, canId=%lX)", _displayIndex, _deviceId.toString(), _canId));
+    _logger.log(name(), format("Set display index '%u' (deviceId=%s, canId=%lX)", _displayIndex, _deviceId.toString(), _canId));
 
     if (_ready) {
       registerDisplay();
@@ -193,9 +199,7 @@ public:
     return true;
   }
   
-  void setup() {
-    _system.addConfigurable("sep", this);
-
+  void setup(bool /*connected*/) override {
     _can.onReady([this] () {
       registerDisplay();
       registerSensor();
@@ -207,7 +211,10 @@ public:
     });
   }
 
-  void loop() {
+  void loop(ConnectionStatus /*status*/) override {
+  }
+
+  void getDiagnostics(IDiagnosticsCollector& /*collector*/) const override {
   }
 
   bool ready() const {
@@ -370,7 +377,7 @@ private:
       }
 
       if (type == MessageType::Register) {
-        _system.log("sep", format("%s t:%s s:%s %02X %02X %02X %02X %02X", messageTypeName(type), target.toString(), source.toString(), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]));
+        _logger.log(name(), format("%s t:%s s:%s %02X %02X %02X %02X %02X", messageTypeName(type), target.toString(), source.toString(), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]));
       }
 
       if (type == MessageType::Write || type == MessageType::Response || type == MessageType::Request) {
@@ -378,13 +385,7 @@ private:
         ValueId valueId = getValueId(frame.data);
         uint16_t value = getValue(frame.data);
 
-        int logLevel = _system.logLevel("sep");
-        if (logLevel > 0) {
-          bool isNotTargetedAtThis = !target.includes(_deviceId);
-          if (logLevel > 1 || isNotTargetedAtThis) {
-            _system.log("sep", format("%c%s t:%s s:%s %02X id:%04X v:%04X", isNotTargetedAtThis ? '*' : '+', messageTypeName(type), target.toString(), source.toString(), fix, valueId, value));
-          }
-        }
+        _logger.logIf(LogLevel::Debug, name(), [&] () { return format("%c%s t:%s s:%s %02X id:%04X v:%04X", target.includes(_deviceId) ? '>' : '*', messageTypeName(type), target.toString(), source.toString(), fix, valueId, value); });
         
         switch (type) {
           case MessageType::Response:

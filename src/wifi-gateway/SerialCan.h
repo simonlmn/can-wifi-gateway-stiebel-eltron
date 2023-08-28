@@ -4,12 +4,13 @@
 #include "CanInterface.h"
 #include "src/shared/SerialProtocol.h"
 
-class SerialCan final : public IConfigurable {
+class SerialCan final : public IApplicationComponent {
 private:
   static const uint32_t CAN_BITRATE = 20UL * 1000UL; // 20 kbit/s
   static constexpr uint32_t MAX_ERR_COUNT = 5;
 
-  ApplicationContainer& _system;
+  Logger& _logger;
+  ISystem& _system;
   DigitalOutput& _resetPin;
   DigitalInput& _txEnablePin;
   bool _canAvailable;
@@ -18,13 +19,13 @@ private:
   std::function<void(const CanMessage& message)> _messageHandler;
   
   CanMode _mode = CanMode::ListenOnly;
-  CanLogLevel _logLevel = CanLogLevel::Status;
   CanCounters _counters;
 
   SerialProtocol _serial;
 
 public:
-  SerialCan(ApplicationContainer& system, DigitalOutput& resetPin, DigitalInput& txEnablePin) :
+  SerialCan(ISystem& system, DigitalOutput& resetPin, DigitalInput& txEnablePin) :
+    _logger(system.logger()),
     _system(system),
     _resetPin(resetPin),
     _txEnablePin(txEnablePin),
@@ -33,7 +34,10 @@ public:
     _counters(),
     _serial([this] (const char* message, SerialProtocol& serial) { processReceived(message, serial); }, [this] (SerialErrorCode errorCode, SerialProtocol& serial) { handleError(errorCode, serial); })
   {
-    system.logLevel("can", (int)_logLevel);
+  }
+
+  const char* name() const override {
+    return "can";
   }
 
   bool configure(const char* name, const char* value) override {
@@ -48,7 +52,7 @@ public:
   bool setMode(CanMode mode) {
     _mode = mode;
     reset();
-    _system.log("can", format("Set mode '%s'.", canModeName(_mode)));
+    _logger.log(name(), format("Set mode '%s'.", canModeName(_mode)));
     return true;
   }
 
@@ -56,31 +60,32 @@ public:
     return _txEnablePin ? _mode : CanMode::ListenOnly;
   }
 
-  void setup() {
-    if (_logLevel >= CanLogLevel::Status) _system.log("can", "Initializing SerialCan.");
+  void setup(bool /*connected*/) override {
+    _logger.logIf(LogLevel::Info, name(), [] () { return "Initializing SerialCan."; });
     _serial.setup();
     delay(100);
-    _system.addConfigurable("can", this);
     reset();
   }
 
-  void loop() {
-    _logLevel = (CanLogLevel)_system.logLevel("can");
+  void loop(ConnectionStatus /*status*/) override {
     _serial.loop();
 
     if (!ready() && _resetInterval.elapsed()) {
-      if (_logLevel >= CanLogLevel::Error) _system.log("can", "Timeout: resetting CAN module.");
+      _logger.logIf(LogLevel::Error, name(), [] () { return "Timeout: resetting CAN module."; });
       resetInternal();
     }
 
     if (_counters.err > MAX_ERR_COUNT) {
-      if (_logLevel >= CanLogLevel::Error) _system.log("can", "Error threshold reached: resetting CAN module.");
+      _logger.logIf(LogLevel::Error, name(), [] () { return "Error threshold reached: resetting CAN module."; });
       resetInternal();
     }
   }
+  
+  void getDiagnostics(IDiagnosticsCollector& /*collector*/) const override {
+  }
 
   void reset() {
-    if (_logLevel >= CanLogLevel::Status) _system.log("can", "Resetting CAN module.");
+    _logger.logIf(LogLevel::Info, name(), [] () { return "Resetting CAN module."; });
     resetInternal();
   }
 
@@ -105,9 +110,7 @@ public:
     }
 
     if (_canAvailable) {
-      if (_logLevel >= CanLogLevel::Tx) {
-        logCanMessage("TX", message);
-      }
+      logCanMessage("TX", message);
 
       // TODO check _serial.canQueue() and/or result from queueCanTxMessage()
       queueCanTxMessage(_serial, message.id, message.ext, message.rtr, message.len, message.data);
@@ -134,8 +137,8 @@ private:
     _resetInterval.restart();
   }
 
-  void handleError(SerialErrorCode errorCode, SerialProtocol& serial) {
-    if (_logLevel >= CanLogLevel::Error) _system.log("can", format("Serial error %c: %s", static_cast<char>(errorCode), errorCodeDescription(errorCode)));
+  void handleError(SerialErrorCode errorCode, SerialProtocol& /*serial*/) {
+    _logger.logIf(LogLevel::Warning, name(), [&] () { return format("Serial error %c: %s", static_cast<char>(errorCode), errorCodeDescription(errorCode)); });
     _counters.err += 1;
   }
 
@@ -173,9 +176,7 @@ private:
         start = end;
       }
 
-      if (_logLevel >= CanLogLevel::Rx) {
-        logCanMessage("RX", message);
-      }
+      logCanMessage("RX", message);
 
       if (_messageHandler) _messageHandler(message);
 
@@ -183,44 +184,45 @@ private:
     } else if (strncmp(start, "CANTX ", 6) == 0) {
       if (strncmp(start + 6, "OK ", 3) != 0) {
         _counters.err += 1;
-        if (_logLevel >= CanLogLevel::Error) _system.log("can", message);
+        _logger.logIf(LogLevel::Error, name(), message);
       }
     } else if (strncmp(start, "READY", 5) == 0) {
       serial.queue("SETUP %X %s", CAN_BITRATE, toSetupModeString(effectiveMode()));
     } else if (strncmp(start, "SETUP ", 6) == 0) {
       _canAvailable = strncmp(start + 6, "OK ", 3) == 0;
       if (_canAvailable) {
-        if (_logLevel >= CanLogLevel::Status) _system.log("can", message);
+        _logger.logIf(LogLevel::Info, name(), message);
         if (_readyHandler) _readyHandler();
       } else {
-        if (_logLevel >= CanLogLevel::Error) _system.log("can", message);
+        _logger.logIf(LogLevel::Error, name(), message);
       }
     } else {
       _counters.err += 1;
-      if (_logLevel >= CanLogLevel::Error) _system.log("can", message);
+      _logger.logIf(LogLevel::Error, name(), message);
     }
   }
 
   void logCanMessage(const char* prefix, const CanMessage& message) {
-    static char logMessage[36]; // "XX 123456789 xr 8 FFFFFFFFFFFFFFFF";
-    int insertPos = 0;
-    insertPos += snprintf(logMessage + insertPos, 36 - insertPos, "%s %x ", prefix, message.id);
-    if (message.ext) {
-      logMessage[insertPos++] = 'x';
-    }
-    if (message.rtr) {
-      logMessage[insertPos++] = 'r';
-    }
-    insertPos += snprintf(logMessage + insertPos, 36 - insertPos, " %u ", message.len);
-    for (size_t i = 0; i < message.len; ++i) {
-      insertPos += snprintf(logMessage + insertPos, 36 - insertPos, "%02X", message.data[i]);
-    }
-    
-    _system.log("can", logMessage);
+    _logger.logIf(LogLevel::Debug, name(), [&] () {
+      static char logMessage[36]; // "XX 123456789 xr 8 FFFFFFFFFFFFFFFF";
+      int insertPos = 0;
+      insertPos += snprintf(logMessage + insertPos, 36 - insertPos, "%s %x ", prefix, message.id);
+      if (message.ext) {
+        logMessage[insertPos++] = 'x';
+      }
+      if (message.rtr) {
+        logMessage[insertPos++] = 'r';
+      }
+      insertPos += snprintf(logMessage + insertPos, 36 - insertPos, " %u ", message.len);
+      for (size_t i = 0; i < message.len; ++i) {
+        insertPos += snprintf(logMessage + insertPos, 36 - insertPos, "%02X", message.data[i]);
+      }
+      return logMessage;
+    });
   }
 
   const char* toSetupModeString(CanMode mode) const {
-    switch (effectiveMode())
+    switch (mode)
     {
     case CanMode::ListenOnly:
       return "LIS";

@@ -24,22 +24,33 @@ struct DateTimeFields {
   DateTimeFields() : year(), month(), day(), hour(), minute(), availableFields(0) {}
 };
 
-class DateTimeSource {
+class DateTimeSource final : public IApplicationComponent {
 private:
-  ApplicationContainer& _system;
+  ISystem& _system;
   StiebelEltronProtocol& _protocol;
   
   DateTimeFields _dateTimeFields;
   DateTime _currentDateTime;
 
 public:
-  DateTimeSource(ApplicationContainer& system, StiebelEltronProtocol& protocol)
+  DateTimeSource(ISystem& system, StiebelEltronProtocol& protocol)
     : _system(system),
     _protocol(protocol),
     _dateTimeFields(),
     _currentDateTime() {}
 
-  void setup() {
+  const char* name() const override {
+    return "dts";
+  }
+
+  bool configure(const char* /*name*/, const char* /*value*/) override {
+    return false;
+  }
+
+  void getConfig(std::function<void(const char*, const char*)> /*writer*/) const override {
+  }
+
+  void setup(bool /*connected*/) override {
     _dateTimeFields.year.definition = &getDefinition(DATETIME_YEAR_ID);
     _dateTimeFields.month.definition = &getDefinition(DATETIME_MONTH_ID);
     _dateTimeFields.day.definition = &getDefinition(DATETIME_DAY_ID);
@@ -50,13 +61,16 @@ public:
     _protocol.onWrite([this] (WriteData data) { processData(data.valueId, data.value); });
   }
 
-  void loop() {
+  void loop(ConnectionStatus /*status*/) override {
     if (!_protocol.ready()) {
       return;
     }
 
     updateDateTime();
     requestDateTimeFields();
+  }
+
+  void getDiagnostics(IDiagnosticsCollector& /*collector*/) const override {
   }
 
   bool available() const {
@@ -106,7 +120,7 @@ private:
       bool availableBefore = available();
       updateDateTimeField(valueId, value);
       if (!availableBefore && available()) {
-        _system.log("dts", format(F("Date and time acquired: %s"), _currentDateTime.toString()));
+        _system.logger().log(name(), format(F("Date and time acquired: %s"), _currentDateTime.toString()));
       }
     }
   }

@@ -31,54 +31,30 @@ DigitalOutput canResetPin { pins::esp8266::nodemcu::D1, false, SignalMode::Inver
 DigitalOutput builtinLed { LED_BUILTIN, false, SignalMode::Inverted };
 }
 
-ApplicationContainer app ("fzDL9RKdPAhAhFu7", io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin);
-SerialCan can (app, io::canResetPin, io::txEnablePin);
-StiebelEltronProtocol protocol (app, can);
-DateTimeSource timeSource (app, protocol);
-DataAccess access (app, protocol, timeSource, io::writeEnablePin);
-RestApi api (app, access, protocol);
+System sys { "fzDL9RKdPAhAhFu7", io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin };
+SerialCan can { sys, io::canResetPin, io::txEnablePin };
+StiebelEltronProtocol protocol { sys, can };
+DateTimeSource timeSource { sys, protocol };
+DataAccess access { sys, protocol, timeSource, io::writeEnablePin };
+RestApi api { sys, sys, access, protocol };
 
 void setup() {
-  app.init(
-    [] (bool connected) {
-      can.setup(); yield();
-      protocol.setup(); yield();
-      timeSource.setup(); yield();
-      access.setup(); yield();
-
-      if (connected) {
-        api.setup(); yield();
-      }
-    },
-    [] (ConnectionStatus status) {
-      can.loop(); app.lyield();
-      protocol.loop(); app.lyield();
-      timeSource.loop(); app.lyield();
-      access.loop(); app.lyield();
-
-      switch (status) {
-        case ConnectionStatus::Connecting:
-          api.begin();
-          break;
-        case ConnectionStatus::Connected:
-          api.loop(); app.lyield();
-          break;
-        case ConnectionStatus::Disconnecting:
-          api.end();
-          break;
-      }
-    });
-
-  app.setup();
-
-  app.log("ios", format("ota=%u write=%u tx=%u debug=%u",
+  sys.logger().log("ios", format("ota=%u write=%u tx=%u debug=%u",
     io::otaEnablePin.read(),
     io::writeEnablePin.read(),
     io::txEnablePin.read(),
     io::debugModePin.read()
     ));
+
+  sys.addComponent(&can);
+  sys.addComponent(&protocol);
+  sys.addComponent(&timeSource);
+  sys.addComponent(&access);
+  sys.addComponent(&api);
+
+  sys.setup();
 }
 
 void loop() {
-  app.loop();
+  sys.loop();
 }

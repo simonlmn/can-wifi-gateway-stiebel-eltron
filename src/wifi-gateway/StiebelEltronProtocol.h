@@ -4,4 +4,4 @@
 #include "ApplicationContainer.h"
 #include "SerialCan.h"
 
-using StiebelEltronProtocol = impl::StiebelEltronProtocol<ApplicationContainer, SerialCan>;
+using StiebelEltronProtocol = impl::StiebelEltronProtocol<SerialCan>;
