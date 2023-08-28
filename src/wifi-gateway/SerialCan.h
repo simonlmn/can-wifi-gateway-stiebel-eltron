@@ -4,7 +4,7 @@
 #include "CanInterface.h"
 #include "src/shared/SerialProtocol.h"
 
-class SerialCan final : public IApplicationComponent {
+class SerialCan final : public ICanInterface, public IApplicationComponent {
 private:
   static const uint32_t CAN_BITRATE = 20UL * 1000UL; // 20 kbit/s
   static constexpr uint32_t MAX_ERR_COUNT = 5;
@@ -49,7 +49,7 @@ public:
     writer("mode", canModeName(_mode));
   }
 
-  bool setMode(CanMode mode) {
+  bool setMode(CanMode mode) override {
     _mode = mode;
     reset();
     _logger.log(name(), format("Set mode '%s'.", canModeName(_mode)));
@@ -84,27 +84,27 @@ public:
   void getDiagnostics(IDiagnosticsCollector& /*collector*/) const override {
   }
 
-  void reset() {
+  void reset() override {
     _logger.logIf(LogLevel::Info, name(), [] () { return "Resetting CAN module."; });
     resetInternal();
   }
 
-  bool ready() const {
+  bool ready() const override {
     return _canAvailable;
   }
 
-  void onReady(std::function<void()> readyHandler) {
+  void onReady(std::function<void()> readyHandler) override {
     _readyHandler = readyHandler;
     if (_canAvailable) {
       if (_readyHandler) _readyHandler();
     }
   }
 
-  void onMessage(std::function<void(const CanMessage& message)> messageHandler) {
+  void onMessage(std::function<void(const CanMessage& message)> messageHandler) override {
     _messageHandler = messageHandler;
   }
 
-  void sendCanMessage(const CanMessage& message) {
+  void sendCanMessage(const CanMessage& message) override {
     if (effectiveMode() == CanMode::ListenOnly) {
       return;
     }
@@ -119,7 +119,7 @@ public:
     }
   }
 
-  CanCounters const& counters() const {
+  CanCounters const& counters() const override {
     return _counters;
   }
 

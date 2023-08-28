@@ -54,3 +54,14 @@ struct CanCounters {
   uint32_t tx = 0;
   uint32_t err = 0;
 };
+
+class ICanInterface {
+public:
+  virtual bool setMode(CanMode mode) = 0;
+  virtual void reset() = 0;
+  virtual bool ready() const = 0;
+  virtual void onReady(std::function<void()> readyHandler) = 0;
+  virtual void onMessage(std::function<void(const CanMessage& message)> messageHandler) = 0;
+  virtual void sendCanMessage(const CanMessage& message) = 0;
+  virtual CanCounters const& counters() const = 0;
+};
