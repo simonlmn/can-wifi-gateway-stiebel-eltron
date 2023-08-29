@@ -103,13 +103,13 @@ public:
 
   bool configure(const char* name, const char* value) override {
     if (strcmp(name, "mode") == 0) return setMode(dataCaptureModeFromString(value));
-    if (strcmp(name, "readOnly") == 0) return setReadOnly(strcmp(value, "true") == 0);
+    if (strcmp(name, "readOnly") == 0) return setReadOnly(iot_core::convert<bool>::fromString(value, true));
     return false;
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
     writer("mode", dataCaptureModeToString(_mode));
-    writer("readOnly", _readOnly ? "true" : "false");
+    writer("readOnly", iot_core::convert<bool>::toString(_readOnly));
   }
 
   bool setMode(DataCaptureMode mode) {

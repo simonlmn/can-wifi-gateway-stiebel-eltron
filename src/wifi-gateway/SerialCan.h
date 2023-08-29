@@ -84,7 +84,11 @@ public:
     }
   }
   
-  void getDiagnostics(iot_core::IDiagnosticsCollector& /*collector*/) const override {
+  void getDiagnostics(iot_core::IDiagnosticsCollector& collector) const override {
+    collector.addValue("available", iot_core::convert<bool>::toString(_canAvailable));
+    collector.addValue("err", iot_core::convert<uint32_t>::toString(_counters.err, 10));
+    collector.addValue("rx", iot_core::convert<uint32_t>::toString(_counters.rx, 10));
+    collector.addValue("tx", iot_core::convert<uint32_t>::toString(_counters.tx, 10));
   }
 
   void reset() override {

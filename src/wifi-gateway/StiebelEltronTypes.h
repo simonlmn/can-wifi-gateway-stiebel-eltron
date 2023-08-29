@@ -45,7 +45,7 @@ DeviceType deviceTypeFromString(const char* type, size_t length = SIZE_MAX) {
   if (strncmp(type, "DIS", length) == 0) return DeviceType::Display;
   if (strncmp(type, "ANY", length) == 0) return DeviceType::Any;
   if (strnlen(type, length) == 3 && (type[0] == 'X')) {
-    return DeviceType(strtol(type + 1, nullptr, 16));
+    return DeviceType(iot_core::convert<uint8_t>::fromString(type + 1, nullptr, 16));
   }
   
   return DeviceType::Any;
@@ -107,7 +107,7 @@ struct DeviceId {
         *end = const_cast<char*>(&string[5]);
       }
     } else {
-      address = strtol(string + 4, end, 10);
+      address = iot_core::convert<DeviceAddress>::fromString(string + 4, end, 10);
     }
     return DeviceId{type, address};
   }

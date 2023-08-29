@@ -170,12 +170,12 @@ public:
   }
 
   bool configure(const char* name, const char* value) override {
-    if (strcmp(name, "display") == 0) return setDisplayIndex(strtol(value, nullptr, 10));
+    if (strcmp(name, "display") == 0) return setDisplayIndex(iot_core::convert<uint8_t>::fromString(value, nullptr, 10));
     return false;
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
-    writer("display", iot_core::toConstStr(_displayIndex, 10));
+    writer("display", iot_core::convert<long>::toString(_displayIndex, 10));
   }
 
   bool setDisplayIndex(uint8_t displayIndex) {

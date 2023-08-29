@@ -103,64 +103,64 @@ void test_ConstString_FlashStringHelper() {
   }
 }
 
-void test_toConstStr() {
+void test_toString() {
   const char* str;
 
   {
     // Single character
-    str = toConstStr('a');
+    str = toString('a');
     assert(strlen(str) == 1);
     assert(strcmp(str, "a") == 0);
   }
   {
     // Decimal (base 10)
-    str = toConstStr(uint8_t(123u), 10);
+    str = toString(uint8_t(123u), 10);
     assert(strlen(str) == 3);
     assert(strcmp(str, "123") == 0);
 
-    str = toConstStr(int8_t(-123u), 10);
+    str = toString(int8_t(-123u), 10);
     assert(strlen(str) == 4);
     assert(strcmp(str, "-123") == 0);
 
-    str = toConstStr(uint16_t(12345u), 10);
+    str = toString(uint16_t(12345u), 10);
     assert(strlen(str) == 5);
     assert(strcmp(str, "12345") == 0);
 
-    str = toConstStr(int16_t(-12345u), 10);
+    str = toString(int16_t(-12345u), 10);
     assert(strlen(str) == 6);
     assert(strcmp(str, "-12345") == 0);
 
-    str = toConstStr(uint32_t(12345678u), 10);
+    str = toString(uint32_t(12345678u), 10);
     assert(strlen(str) == 8);
     assert(strcmp(str, "12345678") == 0);
 
-    str = toConstStr(int32_t(-12345678u), 10);
+    str = toString(int32_t(-12345678u), 10);
     assert(strlen(str) == 9);
     assert(strcmp(str, "-12345678") == 0);
 
-    str = toConstStr(12345678ul, 10);
+    str = toString(12345678ul, 10);
     assert(strlen(str) == 8);
     assert(strcmp(str, "12345678") == 0);
 
-    str = toConstStr(-12345678l, 10);
+    str = toString(-12345678l, 10);
     assert(strlen(str) == 9);
     assert(strcmp(str, "-12345678") == 0);
   }
   {
     // Hexadecimal (base 16)
-    str = toConstStr(uint8_t(123u), 16);
+    str = toString(uint8_t(123u), 16);
     assert(strlen(str) == 2);
     assert(strcmp(str, "7B") == 0);
 
-    str = toConstStr(uint16_t(12345u), 16);
+    str = toString(uint16_t(12345u), 16);
     assert(strlen(str) == 4);
     assert(strcmp(str, "3039") == 0);
 
-    str = toConstStr(uint32_t(12345678u), 16);
+    str = toString(uint32_t(12345678u), 16);
     assert(strlen(str) == 6);
     assert(strcmp(str, "BC614E") == 0);
 
-    str = toConstStr(12345678ul, 16);
+    str = toString(12345678ul, 16);
     assert(strlen(str) == 6);
     assert(strcmp(str, "BC614E") == 0);
   }
@@ -169,6 +169,6 @@ void test_toConstStr() {
 int main() {
   test_ConstString_char();
   test_ConstString_FlashStringHelper();
-  test_toConstStr();
+  test_toString();
   return 0;
 }

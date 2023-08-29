@@ -332,7 +332,7 @@ private:
     const char* body = _server.arg(FPSTR(ARG_PLAIN)).c_str();
     char* next;
     while (true) {
-      ValueId valueId = strtol(body, &next, 0);
+      ValueId valueId = iot_core::convert<ValueId>::fromString(body, &next, 0);
       if (next == body) {
         break;
       }
@@ -415,14 +415,14 @@ private:
 
     char* end;
     const char* addressArg = _server.pathArg(1).c_str();
-    long addressNumber = strtol(addressArg, &end, 10);
+    long addressNumber = iot_core::convert<long>::fromString(addressArg, &end, 10);
     if (end == addressArg || addressNumber < 0 || addressNumber > 0x7F) {
       _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), F("device address invalid"));
       return;
     }
 
     const char* valueIdArg = _server.pathArg(2).c_str();
-    long valueIdNumber = strtol(valueIdArg, &end, 0);
+    long valueIdNumber = iot_core::convert<long>::fromString(valueIdArg, &end, 0);
     if (end == valueIdArg || valueIdNumber < 0 || valueIdNumber > 0xFFFF) {
       _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), F("value ID invalid"));
       return;
@@ -469,7 +469,7 @@ private:
     _buffer.jsonObjectOpen();
     _buffer.jsonPropertyString(F("retrievedOn"), _access.currentDateTime().toString());
     _buffer.jsonSeparator();
-    _buffer.jsonPropertyRaw(F("totalItems"), iot_core::toConstStr(collectionData.size(), 10));
+    _buffer.jsonPropertyRaw(F("totalItems"), iot_core::convert<size_t>::toString(collectionData.size(), 10));
     _buffer.jsonSeparator();
     _buffer.jsonPropertyStart(F("items"));
     _buffer.jsonObjectOpen();
@@ -484,7 +484,7 @@ private:
           address = data.first.first.address;
           _buffer.jsonPropertyStart(deviceTypeToString(type));
           _buffer.jsonObjectOpen();
-          _buffer.jsonPropertyStart(iot_core::toConstStr(address, 10));
+          _buffer.jsonPropertyStart(iot_core::convert<DeviceAddress>::toString(address, 10));
           _buffer.jsonObjectOpen();
         } else {
           if (type != data.first.first.type) {
@@ -495,20 +495,20 @@ private:
             _buffer.jsonSeparator();
             _buffer.jsonPropertyStart(deviceTypeToString(type));
             _buffer.jsonObjectOpen();
-            _buffer.jsonPropertyStart(iot_core::toConstStr(address, 10));
+            _buffer.jsonPropertyStart(iot_core::convert<DeviceAddress>::toString(address, 10));
             _buffer.jsonObjectOpen();            
           } else if (address != data.first.first.address) {
             address = data.first.first.address;
             _buffer.jsonObjectClose();
             _buffer.jsonSeparator();
-            _buffer.jsonPropertyStart(iot_core::toConstStr(address, 10));
+            _buffer.jsonPropertyStart(iot_core::convert<DeviceAddress>::toString(address, 10));
             _buffer.jsonObjectOpen();
           } else {
             _buffer.jsonSeparator();
           }
         }
 
-        _buffer.jsonPropertyStart(iot_core::toConstStr(data.second.id, 10));
+        _buffer.jsonPropertyStart(iot_core::convert<ValueId>::toString(data.second.id, 10));
         writeItem(data.second, numbersAsDecimals);
 
         ++i;
@@ -524,14 +524,14 @@ private:
 
     _buffer.jsonObjectClose();
     _buffer.jsonSeparator();
-    _buffer.jsonPropertyRaw(F("actualItems"), iot_core::toConstStr(i, 10));
+    _buffer.jsonPropertyRaw(F("actualItems"), iot_core::convert<size_t>::toString(i, 10));
     _buffer.jsonObjectClose();
     _buffer.end();
   }
 
   void writeItem(const DataEntry& entry, bool numbersAsDecimals = false) {
     _buffer.jsonObjectOpen();
-    _buffer.jsonPropertyRaw(F("id"), iot_core::toConstStr(entry.id, 10));
+    _buffer.jsonPropertyRaw(F("id"), iot_core::convert<ValueId>::toString(entry.id, 10));
     _buffer.jsonSeparator();
     if (entry.hasDefinition()) {
       _buffer.jsonPropertyString(F("name"), entry.definition->name);
@@ -557,9 +557,9 @@ private:
     _buffer.jsonSeparator();
     _buffer.jsonPropertyString(F("source"), entry.source.toString());
     _buffer.jsonSeparator();
-    _buffer.jsonPropertyRaw(F("subscribed"), entry.subscribed ? F("true") : F("false"));
+    _buffer.jsonPropertyRaw(F("subscribed"), iot_core::convert<bool>::toString(entry.subscribed));
     _buffer.jsonSeparator();
-    _buffer.jsonPropertyRaw(F("writable"), entry.writable ? F("true") : F("false"));
+    _buffer.jsonPropertyRaw(F("writable"), iot_core::convert<bool>::toString(entry.writable));
     _buffer.jsonObjectClose();
   }
 
@@ -580,7 +580,7 @@ private:
 
         _buffer.jsonObjectOpen();
 
-        _buffer.jsonPropertyRaw(F("id"), iot_core::toConstStr(definition.id, 10));
+        _buffer.jsonPropertyRaw(F("id"), iot_core::convert<ValueId>::toString(definition.id, 10));
         _buffer.jsonSeparator();
         _buffer.jsonPropertyString(F("name"), definition.name);
         _buffer.jsonSeparator();

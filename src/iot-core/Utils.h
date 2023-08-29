@@ -133,56 +133,173 @@ public:
   size_t len(size_t offset = 0u) const { return strlen_P((PGM_P)_string + offset); }
 };
 
+template<typename T>
+struct convert final {
+  static const char* toString(T value) { return ""; }
+  static T fromString(const char* value) { return {}; }
+};
+
 static char NUMBER_STRING_BUFFER[2 + 8 * sizeof(long)];
 
-const char* toConstStr(char value)
-{
-  NUMBER_STRING_BUFFER[0] = value;
-  NUMBER_STRING_BUFFER[1] = '\0';
-  return NUMBER_STRING_BUFFER;
-}
+template<>
+struct convert<char> final {
+  static const char* toString(char value) {
+    NUMBER_STRING_BUFFER[0] = value;
+    NUMBER_STRING_BUFFER[1] = '\0';
+    return NUMBER_STRING_BUFFER;
+  }
 
-const char* toConstStr(unsigned char value, unsigned char base)
-{
-  utoa(value, NUMBER_STRING_BUFFER, base);
-  return NUMBER_STRING_BUFFER;
-}
+  static char fromString(const char* value) {
+    return value[0];
+  }
+};
 
-const char* toConstStr(short value, unsigned char base)
-{
-  itoa(value, NUMBER_STRING_BUFFER, base);
-  return NUMBER_STRING_BUFFER;
-}
+template<>
+struct convert<unsigned char> final {
+  static const char* toString(unsigned char value, int base) {
+    utoa(value, NUMBER_STRING_BUFFER, base);
+    return NUMBER_STRING_BUFFER;
+  }
 
-const char* toConstStr(unsigned short value, unsigned char base)
-{
-  utoa(value, NUMBER_STRING_BUFFER, base);
-  return NUMBER_STRING_BUFFER;
-}
+  static unsigned char fromString(const char* value, char** endptr, int base) {
+    return static_cast<unsigned char>(strtoul(value, endptr, base));
+  }
+};
 
-const char* toConstStr(int value, unsigned char base)
-{
-  itoa(value, NUMBER_STRING_BUFFER, base);
-  return NUMBER_STRING_BUFFER;
-}
+template<>
+struct convert<short> final {
+  static const char* toString(short value, int base) {
+    itoa(value, NUMBER_STRING_BUFFER, base);
+    return NUMBER_STRING_BUFFER;
+  }
 
-const char* toConstStr(unsigned int value, unsigned char base)
-{
-  utoa(value, NUMBER_STRING_BUFFER, base);
-  return NUMBER_STRING_BUFFER;
-}
+  static short fromString(const char* value, char** endptr, int base) {
+    return static_cast<short>(strtol(value, endptr, base));
+  }
+};
 
-const char* toConstStr(long value, unsigned char base)
-{
-  ltoa(value, NUMBER_STRING_BUFFER, base);
-  return NUMBER_STRING_BUFFER;
-}
+template<>
+struct convert<unsigned short> final {
+  static const char* toString(unsigned short value, int base) {
+    utoa(value, NUMBER_STRING_BUFFER, base);
+    return NUMBER_STRING_BUFFER;
+  }
 
-const char* toConstStr(unsigned long value, unsigned char base)
-{
-  ultoa(value, NUMBER_STRING_BUFFER, base);
-  return NUMBER_STRING_BUFFER;
-}
+  static unsigned short fromString(const char* value, char** endptr, int base) {
+    return static_cast<unsigned short>(strtoul(value, endptr, base));
+  }
+};
+
+template<>
+struct convert<int> final {
+  static const char* toString(int value, int base) {
+    itoa(value, NUMBER_STRING_BUFFER, base);
+    return NUMBER_STRING_BUFFER;
+  }
+
+  static int fromString(const char* value, char** endptr, int base) {
+    return static_cast<int>(strtol(value, endptr, base));
+  }
+};
+
+template<>
+struct convert<unsigned int> final {
+  static const char* toString(unsigned int value, int base) {
+    utoa(value, NUMBER_STRING_BUFFER, base);
+    return NUMBER_STRING_BUFFER;
+  }
+
+  static unsigned int fromString(const char* value, char** endptr, int base) {
+    return static_cast<unsigned int>(strtoul(value, endptr, base));
+  }
+};
+
+template<>
+struct convert<long> final {
+  static const char* toString(long value, int base) {
+    ltoa(value, NUMBER_STRING_BUFFER, base);
+    return NUMBER_STRING_BUFFER;
+  }
+
+  static long fromString(const char* value, char** endptr, int base) {
+    return static_cast<long>(strtol(value, endptr, base));
+  }
+};
+
+template<>
+struct convert<unsigned long> final {
+  static const char* toString(unsigned long value, int base) {
+    ultoa(value, NUMBER_STRING_BUFFER, base);
+    return NUMBER_STRING_BUFFER;
+  }
+
+  static unsigned long fromString(const char* value, char** endptr, int base) {
+    return static_cast<unsigned long>(strtoul(value, endptr, base));
+  }
+};
+
+enum struct BoolFormat {
+  Logic,
+  Numeric,
+  Io
+};
+
+template<>
+struct convert<bool> final {
+  static const char* toString(bool value, BoolFormat format = BoolFormat::Logic) {
+    switch (format) {
+      default:
+      case BoolFormat::Logic: return value ? ("true") : ("false");
+      case BoolFormat::Numeric: return value ? ("1") : ("0");
+      case BoolFormat::Io: return value ? ("HIGH") : ("LOW");
+    }
+  }
+
+  static bool fromString(const char* value, bool defaultValue, const char** endptr = nullptr, BoolFormat format = BoolFormat::Logic) {
+    const char* start = value;
+    while (*start == ' ') { start += 1; }
+    
+    switch (format) {
+      default:
+      case BoolFormat::Logic:
+        if (strcmp(start, ("true")) == 0) {
+          if (endptr != nullptr) { *endptr = start + 4; }
+          return true;
+        } else if (strcmp(start, ("false")) == 0) {
+          if (endptr != nullptr) { *endptr = start + 5; }
+          return false;
+        } else {
+          if (endptr != nullptr) { *endptr = value; }
+          return defaultValue;
+        }
+        break;
+      case BoolFormat::Numeric:
+        if (strcmp(start, ("1")) == 0) {
+          if (endptr != nullptr) { *endptr = start + 1; }
+          return true;
+        } else if (strcmp(start, ("0")) == 0) {
+          if (endptr != nullptr) { *endptr = start + 1; }
+          return false;
+        } else {
+          if (endptr != nullptr) { *endptr = value; }
+          return defaultValue;
+        }
+        break;
+      case BoolFormat::Io:
+        if (strcmp(start, ("HIGH")) == 0) {
+          if (endptr != nullptr) { *endptr = start + 4; }
+          return true;
+        } else if (strcmp(start, ("LOW")) == 0) {
+          if (endptr != nullptr) { *endptr = start + 3; }
+          return false;
+        } else {
+          if (endptr != nullptr) { *endptr = value; }
+          return defaultValue;
+        }
+        break;;
+    }
+  }
+};
 
 struct str_less_than
 {
