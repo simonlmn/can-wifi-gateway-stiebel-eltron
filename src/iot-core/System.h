@@ -39,6 +39,8 @@ class System final : public ISystem, public IApplicationContainer {
   pins::DigitalInput& _updatePin;
   pins::DigitalInput& _factoryResetPin;
 
+  TimingStatistics<20> _yieldTiming {};
+
 public:
   System(const char* otaPassword, pins::DigitalOutput& statusLedPin, pins::DigitalInput& otaEnablePin, pins::DigitalInput& updatePin, pins::DigitalInput& factoryResetPin)
     : _logger(_uptime),
@@ -80,6 +82,8 @@ public:
   }
 
   void loop() {
+    _yieldTiming.start();
+
     _uptime.update();
 
     lyield();
@@ -132,15 +136,19 @@ public:
         }
       }
     }
+
+    _yieldTiming.stop();
   }
 
   void lyield() override {
+    _yieldTiming.stop();
     yield();
     _wifiManager.process();
     if (_otaEnablePin) {
       ArduinoOTA.handle();
     }
     yield();
+    _yieldTiming.start();
   }
 
   void reset() override {
@@ -253,6 +261,12 @@ public:
     collector.addValue("maxFreeBlockSize", format("%u", ESP.getMaxFreeBlockSize()));
     collector.addValue("wifiRssi", format("%i", WiFi.RSSI()));
     collector.addValue("ip", WiFi.localIP().toString().c_str());
+
+    collector.addSection("yield");
+    collector.addValue("count", convert<size_t>::toString(_yieldTiming.count(), 10));
+    collector.addValue("avg", convert<unsigned long>::toString(_yieldTiming.avg(), 10));
+    collector.addValue("min", convert<unsigned long>::toString(_yieldTiming.min(), 10));
+    collector.addValue("max", convert<unsigned long>::toString(_yieldTiming.max(), 10));
 
     for (auto component : _components) {
       collector.addSection(component->name());
