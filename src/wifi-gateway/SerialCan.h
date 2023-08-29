@@ -1,30 +1,33 @@
 #pragma once
 
-#include "ApplicationContainer.h"
+#include "src/iot-core/Interfaces.h"
+#include "src/iot-core/Utils.h"
+#include "src/pins/DigitalOutput.h"
+#include "src/pins/DigitalInput.h"
+#include "src/serial-protocol/Endpoint.h"
 #include "CanInterface.h"
-#include "src/shared/SerialProtocol.h"
 
-class SerialCan final : public ICanInterface, public IApplicationComponent {
+class SerialCan final : public ICanInterface, public iot_core::IApplicationComponent {
 private:
   static const uint32_t CAN_BITRATE = 20UL * 1000UL; // 20 kbit/s
   static constexpr uint32_t MAX_ERR_COUNT = 5;
 
-  Logger& _logger;
-  ISystem& _system;
-  DigitalOutput& _resetPin;
-  DigitalInput& _txEnablePin;
+  iot_core::Logger& _logger;
+  iot_core::ISystem& _system;
+  pins::DigitalOutput& _resetPin;
+  pins::DigitalInput& _txEnablePin;
   bool _canAvailable;
-  IntervalTimer _resetInterval;
+  iot_core::IntervalTimer _resetInterval;
   std::function<void()> _readyHandler;
   std::function<void(const CanMessage& message)> _messageHandler;
   
   CanMode _mode = CanMode::ListenOnly;
   CanCounters _counters;
 
-  SerialProtocol _serial;
+  serial_protocol::Endpoint _serial;
 
 public:
-  SerialCan(ISystem& system, DigitalOutput& resetPin, DigitalInput& txEnablePin) :
+  SerialCan(iot_core::ISystem& system, pins::DigitalOutput& resetPin, pins::DigitalInput& txEnablePin) :
     _logger(system.logger()),
     _system(system),
     _resetPin(resetPin),
@@ -32,7 +35,7 @@ public:
     _canAvailable(false),
     _resetInterval(30000),
     _counters(),
-    _serial([this] (const char* message, SerialProtocol& serial) { processReceived(message, serial); }, [this] (SerialErrorCode errorCode, SerialProtocol& serial) { handleError(errorCode, serial); })
+    _serial([this] (const char* message, serial_protocol::Endpoint& serial) { processReceived(message, serial); }, [this] (serial_protocol::ErrorCode errorCode, serial_protocol::Endpoint& serial) { handleError(errorCode, serial); })
   {
   }
 
@@ -46,13 +49,13 @@ public:
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
-    writer("mode", canModeName(_mode));
+    writer("mode", canModeToString(_mode));
   }
 
   bool setMode(CanMode mode) override {
     _mode = mode;
     reset();
-    _logger.log(name(), format("Set mode '%s'.", canModeName(_mode)));
+    _logger.log(name(), iot_core::format("Set mode '%s'.", canModeToString(_mode)));
     return true;
   }
 
@@ -61,31 +64,31 @@ public:
   }
 
   void setup(bool /*connected*/) override {
-    _logger.logIf(LogLevel::Info, name(), [] () { return "Initializing SerialCan."; });
+    _logger.logIf(iot_core::LogLevel::Info, name(), [] () { return "Initializing SerialCan."; });
     _serial.setup();
     delay(100);
     reset();
   }
 
-  void loop(ConnectionStatus /*status*/) override {
+  void loop(iot_core::ConnectionStatus /*status*/) override {
     _serial.loop();
 
     if (!ready() && _resetInterval.elapsed()) {
-      _logger.logIf(LogLevel::Error, name(), [] () { return "Timeout: resetting CAN module."; });
+      _logger.logIf(iot_core::LogLevel::Error, name(), [] () { return "Timeout: resetting CAN module."; });
       resetInternal();
     }
 
     if (_counters.err > MAX_ERR_COUNT) {
-      _logger.logIf(LogLevel::Error, name(), [] () { return "Error threshold reached: resetting CAN module."; });
+      _logger.logIf(iot_core::LogLevel::Error, name(), [] () { return "Error threshold reached: resetting CAN module."; });
       resetInternal();
     }
   }
   
-  void getDiagnostics(IDiagnosticsCollector& /*collector*/) const override {
+  void getDiagnostics(iot_core::IDiagnosticsCollector& /*collector*/) const override {
   }
 
   void reset() override {
-    _logger.logIf(LogLevel::Info, name(), [] () { return "Resetting CAN module."; });
+    _logger.logIf(iot_core::LogLevel::Info, name(), [] () { return "Resetting CAN module."; });
     resetInternal();
   }
 
@@ -112,7 +115,7 @@ public:
     if (_canAvailable) {
       logCanMessage("TX", message);
 
-      // TODO check _serial.canQueue() and/or result from queueCanTxMessage()
+      // TODO check _serial.canQueue() and/or result from queueCanTxMessage() ?
       queueCanTxMessage(_serial, message.id, message.ext, message.rtr, message.len, message.data);
 
       _counters.tx += 1;
@@ -137,12 +140,12 @@ private:
     _resetInterval.restart();
   }
 
-  void handleError(SerialErrorCode errorCode, SerialProtocol& /*serial*/) {
-    _logger.logIf(LogLevel::Warning, name(), [&] () { return format("Serial error %c: %s", static_cast<char>(errorCode), errorCodeDescription(errorCode)); });
+  void handleError(serial_protocol::ErrorCode errorCode, serial_protocol::Endpoint& /*serial*/) {
+    _logger.logIf(iot_core::LogLevel::Warning, name(), [&] () { return iot_core::format("Serial error %c: %s", static_cast<char>(errorCode), serial_protocol::describe(errorCode)); });
     _counters.err += 1;
   }
 
-  void processReceived(const char* message, SerialProtocol& serial) {
+  void processReceived(const char* message, serial_protocol::Endpoint& serial) {
     const char* start = message;
     char* end = nullptr;
 
@@ -184,26 +187,26 @@ private:
     } else if (strncmp(start, "CANTX ", 6) == 0) {
       if (strncmp(start + 6, "OK ", 3) != 0) {
         _counters.err += 1;
-        _logger.logIf(LogLevel::Error, name(), message);
+        _logger.logIf(iot_core::LogLevel::Error, name(), message);
       }
     } else if (strncmp(start, "READY", 5) == 0) {
       serial.queue("SETUP %X %s", CAN_BITRATE, toSetupModeString(effectiveMode()));
     } else if (strncmp(start, "SETUP ", 6) == 0) {
       _canAvailable = strncmp(start + 6, "OK ", 3) == 0;
       if (_canAvailable) {
-        _logger.logIf(LogLevel::Info, name(), message);
+        _logger.logIf(iot_core::LogLevel::Info, name(), message);
         if (_readyHandler) _readyHandler();
       } else {
-        _logger.logIf(LogLevel::Error, name(), message);
+        _logger.logIf(iot_core::LogLevel::Error, name(), message);
       }
     } else {
       _counters.err += 1;
-      _logger.logIf(LogLevel::Error, name(), message);
+      _logger.logIf(iot_core::LogLevel::Error, name(), message);
     }
   }
 
   void logCanMessage(const char* prefix, const CanMessage& message) {
-    _logger.logIf(LogLevel::Debug, name(), [&] () {
+    _logger.logIf(iot_core::LogLevel::Debug, name(), [&] () {
       static char logMessage[36]; // "XX 123456789 xr 8 FFFFFFFFFFFFFFFF";
       int insertPos = 0;
       insertPos += snprintf(logMessage + insertPos, 36 - insertPos, "%s %x ", prefix, message.id);

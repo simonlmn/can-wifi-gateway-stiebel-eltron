@@ -6,7 +6,7 @@
 #include <cstring>
 #endif
 
-#include "Utils.h"
+#include "src/iot-core/Utils.h"
 
 /*
    From https://www.stiebel-eltron.de/content/dam/ste/cdbassets/historic/bedienungs-_u_installationsanleitungen/ISG_Modbus__b89c1c53-6d34-4243-a630-b42cf0633361.pdf
@@ -65,7 +65,7 @@ enum struct Unit : uint8_t {
   Volt
 };
 
-const char* getUnitSymbol(Unit unit) {
+const char* unitSymbol(Unit unit) {
   switch (unit) {
     case Unit::Unknown: return "?";
     case Unit::None: return "";

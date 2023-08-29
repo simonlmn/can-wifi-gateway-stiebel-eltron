@@ -1,15 +1,12 @@
-#pragma once
+#ifndef IOT_CORE_CONFIG_H_
+#define IOT_CORE_CONFIG_H_
 
 #include <LittleFS.h>
-#include <functional>
+#include "Interfaces.h"
 
-struct IConfigurable {
-  virtual const char* name() const = 0;
-  virtual bool configure(const char* name, const char* value) = 0;
-  virtual void getConfig(std::function<void(const char*, const char*)> writer) const = 0;
-};
+namespace iot_core {
 
-class ConfigParser final {
+class ConfigParser final : public IConfigParser {
 public:
   static constexpr char SEPARATOR = '=';
   static constexpr char END = ';';
@@ -22,7 +19,7 @@ public:
 
   ConfigParser(char* config) : _config(config) {}
   
-  bool parse(std::function<bool(char* name, const char* value)> processEntry) const {
+  bool parse(std::function<bool(char* name, const char* value)> processEntry) const override {
     if (_config == nullptr) {
       return false;
     }
@@ -98,3 +95,7 @@ void writeConfigFile(const char* filename, IConfigurable* configurable) {
     configFile.close();
   }
 }
+
+}
+
+#endif

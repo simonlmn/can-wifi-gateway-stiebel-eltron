@@ -1,10 +1,13 @@
-#pragma once
+#ifndef SERIAL_PROTOCOL_ENDPOINT_H_
+#define SERIAL_PROTOCOL_ENDPOINT_H_
 
 #include <Arduino.h>
 
-class SerialProtocol;
+namespace serial_protocol {
 
-enum struct SerialErrorCode : char {
+class Endpoint;
+
+enum struct ErrorCode : char {
     InvalidMessageTermination = 'E',
     InvalidMessageStart = 'H',
     InvalidMessageSize = 'S',
@@ -14,13 +17,15 @@ enum struct SerialErrorCode : char {
     ResendLimitExceeded = 'R'
 };
 
+const char* describe(ErrorCode errorCode);
+
 #if defined(ARDUINO_AVR_NANO)
-using SerialReceiveCallback = void (*)(const char* rxMessage, SerialProtocol& serial);
-using SerialErrorCallback = void (*)(SerialErrorCode errorCode, SerialProtocol& serial);
+using ReceiveCallback = void (*)(const char* rxMessage, Endpoint& serial);
+using ErrorCallback = void (*)(ErrorCode errorCode, Endpoint& serial);
 #else
 #include <functional>
-using SerialReceiveCallback = std::function<void(const char* rxMessage, SerialProtocol& serial)>;
-using SerialErrorCallback = std::function<void(SerialErrorCode errorCode, SerialProtocol& serial)>;
+using ReceiveCallback = std::function<void(const char* rxMessage, Endpoint& serial)>;
+using ErrorCallback = std::function<void(ErrorCode errorCode, Endpoint& serial)>;
 #endif
 
 /**
@@ -49,8 +54,10 @@ using SerialErrorCallback = std::function<void(SerialErrorCode errorCode, Serial
  * +[A-Z] CANTX ENOAV FFFFFFFF 8 01 02 03 04 05 06 07 08 \r\n
  * +[A-Z] ERROR _______________________________________________\r\n
  */
-class SerialProtocol final {
+class Endpoint final {
 private:
+    static const unsigned long DEFAULT_BAUD_RATE = 115200u;
+
     static const unsigned long DEFAULT_TIMEOUT = 2000u;
     static const uint8_t DEFAULT_RESEND_LIMIT = 4u;
 
@@ -86,14 +93,13 @@ private:
     bool _timeoutEnabled = true;
     unsigned long _timeout = DEFAULT_TIMEOUT;
     uint8_t _resendLimit = DEFAULT_RESEND_LIMIT;
-    
 
-    SerialReceiveCallback _processReceived;
-    SerialErrorCallback _handleError;
+    ReceiveCallback _processReceived;
+    ErrorCallback _handleError;
 
     void send(QueuedMessage& message);
     void sendAcknowledge(uint8_t sequenceNumber);
-    void sendError(SerialErrorCode errorCode);
+    void sendError(ErrorCode errorCode);
     void sendControlResponse(const char forControl, const char* fmt, ...);
     const QueuedMessage& currentUnacknowledgedMessage() const;
     QueuedMessage& currentUnacknowledgedMessage();
@@ -113,9 +119,9 @@ private:
     void handleTimeoutControl(const char operation);
 
 public:
-    SerialProtocol(SerialReceiveCallback processReceived, SerialErrorCallback handleError);
+    Endpoint(ReceiveCallback processReceived, ErrorCallback handleError);
 
-    void setup();
+    void setup(unsigned long baud = DEFAULT_BAUD_RATE);
     void reset();
     void loop();
     bool canQueue() const;
@@ -123,10 +129,12 @@ public:
     bool queue(const char* fmt, ...);
 };
 
-const char* errorCodeDescription(SerialErrorCode errorCode);
-
 // Helper functions to send CAN messages from both sides
 
-bool queueCanTxMessage(SerialProtocol& serial, uint32_t id, bool ext, bool rtr, uint8_t length, const uint8_t (&data)[8]);
+bool queueCanTxMessage(Endpoint& serial, uint32_t id, bool ext, bool rtr, uint8_t length, const uint8_t (&data)[8]);
 
-bool queueCanRxMessage(SerialProtocol& serial, uint32_t id, bool ext, bool rtr, uint8_t length, const uint8_t (&data)[8]);
+bool queueCanRxMessage(Endpoint& serial, uint32_t id, bool ext, bool rtr, uint8_t length, const uint8_t (&data)[8]);
+
+}
+
+#endif

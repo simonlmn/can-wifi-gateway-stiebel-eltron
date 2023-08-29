@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CANINTERFACE_H_
+#define CANINTERFACE_H_
 
 #ifdef TEST_ENV
 #include <cstdint>
@@ -29,7 +30,7 @@ enum struct CanMode : uint8_t {
   LoopBack = 2,
 };
 
-const char* canModeName(CanMode mode) {
+const char* canModeToString(CanMode mode) {
   switch (mode) {
     case CanMode::Normal:
       return "Normal";
@@ -65,3 +66,5 @@ public:
   virtual void sendCanMessage(const CanMessage& message) = 0;
   virtual CanCounters const& counters() const = 0;
 };
+
+#endif

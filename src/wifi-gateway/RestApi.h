@@ -1,9 +1,11 @@
 #pragma once
 
+#include "src/iot-core/Interfaces.h"
+#include "src/iot-core/Utils.h"
+#include "src/iot-core/Config.h"
 #include <ESP8266WebServer.h>
 #include <uri/UriBraces.h>
 #include <uri/UriGlob.h>
-#include "ApplicationContainer.h"
 #include "DataAccess.h"
 #include "StiebelEltronProtocol.h"
 #include "ResponseBuffer.h"
@@ -27,7 +29,7 @@ static const char ARG_ACCESS_MODE[] PROGMEM = "accessMode";
 static const char ARG_VALIDATE_ONLY[] PROGMEM = "validateOnly";
 
 template<typename JsonBuffer>
-class JsonDiagnosticsCollector final : public IDiagnosticsCollector {
+class JsonDiagnosticsCollector final : public iot_core::IDiagnosticsCollector {
 private:
   JsonBuffer& _buffer;
   bool _sectionOpen = false;
@@ -67,20 +69,21 @@ public:
   }
 };
 
-class RestApi final : public IApplicationComponent {
+class RestApi final : public iot_core::IApplicationComponent {
 private:
-  ESP8266WebServer _server;
-  ResponseBuffer<ESP8266WebServer> _buffer;
+  iot_core::Logger& _logger;
+  iot_core::ISystem& _system;
+  iot_core::IApplicationContainer& _application;
 
-  Logger& _logger;
-  ISystem& _system;
-  IApplicationContainer& _application;
   DataAccess& _access;
   StiebelEltronProtocol& _protocol;
+
+  ESP8266WebServer _server;
+  ResponseBuffer<ESP8266WebServer> _buffer;
   
 public:
-  RestApi(ISystem& system, IApplicationContainer& application, DataAccess& access, StiebelEltronProtocol& protocol)
-  :_server(80), _buffer(_server), _logger(system.logger()), _system(system), _application(application), _access(access), _protocol(protocol) {}
+  RestApi(iot_core::ISystem& system, iot_core::IApplicationContainer& application, DataAccess& access, StiebelEltronProtocol& protocol)
+  : _logger(system.logger()), _system(system), _application(application), _access(access), _protocol(protocol), _server(80), _buffer(_server) {}
   
   const char* name() const override {
     return "api";
@@ -127,14 +130,14 @@ public:
           return false;
         }
         
-        ValueAccessMode accessMode = getValueAccessModeFromString(_server.arg(FPSTR(ARG_ACCESS_MODE)).c_str());
+        ValueAccessMode accessMode = valueAccessModeFromString(_server.arg(FPSTR(ARG_ACCESS_MODE)).c_str());
         const char* valueString = _server.arg(FPSTR(ARG_PLAIN)).c_str();
 
         const char* space = strrchr(valueString, ' ');
         if (space != nullptr) {
-          const char* unitSymbol = getUnitSymbol(entry.definition->unit);
-          if (strcmp(space + 1, unitSymbol) != 0) {
-            _logger.logIf(LogLevel::Warning, "api", [&] () { return format("PUT data: unit mismatch %s != %s", space + 1, unitSymbol); });
+          const char* symbol = unitSymbol(entry.definition->unit);
+          if (strcmp(space + 1, symbol) != 0) {
+            _logger.logIf(iot_core::LogLevel::Warning, "api", [&] () { return iot_core::format("PUT data: unit mismatch %s != %s", space + 1, symbol); });
             return false;
           }
         }
@@ -142,7 +145,7 @@ public:
         uint32_t rawValue = entry.definition->toRaw(valueString, space);
 
         if (Codec::isError(rawValue)) {
-          _logger.logIf(LogLevel::Warning, "api", [&] () { return format("PUT data: value error %s", valueString); });
+          _logger.logIf(iot_core::LogLevel::Warning, "api", [&] () { return iot_core::format("PUT data: value error %s", valueString); });
           return false;
         }
   
@@ -222,11 +225,11 @@ public:
 
     _server.on(UriBraces(F("/api/system/log-level/{}")), HTTP_PUT, [this]() {
       const auto& category = _server.pathArg(0);
-      LogLevel logLevel = logLevelFromString(_server.arg("plain").c_str());
+      iot_core::LogLevel logLevel = iot_core::logLevelFromString(_server.arg("plain").c_str());
 
       _logger.logLevel(category.c_str(), logLevel);
       
-      _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), logLevelName(_logger.logLevel(category.c_str())));
+      _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), iot_core::logLevelToString(_logger.logLevel(category.c_str())));
     });
 
     _server.on(F("/api/system/config"), HTTP_GET, [this]() {
@@ -237,9 +240,9 @@ public:
 
       _application.getAllConfig([&] (const char* path, const char* value) {
         _buffer.plainText(path);
-        _buffer.plainChar(ConfigParser::SEPARATOR);
+        _buffer.plainChar(iot_core::ConfigParser::SEPARATOR);
         _buffer.plainText(value);
-        _buffer.plainChar(ConfigParser::END);
+        _buffer.plainChar(iot_core::ConfigParser::END);
         _buffer.plainChar('\n');
       });
 
@@ -249,12 +252,12 @@ public:
     _server.on(F("/api/system/config"), HTTP_PUT, [this]() {
       const char* body = _server.arg("plain").c_str();
 
-      ConfigParser config {const_cast<char*>(body)};
+      iot_core::ConfigParser config {const_cast<char*>(body)};
 
       if (_application.configureAll(config)) {
         _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), body);
       } else {
-        _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), EMPTY_STRING);
+        _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::EMPTY_STRING);
       }
     });
 
@@ -268,9 +271,9 @@ public:
 
       _application.getConfig(category.c_str(), [&] (const char* name, const char* value) {
         _buffer.plainText(name);
-        _buffer.plainChar(ConfigParser::SEPARATOR);
+        _buffer.plainChar(iot_core::ConfigParser::SEPARATOR);
         _buffer.plainText(value);
-        _buffer.plainChar(ConfigParser::END);
+        _buffer.plainChar(iot_core::ConfigParser::END);
         _buffer.plainChar('\n');
       });
 
@@ -281,34 +284,34 @@ public:
       const auto& category = _server.pathArg(0);
       const char* body = _server.arg("plain").c_str();
 
-      ConfigParser config {const_cast<char*>(body)};
+      iot_core::ConfigParser config {const_cast<char*>(body)};
 
       if (_application.configure(category.c_str(), config)) {
         _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), body);
       } else {
-        _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), EMPTY_STRING);
+        _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::EMPTY_STRING);
       }
     });
   }
 
-  void loop(ConnectionStatus status) override {
+  void loop(iot_core::ConnectionStatus status) override {
     switch (status) {
-      case ConnectionStatus::Reconnected:
+      case iot_core::ConnectionStatus::Reconnected:
         _server.begin();
         break;
-      case ConnectionStatus::Connected:
+      case iot_core::ConnectionStatus::Connected:
         _server.handleClient();
         break;
-      case ConnectionStatus::Disconnecting:
+      case iot_core::ConnectionStatus::Disconnecting:
         _server.close();
         break;
-      case ConnectionStatus::Disconnected:
+      case iot_core::ConnectionStatus::Disconnected:
         // do nothing
         break;
     }
   }
 
-  void getDiagnostics(IDiagnosticsCollector& /*collector*/) const override {
+  void getDiagnostics(iot_core::IDiagnosticsCollector& /*collector*/) const override {
   }
 
 private:
@@ -335,7 +338,7 @@ private:
       }
       const auto& definition = getDefinition(valueId);
       if (definition.isUnknown()) {
-        _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), format(F("unknown ID: %u"), valueId));
+        _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::format(F("unknown ID: %u"), valueId));
         return;
       }
       
@@ -345,11 +348,11 @@ private:
         {
           // plain valueId
           if (!definition.source.isExact()) {
-            _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), format(F("device ID required for %u"), valueId));
+            _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::format(F("device ID required for %u"), valueId));
             return;
           }
           if (!itemOperation({definition.source, valueId})) {
-            _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), format(F("operation failed for %u"), valueId));
+            _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::format(F("operation failed for %u"), valueId));
             return;
           }
           break;
@@ -357,20 +360,20 @@ private:
         case '@':
         {
           // <valueId>@<DeviceType>/<address>
-          Maybe<DeviceId> key = DeviceId::fromString(next + 1, &next);
+          iot_core::Maybe<DeviceId> key = DeviceId::fromString(next + 1, &next);
           if (!key.hasValue) {
-            _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), format(F("device ID invalid for %u"), valueId));
+            _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::format(F("device ID invalid for %u"), valueId));
             return;
           }
           if (!itemOperation({key.value, valueId})) {
-            _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), format(F("operation failed for %u@%s"), valueId, key.value.toString()));
+            _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::format(F("operation failed for %u@%s"), valueId, key.value.toString()));
             return;
           }
           break;
         }
         default:
         {
-          _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), format(F("unexpected format: %s"), next));
+          _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::format(F("unexpected format: %s"), next));
           return;
         }
       }
@@ -383,9 +386,9 @@ private:
     }
 
     if (strlen(body) > 0) {
-      _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), format(F("unrecognized value: %s"), body));
+      _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::format(F("unrecognized value: %s"), body));
     } else {
-      _server.send(204, FPSTR(CONTENT_TYPE_PLAIN), EMPTY_STRING);
+      _server.send(204, FPSTR(CONTENT_TYPE_PLAIN), iot_core::EMPTY_STRING);
     }
   }
 
@@ -400,7 +403,7 @@ private:
   void doItem(std::function<bool(DataAccess::DataKey const&, DataEntry const&)> itemOperation = {}) {
     _system.lyield();
 
-    _logger.logIf(LogLevel::Debug, "api", [&] () { return format("doItem: %s", _server.arg(FPSTR(ARG_PLAIN)).c_str()); });
+    _logger.logIf(iot_core::LogLevel::Debug, "api", [&] () { return iot_core::format("doItem: %s", _server.arg(FPSTR(ARG_PLAIN)).c_str()); });
 
     bool validateOnly = _server.hasArg(FPSTR(ARG_VALIDATE_ONLY));
     
@@ -438,9 +441,9 @@ private:
       _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), _server.arg(FPSTR(ARG_PLAIN)));
     } else {
       if (itemOperation(key, *entry)) {
-        _server.send(202, FPSTR(CONTENT_TYPE_PLAIN), EMPTY_STRING);
+        _server.send(202, FPSTR(CONTENT_TYPE_PLAIN), iot_core::EMPTY_STRING);
       } else {
-        _logger.logIf(LogLevel::Warning, name(), [] () { return "doItem: operation failed"; });
+        _logger.logIf(iot_core::LogLevel::Warning, name(), [] () { return "doItem: operation failed"; });
         _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), F("operation failed"));
       }
     }
@@ -450,7 +453,7 @@ private:
    * Produce a list of items based on the optional predicate.
    */
   void getItems(std::function<bool(DataEntry const&)> predicate = {}) {
-    DateTime updatedSince;
+    iot_core::DateTime updatedSince;
     if (_server.hasArg(FPSTR(ARG_UPDATED_SINCE))) {
       updatedSince.fromString(_server.arg(FPSTR(ARG_UPDATED_SINCE)).c_str());
     }
@@ -464,9 +467,9 @@ private:
     const auto& collectionData = _access.getData();
 
     _buffer.jsonObjectOpen();
-    _buffer.jsonPropertyString(F("retrievedOn"), _access.getCurrentDateTime().toString());
+    _buffer.jsonPropertyString(F("retrievedOn"), _access.currentDateTime().toString());
     _buffer.jsonSeparator();
-    _buffer.jsonPropertyRaw(F("totalItems"), toConstStr(collectionData.size(), 10));
+    _buffer.jsonPropertyRaw(F("totalItems"), iot_core::toConstStr(collectionData.size(), 10));
     _buffer.jsonSeparator();
     _buffer.jsonPropertyStart(F("items"));
     _buffer.jsonObjectOpen();
@@ -479,9 +482,9 @@ private:
         if (i == 0) {
           type = data.first.first.type;
           address = data.first.first.address;
-          _buffer.jsonPropertyStart(deviceTypeName(type));
+          _buffer.jsonPropertyStart(deviceTypeToString(type));
           _buffer.jsonObjectOpen();
-          _buffer.jsonPropertyStart(toConstStr(address, 10));
+          _buffer.jsonPropertyStart(iot_core::toConstStr(address, 10));
           _buffer.jsonObjectOpen();
         } else {
           if (type != data.first.first.type) {
@@ -490,22 +493,22 @@ private:
             _buffer.jsonObjectClose();
             _buffer.jsonObjectClose();
             _buffer.jsonSeparator();
-            _buffer.jsonPropertyStart(deviceTypeName(type));
+            _buffer.jsonPropertyStart(deviceTypeToString(type));
             _buffer.jsonObjectOpen();
-            _buffer.jsonPropertyStart(toConstStr(address, 10));
+            _buffer.jsonPropertyStart(iot_core::toConstStr(address, 10));
             _buffer.jsonObjectOpen();            
           } else if (address != data.first.first.address) {
             address = data.first.first.address;
             _buffer.jsonObjectClose();
             _buffer.jsonSeparator();
-            _buffer.jsonPropertyStart(toConstStr(address, 10));
+            _buffer.jsonPropertyStart(iot_core::toConstStr(address, 10));
             _buffer.jsonObjectOpen();
           } else {
             _buffer.jsonSeparator();
           }
         }
 
-        _buffer.jsonPropertyStart(toConstStr(data.second.id, 10));
+        _buffer.jsonPropertyStart(iot_core::toConstStr(data.second.id, 10));
         writeItem(data.second, numbersAsDecimals);
 
         ++i;
@@ -521,22 +524,22 @@ private:
 
     _buffer.jsonObjectClose();
     _buffer.jsonSeparator();
-    _buffer.jsonPropertyRaw(F("actualItems"), toConstStr(i, 10));
+    _buffer.jsonPropertyRaw(F("actualItems"), iot_core::toConstStr(i, 10));
     _buffer.jsonObjectClose();
     _buffer.end();
   }
 
   void writeItem(const DataEntry& entry, bool numbersAsDecimals = false) {
     _buffer.jsonObjectOpen();
-    _buffer.jsonPropertyRaw(F("id"), toConstStr(entry.id, 10));
+    _buffer.jsonPropertyRaw(F("id"), iot_core::toConstStr(entry.id, 10));
     _buffer.jsonSeparator();
     if (entry.hasDefinition()) {
       _buffer.jsonPropertyString(F("name"), entry.definition->name);
       _buffer.jsonSeparator();
-      _buffer.jsonPropertyString(F("accessMode"), getValueAccessModeString(entry.definition->accessMode));
+      _buffer.jsonPropertyString(F("accessMode"), valueAccessModeToString(entry.definition->accessMode));
       _buffer.jsonSeparator();
       if (entry.definition->unit != Unit::Unknown) {
-        _buffer.jsonPropertyString(F("unit"), getUnitSymbol(entry.definition->unit));
+        _buffer.jsonPropertyString(F("unit"), unitSymbol(entry.definition->unit));
         _buffer.jsonSeparator();
       }
     }
@@ -577,13 +580,13 @@ private:
 
         _buffer.jsonObjectOpen();
 
-        _buffer.jsonPropertyRaw(F("id"), toConstStr(definition.id, 10));
+        _buffer.jsonPropertyRaw(F("id"), iot_core::toConstStr(definition.id, 10));
         _buffer.jsonSeparator();
         _buffer.jsonPropertyString(F("name"), definition.name);
         _buffer.jsonSeparator();
-        _buffer.jsonPropertyString(F("unit"), getUnitSymbol(definition.unit));
+        _buffer.jsonPropertyString(F("unit"), unitSymbol(definition.unit));
         _buffer.jsonSeparator();
-        _buffer.jsonPropertyString(F("accessMode"), getValueAccessModeString(definition.accessMode));
+        _buffer.jsonPropertyString(F("accessMode"), valueAccessModeToString(definition.accessMode));
         _buffer.jsonSeparator();
         _buffer.jsonPropertyString(F("source"), definition.source.toString());
         

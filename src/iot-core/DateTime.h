@@ -1,10 +1,13 @@
-#pragma once
+#ifndef IOT_CORE_DATETIME_H_
+#define IOT_CORE_DATETIME_H_
 
 #ifdef TEST_ENV
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #endif
+
+namespace iot_core {
 
 struct DateTime {
   uint16_t year;
@@ -63,3 +66,43 @@ struct DateTime {
     return toStringBuffer;
   }
 };
+
+static const DateTime NO_DATETIME {};
+
+const char* formatTime(unsigned long time, uint8_t epoch = 0u) {
+  static char toStringBuffer[21u]; // "255e9w6d23h59m59s999\0"
+
+  uint16_t millis = time % 1000u;
+  uint16_t seconds = time / 1000u % 60u;
+  uint16_t minutes = time / 1000u / 60u % 60u;
+  uint16_t hours = time / 1000u / 60u / 60u % 24u;
+  uint16_t days = time / 1000u / 60u / 60u / 24u % 7u;
+  uint16_t weeks = time / 1000u / 60u / 60u / 24u / 7u;
+
+  snprintf(toStringBuffer, 21u, "%ue%1uw%1ud%02uh%02um%02us%03u", epoch, weeks, days, hours, minutes, seconds, millis);
+  return toStringBuffer;
+}
+
+struct Time {
+private:
+  unsigned long _millis = 0u;
+  uint8_t _epoch = 0u;
+
+public:
+  unsigned long millis() const { return _millis; }
+  uint8_t epoch() const { return _epoch; }
+
+  void update() {
+    auto currentMs = ::millis();
+    if (currentMs < _millis) {
+      _epoch += 1;
+    }
+    _millis = currentMs;
+  }
+
+  const char* format() const { return formatTime(_millis, _epoch); }
+};
+
+}
+
+#endif

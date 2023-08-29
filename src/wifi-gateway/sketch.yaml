@@ -1,5 +1,5 @@
 profiles:
-  esp8266:
+  default:
     notes: Standard build for ESP8266 NodeMCU board (currently the only tested option)
     fqbn: esp8266:esp8266:nodemcu:xtal=160,vt=flash,exception=disabled,stacksmash=disabled,ssl=all,mmu=3232,non32xfer=fast,eesz=4M2M,ip=lm2f,dbg=Disabled,lvl=None____,wipe=none,baud=115200
     platforms:

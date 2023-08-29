@@ -79,7 +79,7 @@ export class StatusPage {
             this.statusList.add('Supply voltage', `${data.system.chipVcc} V`);
             this.statusList.add('CPU frequency', `${data.system.cpuFreq} MHz`);
             this.statusList.add('Reset reason', data.system.resetReason);
-            this.statusList.add('Uptime', `${data.system.millis} ms (epoch ${data.system.epoch})`);            
+            this.statusList.add('Uptime', data.system.uptime);            
             this.statusList.add('Free heap', `${data.system.freeHeap} B`);
             this.statusList.add('Max. free block size', `${data.system.maxFreeBlockSize} B`);
             this.statusList.add('Heap fragmentation', `<progress value="${data.system.heapFragmentation}" max="100" class="condition-${mapToCondition(data.system.heapFragmentation)}">${data.system.heapFragmentation}%</progress>`);

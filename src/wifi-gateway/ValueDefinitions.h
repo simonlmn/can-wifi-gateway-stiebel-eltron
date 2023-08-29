@@ -33,7 +33,7 @@ enum struct ValueAccessMode : uint8_t {
   WritableExtraProtected = 4, 
 };
 
-const char* getValueAccessModeString(ValueAccessMode accessMode) {
+const char* valueAccessModeToString(ValueAccessMode accessMode) {
   switch (accessMode) {
     case ValueAccessMode::None: return "None";
     case ValueAccessMode::Readable: return "Readable";
@@ -44,7 +44,7 @@ const char* getValueAccessModeString(ValueAccessMode accessMode) {
   }
 }
 
-ValueAccessMode getValueAccessModeFromString(const char* accessMode) {
+ValueAccessMode valueAccessModeFromString(const char* accessMode) {
   if (strcmp(accessMode, "None") == 0) return ValueAccessMode::None;
   if (strcmp(accessMode, "Readable") == 0) return ValueAccessMode::Readable;
   if (strcmp(accessMode, "Writable") == 0) return ValueAccessMode::Writable;

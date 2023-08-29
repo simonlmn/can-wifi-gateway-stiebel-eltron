@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IOT_CORE_UTILS_H_
+#define IOT_CORE_UTILS_H_
 
 #ifdef TEST_ENV
 #include <cstdint>
@@ -20,6 +21,8 @@ char* ultoa (unsigned long val, char *s, int radix) { radix == 10 ? sprintf(s, "
 
 #include <algorithm>
 #include <map>
+
+namespace iot_core {
 
 class IntervalTimer {
   unsigned long _intervalDurationMs;
@@ -191,3 +194,7 @@ struct str_less_than
 
 template<typename T>
 using ConstStrMap = std::map<const char*, T, str_less_than>;
+
+}
+
+#endif

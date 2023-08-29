@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Utils.h"
+#include "src/iot-core/Utils.h"
 
 template<typename T, size_t BUFFER_SIZE = 1024u>
 class ResponseBuffer final {
@@ -45,10 +45,10 @@ public:
   }
 
   template<typename X>
-  void plainText(X text) { plainText(ConstString<remove_const_ptr<X>>{text}); }
+  void plainText(X text) { plainText(iot_core::ConstString<remove_const_ptr<X>>{text}); }
 
   template<typename U>
-  void plainText(ConstString<U> text) {
+  void plainText(iot_core::ConstString<U> text) {
     size_t offset = 0u;
     do {
       size_t maxLength = BUFFER_SIZE - _size;
@@ -90,37 +90,37 @@ public:
   }
 
   template<typename X>
-  void jsonPropertyStart(X name) { jsonPropertyStart(ConstString<remove_const_ptr<X>>{name}); }
+  void jsonPropertyStart(X name) { jsonPropertyStart(iot_core::ConstString<remove_const_ptr<X>>{name}); }
   
   template<typename U>
-  void jsonPropertyStart(ConstString<U> name) {
+  void jsonPropertyStart(iot_core::ConstString<U> name) {
     jsonString(name);
     plainChar(':');
   }
 
   template<typename X, typename Y>
-  void jsonPropertyRaw(X name, Y value) { jsonPropertyRaw(ConstString<remove_const_ptr<X>>{name}, ConstString<remove_const_ptr<Y>>{value}); }
+  void jsonPropertyRaw(X name, Y value) { jsonPropertyRaw(iot_core::ConstString<remove_const_ptr<X>>{name}, iot_core::ConstString<remove_const_ptr<Y>>{value}); }
   
   template<typename U, typename V>
-  void jsonPropertyRaw(ConstString<U> name, ConstString<V> value) {
+  void jsonPropertyRaw(iot_core::ConstString<U> name, iot_core::ConstString<V> value) {
     jsonPropertyStart(name);
     plainText(value);
   }
 
   template<typename X, typename Y>
-  void jsonPropertyString(X name, Y value) { jsonPropertyString(ConstString<remove_const_ptr<X>>{name}, ConstString<remove_const_ptr<Y>>{value}); }
+  void jsonPropertyString(X name, Y value) { jsonPropertyString(iot_core::ConstString<remove_const_ptr<X>>{name}, iot_core::ConstString<remove_const_ptr<Y>>{value}); }
   
   template<typename U, typename V>
-  void jsonPropertyString(ConstString<U> name, ConstString<V> value) {
+  void jsonPropertyString(iot_core::ConstString<U> name, iot_core::ConstString<V> value) {
     jsonPropertyStart(name);
     jsonString(value);
   }
 
   template<typename X>
-  void jsonString(X value) { jsonString(ConstString<remove_const_ptr<X>>{value}); }
+  void jsonString(X value) { jsonString(iot_core::ConstString<remove_const_ptr<X>>{value}); }
   
   template<typename V>
-  void jsonString(ConstString<V> value) {
+  void jsonString(iot_core::ConstString<V> value) {
     plainChar('"');
     plainText(value);
     plainChar('"');

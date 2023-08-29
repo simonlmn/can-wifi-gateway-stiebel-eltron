@@ -5,7 +5,7 @@
 #include <cstdio>
 #endif
 
-#include "Utils.h"
+#include "src/iot-core/Utils.h"
 
 using ValueId = uint16_t;
 
@@ -19,7 +19,7 @@ enum struct DeviceType : uint8_t {
   Any = 0xFFu
 };
 
-const char* deviceTypeName(DeviceType type) {
+const char* deviceTypeToString(DeviceType type) {
   switch (type) {
     case DeviceType::System:
       return "SYS";
@@ -83,7 +83,7 @@ struct DeviceId {
 
   const char* toString() const {
     static char string[8]; // "XXX/XXX";
-    snprintf(string, 8, "%s/%u", deviceTypeName(type), address);
+    snprintf(string, 8, "%s/%u", deviceTypeToString(type), address);
     if (address == DEVICE_ADDR_ANY) {
       string[4] = '*';
       string[5] = '\0';
@@ -91,7 +91,7 @@ struct DeviceId {
     return string;
   }
 
-  static Maybe<DeviceId> fromString(const char* string, char** end = nullptr) {
+  static iot_core::Maybe<DeviceId> fromString(const char* string, char** end = nullptr) {
     if (strnlen(string, 5) < 5) {
       return {};
     }

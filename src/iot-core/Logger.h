@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IOT_CORE_LOGGER_H_
+#define IOT_CORE_LOGGER_H_
 
 #ifdef TEST_ENV
 #include <cstdio>
@@ -7,7 +8,10 @@ int millis() { return 12345; }
 #endif
 
 #include "Utils.h"
+#include "DateTime.h"
 #include <functional>
+
+namespace iot_core {
 
 static const unsigned short LOG_ENTRY_SIZE = 128u;
 static const char LOG_ENTRY_SEPARATOR = '\n';
@@ -15,7 +19,7 @@ static const unsigned short LOG_BUFFER_SIZE = 4096u;
 static char logEntry[LOG_ENTRY_SIZE + 1];
 
 enum struct LogLevel : uint8_t {
-  Always = 0,
+  None = 0,
   Error = 1,
   Warning = 2,
   Info = 3,
@@ -23,9 +27,9 @@ enum struct LogLevel : uint8_t {
   Trace = 5,
 };
 
-const char* logLevelName(LogLevel level) {
+const char* logLevelToString(LogLevel level) {
   switch (level) {
-    case LogLevel::Always: return "ALW";
+    case LogLevel::None: return "   ";
     case LogLevel::Error: return "ERR";
     case LogLevel::Warning: return "WRN";
     case LogLevel::Info: return "INF";
@@ -36,13 +40,13 @@ const char* logLevelName(LogLevel level) {
 }
 
 LogLevel logLevelFromString(const char* level, size_t length = SIZE_MAX) {
-  if (strncmp(level, "ALW", length) == 0) return LogLevel::Always;
+  if (strncmp(level, "   ", length) == 0) return LogLevel::None;
   if (strncmp(level, "ERR", length) == 0) return LogLevel::Error;
   if (strncmp(level, "WRN", length) == 0) return LogLevel::Warning;
   if (strncmp(level, "INF", length) == 0) return LogLevel::Info;
   if (strncmp(level, "DBG", length) == 0) return LogLevel::Debug;
   if (strncmp(level, "TRC", length) == 0) return LogLevel::Trace;
-  return LogLevel::Always;
+  return LogLevel::None;
 }
 
 class Logger final {
@@ -51,6 +55,7 @@ class Logger final {
   char _logBuffer[LOG_BUFFER_SIZE] = {};
   unsigned short _logBufferStart = 0u;
   unsigned short _logBufferEnd = 0u;
+  Time const& _uptime;
 
   void advanceBufferStart() {
     while (_logBuffer[_logBufferStart] != LOG_ENTRY_SEPARATOR) {
@@ -60,7 +65,7 @@ class Logger final {
   }
 
 public:
-  Logger() {
+  Logger(Time const& uptime) : _uptime(uptime) {
     memset(_logBuffer, LOG_ENTRY_SEPARATOR, LOG_BUFFER_SIZE);
   }
 
@@ -78,7 +83,7 @@ public:
   }
 
   void log(LogLevel level, const char* category, const char* message) {
-    snprintf(logEntry, LOG_ENTRY_SIZE, "[%lu|%s|%s] %s%c", millis(), category, logLevelName(level), message, LOG_ENTRY_SEPARATOR);
+    snprintf(logEntry, LOG_ENTRY_SIZE, "[%s|%s|%s] %s%c", _uptime.format(), category, logLevelToString(level), message, LOG_ENTRY_SEPARATOR);
     logEntry[LOG_ENTRY_SIZE - 1u] = LOG_ENTRY_SEPARATOR;
     logEntry[LOG_ENTRY_SIZE] = '\0';
 
@@ -98,7 +103,7 @@ public:
   }
 
   void log(const char* category, const char* message) {
-    log(LogLevel::Always, category, message);
+    log(LogLevel::None, category, message);
   }
 
   void logIf(LogLevel level, const char* category, const char* message) {
@@ -136,3 +141,7 @@ public:
     }
   }
 };
+
+}
+
+#endif

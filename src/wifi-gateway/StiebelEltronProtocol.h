@@ -5,7 +5,7 @@
 #include <cstdio>
 #endif
 
-#include "ApplicationContainer.h"
+#include "src/iot-core/Interfaces.h"
 #include "StiebelEltronTypes.h"
 #include "CanInterface.h"
 #include <functional>
@@ -47,7 +47,7 @@ enum struct MessageType : uint8_t {
   Register = 0x06u
 };
 
-const char* messageTypeName(MessageType type) {
+const char* messageTypeToString(MessageType type) {
   switch (type) {
     case MessageType::Write:
       return "WRT";
@@ -136,10 +136,10 @@ const uint8_t DISPLAY_ADDRESSES[] = { 0x1Eu, 0x1Fu, 0x20u, 0x21u, 0x22u };
  */
 const uint8_t BROADCAST_DISPLAY_ADDRESS = 0x3Cu;
 
-class StiebelEltronProtocol final : public IApplicationComponent {
+class StiebelEltronProtocol final : public iot_core::IApplicationComponent {
 private:
-  Logger& _logger;
-  ISystem& _system;
+  iot_core::Logger& _logger;
+  iot_core::ISystem& _system;
   ICanInterface& _can;
   uint8_t _displayIndex;
   DeviceId _deviceId;
@@ -152,7 +152,7 @@ private:
   std::function<void(WriteData const& data)> _writeHandler;
   
 public:
-  StiebelEltronProtocol(ISystem& system, ICanInterface& can)
+  StiebelEltronProtocol(iot_core::ISystem& system, ICanInterface& can)
     : _logger(system.logger()),
     _system(system),
     _can(can),
@@ -175,7 +175,7 @@ public:
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
-    writer("display", toConstStr(_displayIndex, 10));
+    writer("display", iot_core::toConstStr(_displayIndex, 10));
   }
 
   bool setDisplayIndex(uint8_t displayIndex) {
@@ -187,7 +187,7 @@ public:
     _deviceId = {DeviceType::Display, DISPLAY_ADDRESSES[displayIndex]};  
     _canId = toCanId(_deviceId);
 
-    _logger.log(name(), format("Set display index '%u' (deviceId=%s, canId=%lX)", _displayIndex, _deviceId.toString(), _canId));
+    _logger.log(name(), iot_core::format("Set display index '%u' (deviceId=%s, canId=%lX)", _displayIndex, _deviceId.toString(), _canId));
 
     if (_ready) {
       registerDisplay();
@@ -209,10 +209,10 @@ public:
     });
   }
 
-  void loop(ConnectionStatus /*status*/) override {
+  void loop(iot_core::ConnectionStatus /*status*/) override {
   }
 
-  void getDiagnostics(IDiagnosticsCollector& /*collector*/) const override {
+  void getDiagnostics(iot_core::IDiagnosticsCollector& /*collector*/) const override {
   }
 
   bool ready() const {
@@ -375,7 +375,7 @@ private:
       }
 
       if (type == MessageType::Register) {
-        _logger.log(name(), format("%s t:%s s:%s %02X %02X %02X %02X %02X", messageTypeName(type), target.toString(), source.toString(), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]));
+        _logger.logIf(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format("%s t:%s s:%s %02X %02X %02X %02X %02X", messageTypeToString(type), target.toString(), source.toString(), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
       }
 
       if (type == MessageType::Write || type == MessageType::Response || type == MessageType::Request) {
@@ -383,7 +383,7 @@ private:
         ValueId valueId = getValueId(frame.data);
         uint16_t value = getValue(frame.data);
 
-        _logger.logIf(LogLevel::Debug, name(), [&] () { return format("%c%s t:%s s:%s %02X id:%04X v:%04X", target.includes(_deviceId) ? '>' : '*', messageTypeName(type), target.toString(), source.toString(), fix, valueId, value); });
+        _logger.logIf(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format("%c%s t:%s s:%s %02X id:%04X v:%04X", target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(), source.toString(), fix, valueId, value); });
         
         switch (type) {
           case MessageType::Response:

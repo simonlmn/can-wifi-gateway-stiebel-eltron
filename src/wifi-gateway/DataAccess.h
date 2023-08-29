@@ -1,21 +1,24 @@
-#pragma once
+#ifndef DATAACCESS_H_
+#define DATAACCESS_H_
 
-#include "ApplicationContainer.h"
+#include "src/iot-core/Interfaces.h"
+#include "src/iot-core/DateTime.h"
+#include "src/iot-core/Utils.h"
+#include "src/pins/DigitalInput.h"
+#include "DateTimeSource.h"
+#include "StiebelEltronProtocol.h"
+#include "ValueDefinitions.h"
 #include <utility>
 #include <map>
 #include <algorithm>
 #include <LittleFS.h>
-#include "DateTimeSource.h"
-#include "StiebelEltronProtocol.h"
-#include "ValueDefinitions.h"
-#include "Utils.h"
 
 struct DataEntry {
   ValueId id;
   DeviceId source;
   uint16_t rawValue;
   uint16_t toWrite;
-  DateTime lastUpdate;
+  iot_core::DateTime lastUpdate;
   unsigned long lastUpdateMs;
   unsigned long lastRequestMs;
   unsigned long lastWriteMs;
@@ -39,7 +42,7 @@ enum struct DataCaptureMode : uint8_t {
   Any = 3, // Store any data, even if no ValueDefinition exists.
 };
 
-const char* dataCaptureModeName(DataCaptureMode mode) {
+const char* dataCaptureModeToString(DataCaptureMode mode) {
   switch (mode) {
     case DataCaptureMode::None:
       return "None";
@@ -62,17 +65,17 @@ DataCaptureMode dataCaptureModeFromString(const char* mode, size_t length = SIZE
   return DataCaptureMode::None;
 }
 
-class DataAccess final : public IApplicationComponent {
+class DataAccess final : public iot_core::IApplicationComponent {
 public:
   using DataKey = std::pair<DeviceId, ValueId>;
   using DataMap = std::map<DataKey, DataEntry>;
 
 private:
-  Logger& _logger;
-  ISystem& _system;
+  iot_core::Logger& _logger;
+  iot_core::ISystem& _system;
   StiebelEltronProtocol& _protocol;
   DateTimeSource& _dateTimeSource;
-  DigitalInput& _writeEnablePin;
+  pins::DigitalInput& _writeEnablePin;
   DataCaptureMode _mode;
   bool _readOnly;
   DataMap _data;
@@ -81,7 +84,7 @@ private:
   std::function<void(DataEntry const& entry)> _updateHandler;
 
 public:
-  DataAccess(ISystem& system, StiebelEltronProtocol& protocol, DateTimeSource& dateTimeSource, DigitalInput& writeEnablePin)
+  DataAccess(iot_core::ISystem& system, StiebelEltronProtocol& protocol, DateTimeSource& dateTimeSource, pins::DigitalInput& writeEnablePin)
     : _logger(system.logger()),
     _system(system),
     _protocol(protocol),
@@ -105,19 +108,19 @@ public:
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
-    writer("mode", dataCaptureModeName(_mode));
+    writer("mode", dataCaptureModeToString(_mode));
     writer("readOnly", _readOnly ? "true" : "false");
   }
 
   bool setMode(DataCaptureMode mode) {
     _mode = mode;
-    _logger.log(name(), format("Set mode '%s'.", dataCaptureModeName(_mode)));
+    _logger.log(name(), iot_core::format("Set mode '%s'.", dataCaptureModeToString(_mode)));
     return true;
   }
 
   bool setReadOnly(bool readOnly) {
     _readOnly = readOnly;
-    _logger.log(name(), format("%s write access (%seffective).", _readOnly ? "Disabled" : "Enabled", effectiveReadOnly() == _readOnly ? "" : "NOT "));
+    _logger.log(name(), iot_core::format("%s write access (%seffective).", _readOnly ? "Disabled" : "Enabled", effectiveReadOnly() == _readOnly ? "" : "NOT "));
     return true;
   }
 
@@ -133,7 +136,7 @@ public:
     _protocol.onWrite([this] (WriteData const& data) { processData({data.targetId.isExact() ? data.targetId : data.sourceId, data.valueId}, data.value); });
   }
 
-  void loop(ConnectionStatus /*status*/) override {
+  void loop(iot_core::ConnectionStatus /*status*/) override {
     if (!_protocol.ready() || !_dateTimeSource.available()) {
       return;
     }
@@ -141,7 +144,7 @@ public:
     maintainData();
   }
 
-  void getDiagnostics(IDiagnosticsCollector& /*collector*/) const override {
+  void getDiagnostics(iot_core::IDiagnosticsCollector& /*collector*/) const override {
   }
 
   void onUpdate(std::function<void(DataEntry const& entry)> updateHandler) {
@@ -192,8 +195,8 @@ public:
     persistWritables();
   }
 
-  const DateTime& getCurrentDateTime() const {
-    return _dateTimeSource.getCurrentDateTime();
+  const iot_core::DateTime& currentDateTime() const {
+    return _dateTimeSource.currentDateTime();
   }
 
   bool write(DataKey const& key, uint16_t rawValue, ValueAccessMode accessMode) {
@@ -378,7 +381,7 @@ private:
   static constexpr unsigned long MAINTENANCE_INTERVAL_MS = 375;
   static constexpr size_t MAX_CONCURRENT_OPERATIONS = 2;
 
-  IntervalTimer _maintenanceInterval {MAINTENANCE_INTERVAL_MS};
+  iot_core::IntervalTimer _maintenanceInterval {MAINTENANCE_INTERVAL_MS};
 
   void maintainData() {
     if (_maintenanceInterval.elapsed()) {
@@ -430,8 +433,8 @@ private:
 
     _system.lyield();
 
-    auto& currentDateTime = getCurrentDateTime();
-    if (currentDateTime.isSet()) {// Only process data if we have established the current date and time
+    auto const& now = currentDateTime();
+    if (now.isSet()) {// Only process data if we have established the current date and time
       DataEntry* entry = nullptr;
       const ValueDefinition* definition = nullptr;
       switch (_mode) {
@@ -463,7 +466,7 @@ private:
         entry->id = key.second;
       }
       entry->rawValue = value;
-      entry->lastUpdate = currentDateTime;
+      entry->lastUpdate = now;
       entry->lastUpdateMs = millis();
 
       if (entry->lastWriteMs > 0 && entry->toWrite == entry->rawValue) {
@@ -474,3 +477,5 @@ private:
     }
   }
 };
+
+#endif

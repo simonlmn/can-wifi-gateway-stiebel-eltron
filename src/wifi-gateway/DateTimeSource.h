@@ -1,7 +1,8 @@
-#pragma once
+#ifndef DATETIMESOURCE_H_
+#define DATETIMESOURCE_H_
 
-#include "DateTime.h"
-#include "ApplicationContainer.h"
+#include "src/iot-core/IDateTimeSource.h"
+#include "src/iot-core/Logger.h"
 #include "StiebelEltronProtocol.h"
 #include "ValueDefinitions.h"
 
@@ -24,17 +25,17 @@ struct DateTimeFields {
   DateTimeFields() : year(), month(), day(), hour(), minute(), availableFields(0) {}
 };
 
-class DateTimeSource final : public IApplicationComponent {
+class DateTimeSource final : public iot_core::IDateTimeSource, public iot_core::IApplicationComponent {
 private:
-  ISystem& _system;
+  iot_core::Logger& _logger;
   StiebelEltronProtocol& _protocol;
   
   DateTimeFields _dateTimeFields;
-  DateTime _currentDateTime;
+  iot_core::DateTime _currentDateTime;
 
 public:
-  DateTimeSource(ISystem& system, StiebelEltronProtocol& protocol)
-    : _system(system),
+  DateTimeSource(iot_core::Logger& logger, StiebelEltronProtocol& protocol)
+    : _logger(logger),
     _protocol(protocol),
     _dateTimeFields(),
     _currentDateTime() {}
@@ -61,7 +62,7 @@ public:
     _protocol.onWrite([this] (WriteData data) { processData(data.valueId, data.value); });
   }
 
-  void loop(ConnectionStatus /*status*/) override {
+  void loop(iot_core::ConnectionStatus /*status*/) override {
     if (!_protocol.ready()) {
       return;
     }
@@ -70,14 +71,14 @@ public:
     requestDateTimeFields();
   }
 
-  void getDiagnostics(IDiagnosticsCollector& /*collector*/) const override {
+  void getDiagnostics(iot_core::IDiagnosticsCollector& /*collector*/) const override {
   }
 
-  bool available() const {
+  bool available() const override {
     return _currentDateTime.isSet();
   }
 
-  const DateTime& getCurrentDateTime() const {
+  const iot_core::DateTime& currentDateTime() const override {
     return _currentDateTime;
   }
   
@@ -115,12 +116,10 @@ private:
 
   void processData(ValueId valueId, uint16_t value) {
     if (isDateTimeField(valueId)) {
-      _system.lyield();
-
       bool availableBefore = available();
       updateDateTimeField(valueId, value);
       if (!availableBefore && available()) {
-        _system.logger().log(name(), format(F("Date and time acquired: %s"), _currentDateTime.toString()));
+        _logger.log(iot_core::LogLevel::Info, name(), iot_core::format(F("Date and time acquired: %s"), _currentDateTime.toString()));
       }
     }
   }
@@ -136,7 +135,7 @@ private:
   void updateDateTimeField(ValueId valueId, uint16_t value) {
     switch (valueId) {
       case DATETIME_YEAR_ID: {
-          Maybe<long int> year = asInteger(_dateTimeFields.year.definition->fromRaw(value));
+          iot_core::Maybe<long int> year = iot_core::asInteger(_dateTimeFields.year.definition->fromRaw(value));
           if (year.hasValue) {
             _dateTimeFields.year.value = year.value;
             _dateTimeFields.year.lastUpdateMs = millis();
@@ -145,7 +144,7 @@ private:
         }
         break;
       case DATETIME_MONTH_ID: {
-          Maybe<long int> month = asInteger(_dateTimeFields.month.definition->fromRaw(value));
+          iot_core::Maybe<long int> month = iot_core::asInteger(_dateTimeFields.month.definition->fromRaw(value));
           if (month.hasValue) {
             _dateTimeFields.month.value = month.value;
             _dateTimeFields.month.lastUpdateMs = millis();
@@ -154,7 +153,7 @@ private:
         }
         break;
       case DATETIME_DAY_ID: {
-          Maybe<long int> day = asInteger(_dateTimeFields.day.definition->fromRaw(value));
+          iot_core::Maybe<long int> day = iot_core::asInteger(_dateTimeFields.day.definition->fromRaw(value));
           if (day.hasValue) {
             _dateTimeFields.day.value = day.value;
             _dateTimeFields.day.lastUpdateMs = millis();
@@ -163,7 +162,7 @@ private:
         }
         break;
       case DATETIME_HOUR_ID: {
-          Maybe<long int> hour = asInteger(_dateTimeFields.hour.definition->fromRaw(value));
+          iot_core::Maybe<long int> hour = iot_core::asInteger(_dateTimeFields.hour.definition->fromRaw(value));
           if (hour.hasValue) {
             _dateTimeFields.hour.value = hour.value;
             _dateTimeFields.hour.lastUpdateMs = millis();
@@ -172,7 +171,7 @@ private:
         }
         break;
       case DATETIME_MINUTE_ID: {
-          Maybe<long int> minute = asInteger(_dateTimeFields.minute.definition->fromRaw(value));
+          iot_core::Maybe<long int> minute = iot_core::asInteger(_dateTimeFields.minute.definition->fromRaw(value));
           if (minute.hasValue && (minute.value != _dateTimeFields.minute.value || _dateTimeFields.minute.lastUpdateMs == 0)) {
             _dateTimeFields.minute.value = minute.value;
             _dateTimeFields.minute.lastUpdateMs = millis();
@@ -249,3 +248,5 @@ private:
     return (year % 4 == 0) && ((year % 100 != 0) || (year % 400 == 0));
   }
 };
+
+#endif
