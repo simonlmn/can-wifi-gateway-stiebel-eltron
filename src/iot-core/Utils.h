@@ -20,11 +20,12 @@ char* ultoa (unsigned long val, char *s, int radix) { radix == 10 ? sprintf(s, "
 #endif
 
 #include <algorithm>
+#include <functional>
 #include <map>
 
 namespace iot_core {
 
-class IntervalTimer {
+class IntervalTimer final {
   unsigned long _intervalDurationMs;
   unsigned long _lastIntervalTimeMs;
 public:
@@ -37,8 +38,83 @@ public:
   void restart() { _lastIntervalTimeMs = millis(); }
 };
 
+
+template<size_t SAMPLES>
+class TimingStatistics final {
+  unsigned long _samples[SAMPLES] = {};
+  bool _hasSamples = false;
+  size_t _oldestSampleIndex = 0u;
+  size_t _newestSampleIndex = 0u;
+
+  unsigned long _startTime = 0u;
+
+  void newSample(unsigned long value) {
+    if (_hasSamples) {
+      _newestSampleIndex = (_newestSampleIndex + 1) % SAMPLES;
+      if (_newestSampleIndex == _oldestSampleIndex) {
+        _oldestSampleIndex = (_oldestSampleIndex + 1) % SAMPLES;
+      }
+    }
+
+    _samples[_newestSampleIndex] = value;
+
+    _hasSamples = true;
+  }
+  
+public:
+  void start() {
+    _startTime = millis();
+  }
+
+  void stop() {
+    newSample(millis() - _startTime);
+  }
+
+  unsigned long min() const {
+    size_t numberOfSamples = count();
+    unsigned long result = _samples[_oldestSampleIndex];
+    for (size_t i = 1u; i < numberOfSamples; ++i) {
+      result = std::min(_samples[(_oldestSampleIndex + i) % SAMPLES], result);
+    }
+    return result;
+  }
+
+  unsigned long max() const {
+    size_t numberOfSamples = count();
+    unsigned long result = _samples[_oldestSampleIndex];
+    for (size_t i = 1u; i < numberOfSamples; ++i) {
+      result = std::max(_samples[(_oldestSampleIndex + i) % SAMPLES], result);
+    }
+    return result;
+  }
+
+  unsigned long avg() const {
+    size_t numberOfSamples = count();
+    if (numberOfSamples == 0u) {
+      return 0u;
+    }
+
+    unsigned long result = _samples[_oldestSampleIndex] / numberOfSamples;
+    for (size_t i = 1u; i < numberOfSamples; ++i) {
+      result += _samples[(_oldestSampleIndex + i) % SAMPLES] / numberOfSamples;
+    }
+    return result;
+  }
+
+  size_t count() const { return _hasSamples ? (_newestSampleIndex >= _oldestSampleIndex ? (_newestSampleIndex - _oldestSampleIndex + 1) : (SAMPLES - _oldestSampleIndex + _newestSampleIndex + 1)) : 0u; }
+
+  template<typename F>
+  auto wrap(F f) {
+    return [this,f] () {
+      this->start();
+      f();
+      this->stop();
+    };
+  }
+};
+
 template<typename T>
-struct Maybe {
+struct Maybe final {
   bool hasValue;
   T value;
 

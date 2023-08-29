@@ -3,12 +3,13 @@
 #include "src/iot-core/Interfaces.h"
 #include "src/iot-core/Utils.h"
 #include "src/iot-core/Config.h"
+#include "src/iot-core/ResponseBuffer.h"
+#include "src/iot-core/JsonDiagnosticsCollector.h"
 #include <ESP8266WebServer.h>
 #include <uri/UriBraces.h>
 #include <uri/UriGlob.h>
 #include "DataAccess.h"
 #include "StiebelEltronProtocol.h"
-#include "ResponseBuffer.h"
 
 #if __has_include("src/wifi-gateway-ui/dist/wifi-gateway-ui.generated.h")
 #  include "src/wifi-gateway-ui/dist/wifi-gateway-ui.generated.h"
@@ -28,47 +29,6 @@ static const char ARG_NUMBERS_AS_DECIMALS[] PROGMEM = "numbersAsDecimals";
 static const char ARG_ACCESS_MODE[] PROGMEM = "accessMode";
 static const char ARG_VALIDATE_ONLY[] PROGMEM = "validateOnly";
 
-template<typename JsonBuffer>
-class JsonDiagnosticsCollector final : public iot_core::IDiagnosticsCollector {
-private:
-  JsonBuffer& _buffer;
-  bool _sectionOpen = false;
-  bool _hasValue = false;
-
-public:
-  JsonDiagnosticsCollector(JsonBuffer& buffer) : _buffer(buffer) {
-    _buffer.jsonObjectOpen();
-  };
-
-  ~JsonDiagnosticsCollector() {
-    if (_sectionOpen) {
-      _buffer.jsonObjectClose();  
-    }
-    _buffer.jsonObjectClose();
-  }
-
-  virtual void addSection(const char* name) override {
-    if (_sectionOpen) {
-      _buffer.jsonObjectClose();
-      _buffer.jsonSeparator();
-    }
-
-    _buffer.jsonPropertyStart(name);
-    _buffer.jsonObjectOpen();
-    _sectionOpen = true;
-    _hasValue = false;
-  }
-
-  virtual void addValue(const char* name, const char* value) {
-    if (_hasValue) {
-      _buffer.jsonSeparator();
-    }
-
-    _buffer.jsonPropertyString(name, value);
-    _hasValue = true;
-  }
-};
-
 class RestApi final : public iot_core::IApplicationComponent {
 private:
   iot_core::Logger& _logger;
@@ -79,7 +39,9 @@ private:
   StiebelEltronProtocol& _protocol;
 
   ESP8266WebServer _server;
-  ResponseBuffer<ESP8266WebServer> _buffer;
+  iot_core::ResponseBuffer<ESP8266WebServer> _buffer;
+
+  iot_core::TimingStatistics<10u> _callStatistics;
   
 public:
   RestApi(iot_core::ISystem& system, iot_core::IApplicationContainer& application, DataAccess& access, StiebelEltronProtocol& protocol)
@@ -105,16 +67,16 @@ public:
       _server.send(204);
     });
     
-    _server.on(F("/"), HTTP_GET, [this]() {
+    _server.on(F("/"), HTTP_GET, _callStatistics.wrap([this]() {
       _server.sendHeader("Content-Encoding", "gzip");
       #ifdef WIFI_GATEWAY_UI_H
         _server.send_P(200, CONTENT_TYPE_HTML, wifi_gateway_ui::HTML, wifi_gateway_ui::HTML_SIZE);
       #else
         _server.send_P(200, CONTENT_TYPE_HTML, no_ui::HTML, no_ui::HTML_SIZE);
       #endif
-    });
+    }));
 
-    _server.on(F("/api/data"), HTTP_GET, [this]() {
+    _server.on(F("/api/data"), HTTP_GET, _callStatistics.wrap([this]() {
       if (_server.hasArg(FPSTR(ARG_ONLY_UNDEFINED))) {
         getItems([] (DataEntry const& entry) { return !entry.hasDefinition(); });
       } else if (_server.hasArg(FPSTR(ARG_ONLY_CONFIGURED))) {
@@ -122,9 +84,9 @@ public:
       } else {
         getItems();
       }
-    });
+    }));
 
-    _server.on(UriBraces(F("/api/data/{}/{}/{}")), HTTP_PUT, [this]() {
+    _server.on(UriBraces(F("/api/data/{}/{}/{}")), HTTP_PUT, _callStatistics.wrap([this]() {
       doItem([&] (DataAccess::DataKey const& key, DataEntry const& entry) {
         if (!entry.writable || !entry.hasDefinition()) {
           return false;
@@ -151,39 +113,39 @@ public:
   
         return _access.write(key, rawValue, accessMode);
       });
-    });
+    }));
 
-    _server.on(F("/api/subscriptions"), HTTP_GET, [this]() {
+    _server.on(F("/api/subscriptions"), HTTP_GET, _callStatistics.wrap([this]() {
       getItems([] (DataEntry const& entry) { return entry.subscribed; });
-    });
+    }));
 
-    _server.on(F("/api/subscriptions"), HTTP_POST, [this]() {      
+    _server.on(F("/api/subscriptions"), HTTP_POST, _callStatistics.wrap([this]() {      
       postItems([&] (DataAccess::DataKey const& key) { return _access.addSubscription(key); });
-    });
+    }));
 
-    _server.on(UriBraces(F("/api/subscriptions/{}/{}/{}")), HTTP_DELETE, [this]() {
+    _server.on(UriBraces(F("/api/subscriptions/{}/{}/{}")), HTTP_DELETE, _callStatistics.wrap([this]() {
       doItem([&] (DataAccess::DataKey const& key, DataEntry const& entry) { _access.removeSubscription(key); return true; });
-    });
+    }));
 
-    _server.on(F("/api/writable"), HTTP_GET, [this]() {
+    _server.on(F("/api/writable"), HTTP_GET, _callStatistics.wrap([this]() {
       getItems([](DataEntry const& entry) { return entry.writable; });
-    });
+    }));
 
-    _server.on(F("/api/writable"), HTTP_POST, [this]() {
+    _server.on(F("/api/writable"), HTTP_POST, _callStatistics.wrap([this]() {
       postItems([&] (DataAccess::DataKey const& key) { return _access.addWritable(key); });
-    });
+    }));
 
-    _server.on(UriBraces(F("/api/writable/{}/{}/{}")), HTTP_DELETE, [this]() {
+    _server.on(UriBraces(F("/api/writable/{}/{}/{}")), HTTP_DELETE, _callStatistics.wrap([this]() {
       doItem([&] (DataAccess::DataKey const& key, DataEntry const& entry) { _access.removeWritable(key); return true; });
-    });
+    }));
 
-    _server.on(F("/api/definitions"), HTTP_GET, [this]() {
+    _server.on(F("/api/definitions"), HTTP_GET, _callStatistics.wrap([this]() {
       getDefinitions();
-    });
+    }));
 
-    _server.on(F("/api/devices"), HTTP_GET, [this]() {
+    _server.on(F("/api/devices"), HTTP_GET, _callStatistics.wrap([this]() {
       getDevices();
-    });
+    }));
     
     _server.on(F("/api/system/reset"), HTTP_POST, [this]() {
       _system.reset();
@@ -202,7 +164,7 @@ public:
       }
       
       {
-        JsonDiagnosticsCollector<ResponseBuffer<ESP8266WebServer>> collector {_buffer};
+        iot_core::JsonDiagnosticsCollector<iot_core::ResponseBuffer<ESP8266WebServer>> collector {_buffer};
         _application.getDiagnostics(collector);
       }
 
@@ -311,7 +273,11 @@ public:
     }
   }
 
-  void getDiagnostics(iot_core::IDiagnosticsCollector& /*collector*/) const override {
+  void getDiagnostics(iot_core::IDiagnosticsCollector& collector) const override {
+    collector.addValue("callCount", iot_core::convert<size_t>::toString(_callStatistics.count(), 10));
+    collector.addValue("callAvg", iot_core::convert<unsigned long>::toString(_callStatistics.avg(), 10));
+    collector.addValue("callMin", iot_core::convert<unsigned long>::toString(_callStatistics.min(), 10));
+    collector.addValue("callMax", iot_core::convert<unsigned long>::toString(_callStatistics.max(), 10));
   }
 
 private:

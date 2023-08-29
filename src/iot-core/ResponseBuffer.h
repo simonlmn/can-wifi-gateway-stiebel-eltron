@@ -1,6 +1,9 @@
-#pragma once
+#ifndef IOT_CORE_RESPONSEBUFFER_H_
+#define IOT_CORE_RESPONSEBUFFER_H_
 
-#include "src/iot-core/Utils.h"
+#include "Utils.h"
+
+namespace iot_core {
 
 template<typename T, size_t BUFFER_SIZE = 1024u>
 class ResponseBuffer final {
@@ -130,3 +133,7 @@ public:
     plainChar(',');
   }
 };
+
+}
+
+#endif
