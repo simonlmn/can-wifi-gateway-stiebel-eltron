@@ -15,7 +15,7 @@ function groupBy(list, keyGetter, valueGetter) {
     return map;
 }
 
-function parseConfig(data) {
+function parseAllConfig(data) {
     const config = {};
     for (const [category, values] of groupBy(data.split(';\n').filter(line => line.length > 0).map(line => line.split('=')).map(([path, value]) => path.split('.').concat(value)), ([category, name, value]) => category, ([category, name, value]) => [name, value])) {
         config[category] = Object.fromEntries(new Map(values));
@@ -24,8 +24,21 @@ function parseConfig(data) {
     return config;
 }
 
-function serializeConfig(config) {
+function serializeAllConfig(config) {
     return Object.entries(config).flatMap(([category, params]) => Object.entries(params).map(([name, value]) => `${category}.${name}=${value};`)).join('\n');
+}
+
+function parseConfig(data) {
+    const config = {};
+    for (const [name, value] of data.split(';\n').filter(line => line.length > 0).map(line => line.split('='))) {
+        config[name] = value;
+    }
+
+    return config;
+}
+
+function serializeConfig(config) {
+    return Object.entries(config).flatMap(([name, value]) => `${name}=${value};`).join('\n');
 }
 
 const SourceTypes = [
@@ -267,7 +280,8 @@ export class ConfigPage {
     async enter(view) {
         view.h1('Configuration');
 
-        await this.#showSettings(view);
+        await this.#showBaseSettings(view);
+        await this.#showMqttSettings(view);
         
         this.dataConfig = view.addView(new DataConfigurationView(this.#client));
         this.dataConfig.show();
@@ -276,16 +290,20 @@ export class ConfigPage {
     async leave() {
     }
 
-    async #showSettings(view) {
-        const fieldset = view.fieldset('Settings');
+    async #showBaseSettings(view) {
+        const fieldset = view.fieldset('Base Settings');
         fieldset.disable();
 
-        const writeEnabled = fieldset.checkbox(fieldset.label('Enable write access'), { indeterminate: true }, (checked) => { });
-        const dataAccessMode = fieldset.select(fieldset.label('Data capture mode'), ['None', 'Configured', 'Defined', 'Any'], {}, (value) => { });
-        const displayAddress = fieldset.number(fieldset.label('Display address'), { min: 1, max: 4 }, (value) => { });
-        const canMode = fieldset.select(fieldset.label('CAN mode'), ['Normal', 'ListenOnly', 'LoopBack'], {}, (value) => { });
+        const displayAddress = fieldset.number(fieldset.label('Display address'), { required: true, min: 1, max: 4 }, (value) => { displayAddress.validate(); });
+        const writeEnabled = fieldset.checkbox(fieldset.label('Enable write access'), { indeterminate: true }, (checked) => { writeEnabled.validate(); });
+        const dataAccessMode = fieldset.select(fieldset.label('Data capture mode'), ['None', 'Configured', 'Defined', 'Any'], {}, (value) => { dataAccessMode.validate(); });
+        const canMode = fieldset.select(fieldset.label('CAN mode'), ['Normal', 'ListenOnly', 'LoopBack'], {}, (value) => { canMode.validate(); });
 
         fieldset.button('Save', {}, async () => {
+            if (!fieldset.validate()) {
+                return;
+            }
+
             fieldset.disable();
 
             const config = {
@@ -302,7 +320,7 @@ export class ConfigPage {
             };
 
             try {
-                await this.#client.put('/system/config', serializeConfig(config));
+                await this.#client.put('/system/config', serializeAllConfig(config));
             } catch (err) {
                 alert(err);
             }
@@ -311,7 +329,7 @@ export class ConfigPage {
 
         try {
             const response = await this.#client.get('/system/config');
-            const config = parseConfig(await response.text());
+            const config = parseAllConfig(await response.text());
             dataAccessMode.selected = config.dta.mode;
             writeEnabled.checked = (config.dta.readOnly == "false");
             displayAddress.value = parseInt(config.sep.display) + 1;
@@ -322,7 +340,47 @@ export class ConfigPage {
         fieldset.enable();
     }
 
-    async #showSubscriptions(view) {
+    async #showMqttSettings(view) {
+        const fieldset = view.fieldset('MQTT Settings');
+        fieldset.disable();
 
+        const enabled = fieldset.checkbox(fieldset.label('Enable MQTT protocol'), { required: true, indeterminate: true }, (value) => { enabled.validate(); });
+        const brokerAddress = fieldset.text(fieldset.label('Broker IP'), { required: true, pattern: '([1-9]|[1-9][0-9]|1[1-9][0-9]|2[0-5][0-5])\.([0-9]|[1-9][0-9]|1[1-9][0-9]|2[0-5][0-5])\.([0-9]|[1-9][0-9]|1[1-9][0-9]|2[0-5][0-5])\.([1-9]|[1-9][0-9]|1[1-9][0-9]|2[0-5][0-3])', maxlength: 15 }, (checked) => { brokerAddress.validate(); });
+        const brokerPort = fieldset.number(fieldset.label('Broker port'), { required: true, min: 1, max: 65535 }, (value) => { brokerPort.validate(); });
+        const topic = fieldset.text(fieldset.label('Topic'), { required: true, maxlength: 31 }, (value) => { topic.validate(); });
+
+        fieldset.button('Save', {}, async () => {
+            if (!fieldset.validate()) {
+                return;
+            }
+
+            fieldset.disable();
+
+            const config = {
+                enabled: enabled.checked ? 'true' : 'false',
+                broker: brokerAddress.value,
+                port: brokerPort.value,
+                topic: topic.value
+            };
+
+            try {
+                await this.#client.put('/system/config/mqc', serializeConfig(config));
+            } catch (err) {
+                alert(err);
+            }
+            fieldset.enable();
+        });
+
+        try {
+            const response = await this.#client.get('/system/config/mqc');
+            const config = parseConfig(await response.text());
+            enabled.checked = config.enabled == 'true';
+            brokerAddress.value = config.broker;
+            brokerPort.value = parseInt(config.port);
+            topic.value = config.topic;
+        } catch (err) {
+            alert(err);
+        }
+        fieldset.enable();
     }
 }

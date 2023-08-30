@@ -107,6 +107,10 @@ export class ContainerView extends View {
         return this.addView(new NumberView(label, attributes, callback));
     }
 
+    text(label, attributes, callback) {
+        return this.addView(new TextView(label, attributes, callback));
+    }
+
     label(labelText, forView, attributes) {
         return this.addView(new LabelView(labelText, forView, attributes));
     }
@@ -140,6 +144,10 @@ export class FieldsetView extends ContainerView {
 
     enable() {
         this._element.disabled = false;
+    }
+
+    validate() {
+        return this._element.checkValidity();
     }
 }
 
@@ -192,6 +200,10 @@ export class CheckboxView extends View {
     get checked() {
         return this._element.checked
     }
+
+    validate() {
+        return this._element.checkValidity();
+    }
 }
 
 export class NumberView extends View {
@@ -219,6 +231,42 @@ export class NumberView extends View {
 
     get value() {
         return this._element.value
+    }
+
+    validate() {
+        return this._element.checkValidity();
+    }
+}
+
+export class TextView extends View {
+    constructor(label, attributes, callback) {
+        super(createElement('input', attributes));
+        this._element.type = 'text';
+        this._element.onchange = (e) => callback(e.target.value, this);
+
+        if (label) {
+            label.forView = this;
+        }
+    }
+
+    disable() {
+        this._element.disabled = true;
+    }
+
+    enable() {
+        this._element.disabled = false;
+    }
+
+    set value(value) {
+        this._element.value = value;
+    }
+
+    get value() {
+        return this._element.value
+    }
+
+    validate() {
+        return this._element.checkValidity();
     }
 }
 
@@ -271,6 +319,10 @@ export class SelectView extends View {
             let e = this.addElement('option', { value: optionValue }, optionLabel);
             this.#options[optionValue] = e;
         }
+    }
+
+    validate() {
+        return this._element.checkValidity();
     }
 }
 
