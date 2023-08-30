@@ -210,7 +210,10 @@ public:
 };
 
 template<typename T>
-ConstString<std::remove_const_t<std::remove_pointer_t<T>>> str(T string) {
+using remove_const_ptr = typename std::remove_const<typename std::remove_pointer<T>::type>::type;
+
+template<typename T>
+ConstString<remove_const_ptr<T>> str(T string) {
   return {string};
 }
 

@@ -3,7 +3,8 @@
 #include "src/iot-core/Interfaces.h"
 #include "src/iot-core/Utils.h"
 #include "src/iot-core/Config.h"
-#include "src/iot-core/ResponseBuffer.h"
+#include "src/iot-core/ChunkedResponse.h"
+#include "src/iot-core/JsonWriter.h"
 #include "src/iot-core/JsonDiagnosticsCollector.h"
 #include <ESP8266WebServer.h>
 #include <uri/UriBraces.h>
@@ -39,13 +40,13 @@ private:
   StiebelEltronProtocol& _protocol;
 
   ESP8266WebServer _server;
-  iot_core::ResponseBuffer<ESP8266WebServer> _buffer;
+  iot_core::ChunkedResponse<ESP8266WebServer> _response;
 
   iot_core::TimingStatistics<10u> _callStatistics;
   
 public:
   RestApi(iot_core::ISystem& system, iot_core::IApplicationContainer& application, DataAccess& access, StiebelEltronProtocol& protocol)
-  : _logger(system.logger()), _system(system), _application(application), _access(access), _protocol(protocol), _server(80), _buffer(_server) {}
+  : _logger(system.logger()), _system(system), _application(application), _access(access), _protocol(protocol), _server(80), _response(_server) {}
   
   const char* name() const override {
     return "api";
@@ -158,31 +159,31 @@ public:
     });
 
     _server.on(F("/api/system/status"), HTTP_GET, [this]() {
-      if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
+      if (!_response.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
         _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
         return;
       }
       
       {
-        iot_core::JsonDiagnosticsCollector<iot_core::ResponseBuffer<ESP8266WebServer>> collector {_buffer};
+        auto writer = iot_core::makeJsonWriter(_response);
+        auto collector = iot_core::makeJsonDiagnosticsCollector(writer);
         _application.getDiagnostics(collector);
       }
 
-      _buffer.end();
+      _response.end();
     });
 
     _server.on(F("/api/system/logs"), HTTP_GET, [this]() {
-      if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
+      if (!_response.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
         _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
         return;
       }
       
       _logger.output([&] (const char* entry) {
-        _buffer.plainText(entry);
-        _system.lyield();
+        _response.write(entry);
       });
 
-      _buffer.end();
+      _response.end();
     });
 
     _server.on(UriBraces(F("/api/system/log-level/{}")), HTTP_PUT, [this]() {
@@ -195,20 +196,20 @@ public:
     });
 
     _server.on(F("/api/system/config"), HTTP_GET, [this]() {
-      if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
+      if (!_response.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
         _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
         return;
       }
 
       _application.getAllConfig([&] (const char* path, const char* value) {
-        _buffer.plainText(path);
-        _buffer.plainChar(iot_core::ConfigParser::SEPARATOR);
-        _buffer.plainText(value);
-        _buffer.plainChar(iot_core::ConfigParser::END);
-        _buffer.plainChar('\n');
+        _response.write(path);
+        _response.write(iot_core::ConfigParser::SEPARATOR);
+        _response.write(value);
+        _response.write(iot_core::ConfigParser::END);
+        _response.write('\n');
       });
 
-      _buffer.end();
+      _response.end();
     });
 
     _server.on(F("/api/system/config"), HTTP_PUT, [this]() {
@@ -226,20 +227,20 @@ public:
     _server.on(UriBraces(F("/api/system/config/{}")), HTTP_GET, [this]() {
       const auto& category = _server.pathArg(0);
 
-      if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
+      if (!_response.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
         _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
         return;
       }
 
       _application.getConfig(category.c_str(), [&] (const char* name, const char* value) {
-        _buffer.plainText(name);
-        _buffer.plainChar(iot_core::ConfigParser::SEPARATOR);
-        _buffer.plainText(value);
-        _buffer.plainChar(iot_core::ConfigParser::END);
-        _buffer.plainChar('\n');
+        _response.write(name);
+        _response.write(iot_core::ConfigParser::SEPARATOR);
+        _response.write(value);
+        _response.write(iot_core::ConfigParser::END);
+        _response.write('\n');
       });
 
-      _buffer.end();
+      _response.end();
     });
 
     _server.on(UriBraces(F("/api/system/config/{}")), HTTP_PUT, [this]() {
@@ -425,20 +426,22 @@ private:
     }
     bool numbersAsDecimals = _server.hasArg(FPSTR(ARG_NUMBERS_AS_DECIMALS));
 
-    if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_JSON))) {
+    if (!_response.begin(200, FPSTR(CONTENT_TYPE_JSON))) {
       _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
       return;
     }
     
     const auto& collectionData = _access.getData();
 
-    _buffer.jsonObjectOpen();
-    _buffer.jsonPropertyString(F("retrievedOn"), _access.currentDateTime().toString());
-    _buffer.jsonSeparator();
-    _buffer.jsonPropertyRaw(F("totalItems"), iot_core::convert<size_t>::toString(collectionData.size(), 10));
-    _buffer.jsonSeparator();
-    _buffer.jsonPropertyStart(F("items"));
-    _buffer.jsonObjectOpen();
+    auto writer = iot_core::makeJsonWriter(_response);
+
+    writer.objectOpen();
+    writer.propertyString(F("retrievedOn"), _access.currentDateTime().toString());
+    writer.separator();
+    writer.propertyRaw(F("totalItems"), iot_core::convert<size_t>::toString(collectionData.size(), 10));
+    writer.separator();
+    writer.propertyStart(F("items"));
+    writer.objectOpen();
 
     size_t i = 0u;
     DeviceType type;
@@ -448,34 +451,34 @@ private:
         if (i == 0) {
           type = data.first.first.type;
           address = data.first.first.address;
-          _buffer.jsonPropertyStart(deviceTypeToString(type));
-          _buffer.jsonObjectOpen();
-          _buffer.jsonPropertyStart(iot_core::convert<DeviceAddress>::toString(address, 10));
-          _buffer.jsonObjectOpen();
+          writer.propertyStart(deviceTypeToString(type));
+          writer.objectOpen();
+          writer.propertyStart(iot_core::convert<DeviceAddress>::toString(address, 10));
+          writer.objectOpen();
         } else {
           if (type != data.first.first.type) {
             type = data.first.first.type;
             address = data.first.first.address;
-            _buffer.jsonObjectClose();
-            _buffer.jsonObjectClose();
-            _buffer.jsonSeparator();
-            _buffer.jsonPropertyStart(deviceTypeToString(type));
-            _buffer.jsonObjectOpen();
-            _buffer.jsonPropertyStart(iot_core::convert<DeviceAddress>::toString(address, 10));
-            _buffer.jsonObjectOpen();            
+            writer.objectClose();
+            writer.objectClose();
+            writer.separator();
+            writer.propertyStart(deviceTypeToString(type));
+            writer.objectOpen();
+            writer.propertyStart(iot_core::convert<DeviceAddress>::toString(address, 10));
+            writer.objectOpen();            
           } else if (address != data.first.first.address) {
             address = data.first.first.address;
-            _buffer.jsonObjectClose();
-            _buffer.jsonSeparator();
-            _buffer.jsonPropertyStart(iot_core::convert<DeviceAddress>::toString(address, 10));
-            _buffer.jsonObjectOpen();
+            writer.objectClose();
+            writer.separator();
+            writer.propertyStart(iot_core::convert<DeviceAddress>::toString(address, 10));
+            writer.objectOpen();
           } else {
-            _buffer.jsonSeparator();
+            writer.separator();
           }
         }
 
-        _buffer.jsonPropertyStart(iot_core::convert<ValueId>::toString(data.second.id, 10));
-        writeItem(data.second, numbersAsDecimals);
+        writer.propertyStart(iot_core::convert<ValueId>::toString(data.second.id, 10));
+        writeItem(writer, data.second, numbersAsDecimals);
 
         ++i;
 
@@ -484,115 +487,122 @@ private:
     }
 
     if (i > 0) {
-      _buffer.jsonObjectClose();
-      _buffer.jsonObjectClose();
+      writer.objectClose();
+      writer.objectClose();
     }
 
-    _buffer.jsonObjectClose();
-    _buffer.jsonSeparator();
-    _buffer.jsonPropertyRaw(F("actualItems"), iot_core::convert<size_t>::toString(i, 10));
-    _buffer.jsonObjectClose();
-    _buffer.end();
+    writer.objectClose();
+    writer.separator();
+    writer.propertyRaw(F("actualItems"), iot_core::convert<size_t>::toString(i, 10));
+    writer.objectClose();
+    
+    _response.end();
   }
 
-  void writeItem(const DataEntry& entry, bool numbersAsDecimals = false) {
-    _buffer.jsonObjectOpen();
-    _buffer.jsonPropertyRaw(F("id"), iot_core::convert<ValueId>::toString(entry.id, 10));
-    _buffer.jsonSeparator();
+  void writeItem(iot_core::JsonWriter<decltype(_response)>& writer, const DataEntry& entry, bool numbersAsDecimals = false) {
+    writer.objectOpen();
+    writer.propertyRaw(F("id"), iot_core::convert<ValueId>::toString(entry.id, 10));
+    writer.separator();
     if (entry.hasDefinition()) {
-      _buffer.jsonPropertyString(F("name"), entry.definition->name);
-      _buffer.jsonSeparator();
-      _buffer.jsonPropertyString(F("accessMode"), valueAccessModeToString(entry.definition->accessMode));
-      _buffer.jsonSeparator();
+      writer.propertyString(F("name"), entry.definition->name);
+      writer.separator();
+      writer.propertyString(F("accessMode"), valueAccessModeToString(entry.definition->accessMode));
+      writer.separator();
       if (entry.definition->unit != Unit::Unknown) {
-        _buffer.jsonPropertyString(F("unit"), unitSymbol(entry.definition->unit));
-        _buffer.jsonSeparator();
+        writer.propertyString(F("unit"), unitSymbol(entry.definition->unit));
+        writer.separator();
       }
     }
     if (entry.lastUpdate.isSet()) {
       if (numbersAsDecimals) {
-        _buffer.jsonPropertyString(F("rawValue"), getRawValueAsDecString(entry.rawValue));
+        writer.propertyString(F("rawValue"), getRawValueAsDecString(entry.rawValue));
       } else {
-        _buffer.jsonPropertyString(F("rawValue"), getRawValueAsHexString(entry.rawValue));
+        writer.propertyString(F("rawValue"), getRawValueAsHexString(entry.rawValue));
       }
-      _buffer.jsonSeparator();
+      writer.separator();
       if (entry.hasDefinition()) {
-        _buffer.jsonPropertyRaw(F("value"), entry.definition->fromRaw(entry.rawValue));
-        _buffer.jsonSeparator();
+        writer.propertyRaw(F("value"), entry.definition->fromRaw(entry.rawValue));
+        writer.separator();
       }
     }
-    _buffer.jsonPropertyString(F("lastUpdate"), entry.lastUpdate.toString());
-    _buffer.jsonSeparator();
-    _buffer.jsonPropertyString(F("source"), entry.source.toString());
-    _buffer.jsonSeparator();
-    _buffer.jsonPropertyRaw(F("subscribed"), iot_core::convert<bool>::toString(entry.subscribed));
-    _buffer.jsonSeparator();
-    _buffer.jsonPropertyRaw(F("writable"), iot_core::convert<bool>::toString(entry.writable));
-    _buffer.jsonObjectClose();
+    writer.propertyString(F("lastUpdate"), entry.lastUpdate.toString());
+    writer.separator();
+    writer.propertyString(F("source"), entry.source.toString());
+    writer.separator();
+    writer.propertyRaw(F("subscribed"), iot_core::convert<bool>::toString(entry.subscribed));
+    writer.separator();
+    writer.propertyRaw(F("writable"), iot_core::convert<bool>::toString(entry.writable));
+    writer.objectClose();
   }
 
   void getDefinitions() {
-    if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_JSON))) {
+    if (!_response.begin(200, FPSTR(CONTENT_TYPE_JSON))) {
       _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
       return;
     }
     
-    _buffer.jsonListOpen();
+    auto writer = iot_core::makeJsonWriter(_response);
+
+    writer.listOpen();
 
     bool first = true;
     for (auto& definition : DEFINITIONS) {
         if (!first) {
-          _buffer.jsonSeparator();
+          writer.separator();
         }
         first = false;
 
-        _buffer.jsonObjectOpen();
+        writer.objectOpen();
 
-        _buffer.jsonPropertyRaw(F("id"), iot_core::convert<ValueId>::toString(definition.id, 10));
-        _buffer.jsonSeparator();
-        _buffer.jsonPropertyString(F("name"), definition.name);
-        _buffer.jsonSeparator();
-        _buffer.jsonPropertyString(F("unit"), unitSymbol(definition.unit));
-        _buffer.jsonSeparator();
-        _buffer.jsonPropertyString(F("accessMode"), valueAccessModeToString(definition.accessMode));
-        _buffer.jsonSeparator();
-        _buffer.jsonPropertyString(F("source"), definition.source.toString());
+        writer.propertyRaw(F("id"), iot_core::convert<ValueId>::toString(definition.id, 10));
+        writer.separator();
+        writer.propertyString(F("name"), definition.name);
+        writer.separator();
+        writer.propertyString(F("unit"), unitSymbol(definition.unit));
+        writer.separator();
+        writer.propertyString(F("accessMode"), valueAccessModeToString(definition.accessMode));
+        writer.separator();
+        writer.propertyString(F("source"), definition.source.toString());
         
-        _buffer.jsonObjectClose();
+        writer.objectClose();
 
         _system.lyield();
     }
 
-    _buffer.jsonListClose();
-    _buffer.end();
+    writer.listClose();
+    
+    _response.end();
   }
 
   void getDevices() {
-    if (!_buffer.begin(200, FPSTR(CONTENT_TYPE_JSON))) {
+    if (!_response.begin(200, FPSTR(CONTENT_TYPE_JSON))) {
       _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
       return;
     }
+
+    auto writer = iot_core::makeJsonWriter(_response);
     
-    _buffer.jsonObjectOpen();
-    _buffer.jsonPropertyString(F("this"), _protocol.getThisDeviceId().toString());
-    _buffer.jsonSeparator();
-    _buffer.jsonPropertyStart(F("others"));
-    _buffer.jsonListOpen();
+    writer.objectOpen();
+    writer.propertyString(F("this"), _protocol.getThisDeviceId().toString());
+    writer.separator();
+    writer.propertyStart(F("others"));
+    writer.listOpen();
 
     bool first = true;
     for (auto& deviceId : _protocol.getOtherDeviceIds()) {
         if (!first) {
-          _buffer.jsonSeparator();
+          writer.separator();
         }
         first = false;
 
-        _buffer.jsonString(deviceId.toString());
+        writer.string(deviceId.toString());
         
         _system.lyield();
     }
 
-    _buffer.jsonListClose();
-    _buffer.jsonObjectClose();
-    _buffer.end();
+    writer.listClose();
+    writer.objectClose();
+
+    _response.end();
   }
 };

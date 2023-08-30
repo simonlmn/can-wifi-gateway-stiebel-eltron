@@ -5,46 +5,49 @@
 
 namespace iot_core {
 
-template<typename JsonBuffer>
+template<typename JsonWriter>
 class JsonDiagnosticsCollector final : public iot_core::IDiagnosticsCollector {
 private:
-  JsonBuffer& _buffer;
+  JsonWriter& _writer;
   bool _sectionOpen = false;
   bool _hasValue = false;
 
 public:
-  JsonDiagnosticsCollector(JsonBuffer& buffer) : _buffer(buffer) {
-    _buffer.jsonObjectOpen();
+  JsonDiagnosticsCollector(JsonWriter& writer) : _writer(writer) {
+    _writer.objectOpen();
   };
 
   ~JsonDiagnosticsCollector() {
     if (_sectionOpen) {
-      _buffer.jsonObjectClose();  
+      _writer.objectClose();  
     }
-    _buffer.jsonObjectClose();
+    _writer.objectClose();
   }
 
   virtual void addSection(const char* name) override {
     if (_sectionOpen) {
-      _buffer.jsonObjectClose();
-      _buffer.jsonSeparator();
+      _writer.objectClose();
+      _writer.separator();
     }
 
-    _buffer.jsonPropertyStart(name);
-    _buffer.jsonObjectOpen();
+    _writer.propertyStart(name);
+    _writer.objectOpen();
     _sectionOpen = true;
     _hasValue = false;
   }
 
   virtual void addValue(const char* name, const char* value) {
     if (_hasValue) {
-      _buffer.jsonSeparator();
+      _writer.separator();
     }
 
-    _buffer.jsonPropertyString(name, value);
+    _writer.propertyString(name, value);
     _hasValue = true;
   }
 };
+
+template<typename JsonWriter>
+JsonDiagnosticsCollector<JsonWriter> makeJsonDiagnosticsCollector(JsonWriter& writer) { return {writer}; }
 
 }
 
