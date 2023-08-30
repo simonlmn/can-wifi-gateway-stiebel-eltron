@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RESTAPI_H_
+#define RESTAPI_H_
 
 #include "src/iot-core/Interfaces.h"
 #include "src/iot-core/Utils.h"
@@ -9,6 +10,7 @@
 #include <ESP8266WebServer.h>
 #include <uri/UriBraces.h>
 #include <uri/UriGlob.h>
+#include "Serializer.h"
 #include "DataAccess.h"
 #include "StiebelEltronProtocol.h"
 
@@ -478,7 +480,7 @@ private:
         }
 
         writer.propertyStart(iot_core::convert<ValueId>::toString(data.second.id, 10));
-        writeItem(writer, data.second, numbersAsDecimals);
+        serializer::serialize(writer, data.second, false, numbersAsDecimals);
 
         ++i;
 
@@ -499,42 +501,6 @@ private:
     _response.end();
   }
 
-  void writeItem(iot_core::JsonWriter<decltype(_response)>& writer, const DataEntry& entry, bool numbersAsDecimals = false) {
-    writer.objectOpen();
-    writer.propertyRaw(F("id"), iot_core::convert<ValueId>::toString(entry.id, 10));
-    writer.separator();
-    if (entry.hasDefinition()) {
-      writer.propertyString(F("name"), entry.definition->name);
-      writer.separator();
-      writer.propertyString(F("accessMode"), valueAccessModeToString(entry.definition->accessMode));
-      writer.separator();
-      if (entry.definition->unit != Unit::Unknown) {
-        writer.propertyString(F("unit"), unitSymbol(entry.definition->unit));
-        writer.separator();
-      }
-    }
-    if (entry.lastUpdate.isSet()) {
-      if (numbersAsDecimals) {
-        writer.propertyString(F("rawValue"), getRawValueAsDecString(entry.rawValue));
-      } else {
-        writer.propertyString(F("rawValue"), getRawValueAsHexString(entry.rawValue));
-      }
-      writer.separator();
-      if (entry.hasDefinition()) {
-        writer.propertyRaw(F("value"), entry.definition->fromRaw(entry.rawValue));
-        writer.separator();
-      }
-    }
-    writer.propertyString(F("lastUpdate"), entry.lastUpdate.toString());
-    writer.separator();
-    writer.propertyString(F("source"), entry.source.toString());
-    writer.separator();
-    writer.propertyRaw(F("subscribed"), iot_core::convert<bool>::toString(entry.subscribed));
-    writer.separator();
-    writer.propertyRaw(F("writable"), iot_core::convert<bool>::toString(entry.writable));
-    writer.objectClose();
-  }
-
   void getDefinitions() {
     if (!_response.begin(200, FPSTR(CONTENT_TYPE_JSON))) {
       _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
@@ -552,20 +518,8 @@ private:
         }
         first = false;
 
-        writer.objectOpen();
-
-        writer.propertyRaw(F("id"), iot_core::convert<ValueId>::toString(definition.id, 10));
-        writer.separator();
-        writer.propertyString(F("name"), definition.name);
-        writer.separator();
-        writer.propertyString(F("unit"), unitSymbol(definition.unit));
-        writer.separator();
-        writer.propertyString(F("accessMode"), valueAccessModeToString(definition.accessMode));
-        writer.separator();
-        writer.propertyString(F("source"), definition.source.toString());
+        serializer::serialize(writer, definition);
         
-        writer.objectClose();
-
         _system.lyield();
     }
 
@@ -606,3 +560,5 @@ private:
     _response.end();
   }
 };
+
+#endif

@@ -2,8 +2,12 @@
 #define MQTTCLIENT_H_
 
 #include "src/iot-core/Interfaces.h"
+#include "src/iot-core/Buffer.h"
+#include "src/iot-core/JsonWriter.h"
 #include <PubSubClient.h>
 #include <ESP8266WiFi.h>
+#include "DataAccess.h"
+#include "Serializer.h"
 
 class MqttClient final : public iot_core::IApplicationComponent {
 private:
@@ -13,10 +17,14 @@ private:
   DataAccess& _access;
   WiFiClient _wifiClient;
   PubSubClient _mqttClient;
+  iot_core::Buffer<640u> _buffer;
 
+  bool _enabled = false;
   char _brokerAddress[16] = {};
   uint16_t _brokerPort = 1883;
   char _topic[32] = {};
+
+  size_t _discardedUpdates = 0u;
 
 public:
   MqttClient(iot_core::ISystem& system, DataAccess& access) :
@@ -35,6 +43,7 @@ public:
   }
 
   bool configure(const char* name, const char* value) override {
+    if (strcmp(name, "enabled") == 0) return setEnabled(iot_core::convert<bool>::fromString(value, false));
     if (strcmp(name, "broker") == 0) return setBrokerAddress(value);
     if (strcmp(name, "port") == 0) return setBrokerPort(iot_core::convert<uint16_t>::fromString(value, nullptr, 10));
     if (strcmp(name, "topic") == 0) return setTopic(value);
@@ -42,50 +51,90 @@ public:
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
+    writer("enabled", iot_core::convert<bool>::toString(_enabled));
     writer("broker", _brokerAddress);
     writer("port", iot_core::convert<uint16_t>::toString(_brokerPort, 10));
     writer("topic", _topic);
   }
 
+  bool setEnabled(bool enabled) {
+    if (enabled != _enabled) {
+      _enabled = enabled;
+      reset();
+    }
+    _logger.log(name(), iot_core::format("MQTT client %s.", _enabled ? "enabled" : "disabled"));
+    return true;
+  }
+
   bool setBrokerAddress(const char* address) {
     iot_core::str(address).copy(_brokerAddress, 15);
-    _mqttClient.setServer(_brokerAddress, _brokerPort);
+    _logger.log(name(), iot_core::format("Using address '%s'.", _brokerAddress));
+    reset();
     return true;
   }
 
   bool setBrokerPort(uint16_t port) {
     _brokerPort = port;
-    _mqttClient.setServer(_brokerAddress, _brokerPort);
+    _logger.log(name(), iot_core::format("Using port %u.", _brokerPort));
+    reset();
     return true;
   }
 
   bool setTopic(const char* topic) {
     iot_core::str(topic).copy(_topic, 31);
+    _logger.log(name(), iot_core::format("Using topic '%s'.", _topic));
     return true;
   }
 
   void setup(bool /*connected*/) override {
     _mqttClient.setServer(_brokerAddress, _brokerPort);
-    _access.onUpdate([&] (DataEntry const& entry) {
-      if (!_mqttClient.connected()) {
-        return;
-      }
-
-      if (entry.hasDefinition()) {
-        _mqttClient.publish(_topic, iot_core::format("update entry %u: %s", entry.id, entry.definition->fromRaw(entry.rawValue)));
-      }
-    });
+    _access.onUpdate([&] (DataEntry const& entry) { handleUpdate(entry); });
   }
 
   void loop(iot_core::ConnectionStatus /*status*/) override {
+    if (!_enabled) {
+      return;
+    }
+
     _mqttClient.loop();
 
     if (!_mqttClient.connected()) {
       _mqttClient.connect(iot_core::format("wifi-gateway-%s", _system.id()));
+    } else {
+      if (_discardedUpdates != 0u) {
+        _logger.log(iot_core::LogLevel::Warning, name(), iot_core::format("Discarded %u updates while disconnected.", _discardedUpdates));
+      }
+      _discardedUpdates = 0u;
     }
   }
   
   void getDiagnostics(iot_core::IDiagnosticsCollector& /*collector*/) const override {
+  }
+
+private:
+  void reset() {
+    _mqttClient.disconnect();
+    _mqttClient.setServer(_brokerAddress, _brokerPort);
+    _discardedUpdates = 0u;
+  }
+
+  void handleUpdate(DataEntry const& entry) {
+    if (!_enabled) {
+      return;
+    }
+
+    if (!_mqttClient.connected()) {
+      if (_discardedUpdates == 0u) {
+        _logger.log(iot_core::LogLevel::Warning, name(), "Disconnected, discarding updates.");
+      }
+      _discardedUpdates += 1u;
+      return;
+    }
+    
+    _buffer.clear();
+    auto writer = iot_core::makeJsonWriter(_buffer);
+    serializer::serialize(writer, entry, true, true);
+    _mqttClient.publish(_topic, _buffer.data(), _buffer.size());
   }
 };
 

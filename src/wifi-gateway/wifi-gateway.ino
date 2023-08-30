@@ -1,6 +1,6 @@
 // Feature flags
 //#define DEVELOPMENT_MODE
-//#define MQTT_SUPPORT
+#define MQTT_SUPPORT
 
 #include "src/iot-core/System.h"
 #include "src/pins/DigitalInput.h"

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef VALUEDEFINITIONS_H_
+#define VALUEDEFINITIONS_H_
 
 #ifdef TEST_ENV
 #include <iterator>
@@ -331,3 +332,5 @@ const ValueDefinition& getDefinition(ValueId id) {
 bool hasDefinition(ValueId id) {
   return getDefinition(id).isUnknown();
 }
+
+#endif

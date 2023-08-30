@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SERIALCAN_H_
+#define SERIALCAN_H_
 
 #include "src/iot-core/Interfaces.h"
 #include "src/iot-core/Utils.h"
@@ -242,3 +243,5 @@ private:
     }
   }
 };
+
+#endif

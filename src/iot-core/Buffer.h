@@ -1,5 +1,5 @@
-#ifndef IOT_CORE_CHUNKEDRESPONSE_H_
-#define IOT_CORE_CHUNKEDRESPONSE_H_
+#ifndef IOT_CORE_BUFFER_H_
+#define IOT_CORE_BUFFER_H_
 
 #include "Utils.h"
 
@@ -17,6 +17,14 @@ class Buffer final {
 
 public:
   Buffer() {}
+
+  const char* c_str() const {
+    return _buffer;
+  }
+
+  const uint8_t* data() const {
+    return (uint8_t*)(&_buffer[0]);
+  }
 
   size_t size() const {
     return _size;
@@ -43,8 +51,10 @@ public:
 
     if (maxLength < textLength) {
       _overrun = true;
+      _size += maxLength;
       return maxLength;
     } else {
+      _size += textLength;
       return textLength;
     }
   }
@@ -56,6 +66,7 @@ public:
     }
     _buffer[_size] = c;
     _size += 1u;
+    _buffer[_size] = '\0';
     return 1u;
   }
 };

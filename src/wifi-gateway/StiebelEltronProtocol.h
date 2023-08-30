@@ -1,4 +1,5 @@
-#pragma once
+#ifndef STIEBELELTRONPROTOCOL_H_
+#define STIEBELELTRONPROTOCOL_H_
 
 #ifdef TEST_ENV
 #include <cstdint>
@@ -404,3 +405,5 @@ private:
     }
   }
 };
+
+#endif

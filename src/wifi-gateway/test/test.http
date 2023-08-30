@@ -39,12 +39,20 @@ PUT http://{{deviceAddress}}/api/system/config/can
 mode=Normal;
 
 ###
+PUT http://{{deviceAddress}}/api/system/config/mqc
+
+enabled=true;
+
+###
 PUT http://{{deviceAddress}}/api/system/config
 
 dta.mode=Configured;
 dta.readOnly=false;
 sep.display=2;
 can.mode=Normal;
+
+###
+GET http://{{deviceAddress}}/api/system/config 
 
 ###
 GET http://{{deviceAddress}}/api/subscriptions

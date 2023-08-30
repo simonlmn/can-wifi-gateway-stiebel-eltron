@@ -1,4 +1,5 @@
-#pragma once
+#ifndef VALUECONVERSION_H_
+#define VALUECONVERSION_H_
 
 #ifdef TEST_ENV
 #include <cstdint>
@@ -535,3 +536,5 @@ struct ValvePositionEnumConverter {
     return "[\"DHW\",\"HC\"]";
   }
 };
+
+#endif

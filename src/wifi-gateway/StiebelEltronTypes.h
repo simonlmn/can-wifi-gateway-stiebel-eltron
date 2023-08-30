@@ -1,4 +1,5 @@
-#pragma once
+#ifndef STIEBELELTRONTYPES_H_
+#define STIEBELELTRONTYPES_H_
 
 #ifdef TEST_ENV
 #include <cstdint>
@@ -142,3 +143,5 @@ struct ResponseData {
   ValueId valueId;
   uint16_t value;
 };
+
+#endif
