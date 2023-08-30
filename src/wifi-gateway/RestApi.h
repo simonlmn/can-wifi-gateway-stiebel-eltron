@@ -516,8 +516,10 @@ private:
         _buffer.jsonPropertyString(F("rawValue"), getRawValueAsHexString(entry.rawValue));
       }
       _buffer.jsonSeparator();
-      _buffer.jsonPropertyRaw(F("value"), entry.definition->fromRaw(entry.rawValue));
-      _buffer.jsonSeparator();
+      if (entry.hasDefinition()) {
+        _buffer.jsonPropertyRaw(F("value"), entry.definition->fromRaw(entry.rawValue));
+        _buffer.jsonSeparator();
+      }
     }
     _buffer.jsonPropertyString(F("lastUpdate"), entry.lastUpdate.toString());
     _buffer.jsonSeparator();

@@ -210,6 +210,11 @@ public:
 };
 
 template<typename T>
+ConstString<std::remove_const_t<std::remove_pointer_t<T>>> str(T string) {
+  return {string};
+}
+
+template<typename T>
 struct convert final {
   static const char* toString(T value) { return ""; }
   static T fromString(const char* value) { return {}; }

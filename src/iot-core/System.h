@@ -24,6 +24,7 @@ class System final : public ISystem, public IApplicationContainer {
   static const unsigned long FACTORY_RESET_TRIGGER_TIME = 5000ul; // 5 seconds
   static const unsigned long DISCONNECTED_RESET_TIMEOUT = 60000ul; // 1 minute
   
+  char _chipId[9];
   bool _stopped = false;
   Time _uptime = {};
   unsigned long _disconnectedSinceMs = 1u;
@@ -49,7 +50,13 @@ public:
     _otaEnablePin(otaEnablePin),
     _updatePin(updatePin),
     _factoryResetPin(factoryResetPin)
-  {}
+  {
+    str(format("%x", ESP.getChipId())).copy(_chipId, 8);
+  }
+
+  const char* id() const override {
+    return _chipId;
+  }
 
   void addComponent(IApplicationComponent* component) override {
     _components.emplace_back(component);
@@ -247,7 +254,7 @@ public:
 
   void getDiagnostics(IDiagnosticsCollector& collector) const override {
     collector.addSection("system");
-    collector.addValue("chipId", format("%x", ESP.getChipId()));
+    collector.addValue("chipId", id());
     collector.addValue("flashChipId", format("%x", ESP.getFlashChipId()));
     collector.addValue("sketchMD5", ESP.getSketchMD5().c_str());
     collector.addValue("coreVersion", ESP.getCoreVersion().c_str());

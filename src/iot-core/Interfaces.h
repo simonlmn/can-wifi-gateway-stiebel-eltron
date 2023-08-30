@@ -16,6 +16,7 @@ enum struct ConnectionStatus {
 
 class ISystem {
 public:
+  virtual const char* id() const = 0;
   virtual void reset() = 0;
   virtual void stop() = 0;
   virtual void factoryReset() = 0;

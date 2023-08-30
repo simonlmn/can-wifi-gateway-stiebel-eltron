@@ -474,6 +474,8 @@ private:
         // the new value which is now the same, we consider it done.
         entry->lastWriteMs = 0;
       }
+
+      if (_updateHandler) _updateHandler(*entry);
     }
   }
 };

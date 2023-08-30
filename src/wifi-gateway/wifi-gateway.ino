@@ -1,4 +1,6 @@
+// Feature flags
 //#define DEVELOPMENT_MODE
+//#define MQTT_SUPPORT
 
 #include "src/iot-core/System.h"
 #include "src/pins/DigitalInput.h"
@@ -9,6 +11,9 @@
 #include "DateTimeSource.h"
 #include "DataAccess.h"
 #include "RestApi.h"
+#ifdef MQTT_SUPPORT
+#include "MqttClient.h"
+#endif
 
 namespace io {
 // Switches
@@ -38,6 +43,9 @@ StiebelEltronProtocol protocol { sys, can };
 DateTimeSource timeSource { sys.logger(), protocol };
 DataAccess access { sys, protocol, timeSource, io::writeEnablePin };
 RestApi api { sys, sys, access, protocol };
+#ifdef MQTT_SUPPORT
+MqttClient mqtt { sys, access };
+#endif
 
 void setup() {
   sys.setDateTimeSource(&timeSource);
@@ -54,6 +62,9 @@ void setup() {
   sys.addComponent(&timeSource);
   sys.addComponent(&access);
   sys.addComponent(&api);
+#ifdef MQTT_SUPPORT
+  sys.addComponent(&mqtt);
+#endif
 
   sys.setup();
 }
