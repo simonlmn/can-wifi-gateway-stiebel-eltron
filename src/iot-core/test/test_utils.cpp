@@ -1,3 +1,4 @@
+#ifndef ARDUINO
 
 #include "../Utils.h"
 #include <cassert>
@@ -172,3 +173,5 @@ int main() {
   test_toString();
   return 0;
 }
+
+#endif

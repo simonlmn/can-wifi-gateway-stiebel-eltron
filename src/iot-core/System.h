@@ -41,6 +41,7 @@ class System final : public ISystem, public IApplicationContainer {
   pins::DigitalInput& _factoryResetPin;
 
   TimingStatistics<20> _yieldTiming {};
+  ConstStrMap<TimingStatistics<10>> _componentTiming {};
 
 public:
   System(const char* otaPassword, pins::DigitalOutput& statusLedPin, pins::DigitalInput& otaEnablePin, pins::DigitalInput& updatePin, pins::DigitalInput& factoryResetPin)
@@ -60,6 +61,7 @@ public:
 
   void addComponent(IApplicationComponent* component) override {
     _components.emplace_back(component);
+    _componentTiming[component->name()] = {};
   }
 
   void setup() {
@@ -115,10 +117,7 @@ public:
 #else
         _statusLedPin = false;
 #endif
-        for (auto component : _components) {
-          component->loop(_status);
-          lyield();
-        }
+        loopComponents();
       }
     } else {
       _status = ConnectionStatus::Disconnected;
@@ -137,10 +136,7 @@ public:
       } else {
         blinkSlow();
       
-        for (auto component : _components) {
-          component->loop(_status);
-          lyield();
-        }
+        loopComponents();
       }
     }
 
@@ -253,7 +249,7 @@ public:
   Logger& logger() override { return _logger; }
 
   void getDiagnostics(IDiagnosticsCollector& collector) const override {
-    collector.addSection("system");
+    collector.beginSection("system");
     collector.addValue("chipId", id());
     collector.addValue("flashChipId", format("%x", ESP.getFlashChipId()));
     collector.addValue("sketchMD5", ESP.getSketchMD5().c_str());
@@ -269,19 +265,45 @@ public:
     collector.addValue("wifiRssi", format("%i", WiFi.RSSI()));
     collector.addValue("ip", WiFi.localIP().toString().c_str());
 
-    collector.addSection("yield");
+    collector.beginSection("timing");
+
+    collector.beginSection("yield");
     collector.addValue("count", convert<size_t>::toString(_yieldTiming.count(), 10));
     collector.addValue("avg", convert<unsigned long>::toString(_yieldTiming.avg(), 10));
     collector.addValue("min", convert<unsigned long>::toString(_yieldTiming.min(), 10));
     collector.addValue("max", convert<unsigned long>::toString(_yieldTiming.max(), 10));
+    collector.endSection();
+
+    for (auto& [componentName, timing] : _componentTiming) {
+      collector.beginSection(componentName);
+      collector.addValue("count", convert<size_t>::toString(timing.count(), 10));
+      collector.addValue("avg", convert<unsigned long>::toString(timing.avg(), 10));
+      collector.addValue("min", convert<unsigned long>::toString(timing.min(), 10));
+      collector.addValue("max", convert<unsigned long>::toString(timing.max(), 10));
+      collector.endSection();
+    }
+
+    collector.endSection();
+    collector.endSection();
 
     for (auto component : _components) {
-      collector.addSection(component->name());
+      collector.beginSection(component->name());
       component->getDiagnostics(collector);
+      collector.endSection();
     }
   }
 
 private:
+  void loopComponents() {
+    for (auto component : _components) {
+      auto& timing = _componentTiming[component->name()];
+      timing.start();
+      component->loop(_status);
+      timing.stop();
+      lyield();
+    }
+  }
+
   IApplicationComponent* findComponentByName(const char* name) {
     for (auto component : _components) {
       if (strcmp(component->name(), name) == 0) {

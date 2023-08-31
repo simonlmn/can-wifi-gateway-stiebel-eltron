@@ -6,6 +6,7 @@
 #include "src/iot-core/Config.h"
 #include "src/iot-core/ChunkedResponse.h"
 #include "src/iot-core/JsonWriter.h"
+#include "src/iot-core/JsonWriter2.h"
 #include "src/iot-core/JsonDiagnosticsCollector.h"
 #include <ESP8266WebServer.h>
 #include <uri/UriBraces.h>
@@ -167,7 +168,7 @@ public:
       }
       
       {
-        auto writer = iot_core::makeJsonWriter(_response);
+        auto writer = iot_core::makeJsonWriter2(_response);
         auto collector = iot_core::makeJsonDiagnosticsCollector(writer);
         _application.getDiagnostics(collector);
       }

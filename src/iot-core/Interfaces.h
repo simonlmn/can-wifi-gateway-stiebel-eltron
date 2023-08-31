@@ -29,8 +29,9 @@ public:
 
 class IDiagnosticsCollector {
 public:
-  virtual void addSection(const char* name) = 0;
+  virtual void beginSection(const char* name) = 0;
   virtual void addValue(const char* name, const char* value) = 0;
+  virtual void endSection() = 0;
 };
 
 class IDiagnosticsProvider {

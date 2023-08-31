@@ -1,3 +1,4 @@
+#ifndef ARDUINO
 
 #include "../ResponseBuffer.h"
 #include <cassert>
@@ -233,3 +234,5 @@ int main() {
   test_ResponseBuffer();
   return 0;
 }
+
+#endif

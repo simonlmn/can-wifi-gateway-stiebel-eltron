@@ -1,3 +1,4 @@
+#ifndef ARDUINO
 
 #include "../Logger.h"
 
@@ -7,3 +8,5 @@ int main() {
     logger.output([](const char* entry){ printf("%s", entry); });
     return 0;
 }
+
+#endif
