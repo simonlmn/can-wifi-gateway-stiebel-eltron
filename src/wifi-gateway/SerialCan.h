@@ -56,7 +56,7 @@ public:
   bool setMode(CanMode mode) override {
     _mode = mode;
     reset();
-    _logger.log(name(), iot_core::format("Set mode '%s'.", canModeToString(_mode)));
+    _logger.log(name(), iot_core::format(F("Set mode '%s'."), canModeToString(_mode)));
     return true;
   }
 
@@ -65,7 +65,7 @@ public:
   }
 
   void setup(bool /*connected*/) override {
-    _logger.logIf(iot_core::LogLevel::Info, name(), [] () { return "Initializing SerialCan."; });
+    _logger.log(iot_core::LogLevel::Info, name(), F("Initializing SerialCan."));
     _serial.setup();
     delay(100);
     reset();
@@ -75,12 +75,12 @@ public:
     _serial.loop();
 
     if (!ready() && _resetInterval.elapsed()) {
-      _logger.logIf(iot_core::LogLevel::Error, name(), [] () { return "Timeout: resetting CAN module."; });
+      _logger.log(iot_core::LogLevel::Error, name(), F("Timeout: resetting CAN module."));
       resetInternal();
     }
 
     if (_counters.err > MAX_ERR_COUNT) {
-      _logger.logIf(iot_core::LogLevel::Error, name(), [] () { return "Error threshold reached: resetting CAN module."; });
+      _logger.log(iot_core::LogLevel::Error, name(), F("Error threshold reached: resetting CAN module."));
       resetInternal();
     }
   }
@@ -93,7 +93,7 @@ public:
   }
 
   void reset() override {
-    _logger.logIf(iot_core::LogLevel::Info, name(), [] () { return "Resetting CAN module."; });
+    _logger.log(iot_core::LogLevel::Info, name(), F("Resetting CAN module."));
     resetInternal();
   }
 
@@ -146,7 +146,7 @@ private:
   }
 
   void handleError(serial_protocol::ErrorCode errorCode, serial_protocol::Endpoint& /*serial*/) {
-    _logger.logIf(iot_core::LogLevel::Warning, name(), [&] () { return iot_core::format("Serial error %c: %s", static_cast<char>(errorCode), serial_protocol::describe(errorCode)); });
+    _logger.log(iot_core::LogLevel::Warning, name(), [&] () { return iot_core::format(F("Serial error %c: %s"), static_cast<char>(errorCode), serial_protocol::describe(errorCode)); });
     _counters.err += 1;
   }
 
@@ -192,26 +192,26 @@ private:
     } else if (strncmp(start, "CANTX ", 6) == 0) {
       if (strncmp(start + 6, "OK ", 3) != 0) {
         _counters.err += 1;
-        _logger.logIf(iot_core::LogLevel::Error, name(), message);
+        _logger.log(iot_core::LogLevel::Error, name(), message);
       }
     } else if (strncmp(start, "READY", 5) == 0) {
       serial.queue("SETUP %X %s", CAN_BITRATE, toSetupModeString(effectiveMode()));
     } else if (strncmp(start, "SETUP ", 6) == 0) {
       _canAvailable = strncmp(start + 6, "OK ", 3) == 0;
       if (_canAvailable) {
-        _logger.logIf(iot_core::LogLevel::Info, name(), message);
+        _logger.log(iot_core::LogLevel::Info, name(), message);
         if (_readyHandler) _readyHandler();
       } else {
-        _logger.logIf(iot_core::LogLevel::Error, name(), message);
+        _logger.log(iot_core::LogLevel::Error, name(), message);
       }
     } else {
       _counters.err += 1;
-      _logger.logIf(iot_core::LogLevel::Error, name(), message);
+      _logger.log(iot_core::LogLevel::Error, name(), message);
     }
   }
 
   void logCanMessage(const char* prefix, const CanMessage& message) {
-    _logger.logIf(iot_core::LogLevel::Debug, name(), [&] () {
+    _logger.log(iot_core::LogLevel::Debug, name(), [&] () {
       static char logMessage[36]; // "XX 123456789 xr 8 FFFFFFFFFFFFFFFF";
       int insertPos = 0;
       insertPos += snprintf(logMessage + insertPos, 36 - insertPos, "%s %x ", prefix, message.id);

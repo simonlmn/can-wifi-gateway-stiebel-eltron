@@ -188,7 +188,7 @@ public:
     _deviceId = {DeviceType::Display, DISPLAY_ADDRESSES[displayIndex]};  
     _canId = toCanId(_deviceId);
 
-    _logger.log(name(), iot_core::format("Set display index '%u' (deviceId=%s, canId=%lX)", _displayIndex, _deviceId.toString(), _canId));
+    _logger.log(name(), iot_core::format(F("Set display index '%u' (deviceId=%s, canId=%lX)"), _displayIndex, _deviceId.toString(), _canId));
 
     if (_ready) {
       registerDisplay();
@@ -376,7 +376,7 @@ private:
       }
 
       if (type == MessageType::Register) {
-        _logger.logIf(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format("%s t:%s s:%s %02X %02X %02X %02X %02X", messageTypeToString(type), target.toString(), source.toString(), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
+        _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type), target.toString(), source.toString(), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
       }
 
       if (type == MessageType::Write || type == MessageType::Response || type == MessageType::Request) {
@@ -384,7 +384,7 @@ private:
         ValueId valueId = getValueId(frame.data);
         uint16_t value = getValue(frame.data);
 
-        _logger.logIf(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format("%c%s t:%s s:%s %02X id:%04X v:%04X", target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(), source.toString(), fix, valueId, value); });
+        _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%c%s t:%s s:%s %02X id:%04X v:%04X"), target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(), source.toString(), fix, valueId, value); });
         
         switch (type) {
           case MessageType::Response:

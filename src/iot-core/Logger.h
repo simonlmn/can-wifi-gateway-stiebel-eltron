@@ -10,13 +10,13 @@ int millis() { return 12345; }
 #include "Utils.h"
 #include "DateTime.h"
 #include <functional>
+#include <algorithm>
 
 namespace iot_core {
 
-static const unsigned short LOG_ENTRY_SIZE = 128u;
+static const size_t MAX_LOG_ENTRY_LENGTH = 128u;
+static const size_t LOG_BUFFER_SIZE = 4096u;
 static const char LOG_ENTRY_SEPARATOR = '\n';
-static const unsigned short LOG_BUFFER_SIZE = 4096u;
-static char logEntry[LOG_ENTRY_SIZE + 1];
 
 enum struct LogLevel : uint8_t {
   None = 0,
@@ -52,10 +52,49 @@ LogLevel logLevelFromString(const char* level, size_t length = SIZE_MAX) {
 class Logger final {
   static const LogLevel DEFAULT_LOG_LEVEL = LogLevel::Info;
   ConstStrMap<LogLevel> _logLevels = {};
+  mutable char _logEntry[MAX_LOG_ENTRY_LENGTH + 1] = {};
+  size_t _logEntryLength = 0u;
   char _logBuffer[LOG_BUFFER_SIZE] = {};
-  unsigned short _logBufferStart = 0u;
-  unsigned short _logBufferEnd = 0u;
+  size_t _logBufferStart = 0u;
+  size_t _logBufferEnd = 0u;
   Time const& _uptime;
+
+  template<typename T>
+  void logInternal(LogLevel level, const char* category, T message) {
+    beginLogEntry(level, category);
+    str(message).copy(_logEntry + _logEntryLength, MAX_LOG_ENTRY_LENGTH - _logEntryLength, 0u, &_logEntryLength);
+    commitLogEntry();
+  }
+
+  void beginLogEntry(LogLevel level, const char* category) {
+    size_t actualLength = snprintf_P(_logEntry, MAX_LOG_ENTRY_LENGTH, PSTR("[%s|%s|%s] "), _uptime.format(), category, logLevelToString(level));
+    _logEntryLength = std::min(actualLength, MAX_LOG_ENTRY_LENGTH);
+  }
+
+  void commitLogEntry() {
+    if (_logEntryLength == 0u) {
+      return;
+    }
+    _logEntry[_logEntryLength - 1u] = LOG_ENTRY_SEPARATOR;
+    _logEntry[_logEntryLength] = '\0';
+
+    for (unsigned short i = 0u; _logEntry[i] != '\0'; ++i) {
+      if (_logBufferEnd == LOG_BUFFER_SIZE) {
+        _logBufferEnd = 0u;
+        if (_logBufferStart == 0u) {
+          advanceBufferStart();
+        }
+      } else if (_logBufferStart == _logBufferEnd && _logBufferStart != 0u) {
+        advanceBufferStart();
+      }
+
+      _logBuffer[_logBufferEnd] = _logEntry[i];
+      _logBufferEnd += 1u;
+    }
+
+    _logEntryLength = 0u;
+    _logEntry[_logEntryLength] = '\0';
+  }
 
   void advanceBufferStart() {
     while (_logBuffer[_logBufferStart] != LOG_ENTRY_SEPARATOR) {
@@ -65,11 +104,11 @@ class Logger final {
   }
 
 public:
-  Logger(Time const& uptime) : _uptime(uptime) {
+  explicit Logger(Time const& uptime) : _uptime(uptime) {
     memset(_logBuffer, LOG_ENTRY_SEPARATOR, LOG_BUFFER_SIZE);
   }
 
-  LogLevel logLevel(const char* category) {
+  LogLevel logLevel(const char* category) const {
     auto entry = _logLevels.find(category);
     if (entry == _logLevels.end()) {
       return DEFAULT_LOG_LEVEL;
@@ -82,41 +121,22 @@ public:
     _logLevels[category] = level;
   }
 
-  void log(LogLevel level, const char* category, const char* message) {
-    snprintf(logEntry, LOG_ENTRY_SIZE, "[%s|%s|%s] %s%c", _uptime.format(), category, logLevelToString(level), message, LOG_ENTRY_SEPARATOR);
-    logEntry[LOG_ENTRY_SIZE - 1u] = LOG_ENTRY_SEPARATOR;
-    logEntry[LOG_ENTRY_SIZE] = '\0';
-
-    for (unsigned short i = 0u; logEntry[i] != '\0'; ++i) {
-      if (_logBufferEnd == LOG_BUFFER_SIZE) {
-        _logBufferEnd = 0u;
-        if (_logBufferStart == 0u) {
-          advanceBufferStart();
-        }
-      } else if (_logBufferStart == _logBufferEnd && _logBufferStart != 0u) {
-        advanceBufferStart();
-      }
-
-      _logBuffer[_logBufferEnd] = logEntry[i];
-      _logBufferEnd += 1u;
-    }
+  template<typename T>
+  void log(const char* category, T message) {
+    logInternal(LogLevel::None, category, message);
   }
 
-  void log(const char* category, const char* message) {
-    log(LogLevel::None, category, message);
-  }
-
-  void logIf(LogLevel level, const char* category, const char* message) {
+  template<typename T, std::enable_if_t<!std::is_invocable<T>::value, bool> = true>
+  void log(LogLevel level, const char* category, T message) {
     if (level <= logLevel(category)) {
-      log(category, message);
+      logInternal(level, category, message);
     }
   };
 
-  template<typename MessageFunction>
-  void logIf(LogLevel level, const char* category, MessageFunction messageFunction) {
+  template<typename T, std::enable_if_t<std::is_invocable<T>::value, bool> = true>
+  void log(LogLevel level, const char* category, T messageFunction) {
     if (level <= logLevel(category)) {
-      const char* message = messageFunction();
-      log(category, message);
+      logInternal(level, category, messageFunction());
     }
   };
 
@@ -126,11 +146,11 @@ public:
       unsigned short entryIndex = 0u;
       do {
         bufferIndex = bufferIndex % LOG_BUFFER_SIZE;
-        logEntry[entryIndex] = _logBuffer[bufferIndex];
+        _logEntry[entryIndex] = _logBuffer[bufferIndex];
 
-        if (logEntry[entryIndex] == LOG_ENTRY_SEPARATOR) {
-          logEntry[entryIndex + 1u] = '\0';
-          handler(logEntry);
+        if (_logEntry[entryIndex] == LOG_ENTRY_SEPARATOR) {
+          _logEntry[entryIndex + 1u] = '\0';
+          handler(_logEntry);
           entryIndex = 0u;
         } else {
           entryIndex += 1u;

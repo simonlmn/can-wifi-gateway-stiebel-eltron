@@ -34,8 +34,8 @@ public:
     _wifiClient(),
     _mqttClient(_wifiClient)
   {
-    iot_core::str("52.29.250.158" /* broker.hivemq.com */).copy(_brokerAddress, 15);
-    iot_core::str("can-wifi-gateway-stiebel-eltron").copy(_topic, 31);
+    iot_core::str(F("52.29.250.158") /* broker.hivemq.com */).copy(_brokerAddress, 15);
+    iot_core::str(F("can-wifi-gateway-stiebel-eltron")).copy(_topic, 31);
   }
 
   const char* name() const override {
@@ -62,27 +62,27 @@ public:
       _enabled = enabled;
       reset();
     }
-    _logger.log(name(), iot_core::format("MQTT client %s.", _enabled ? "enabled" : "disabled"));
+    _logger.log(name(), iot_core::format(F("MQTT client %s."), _enabled ? "enabled" : "disabled"));
     return true;
   }
 
   bool setBrokerAddress(const char* address) {
     iot_core::str(address).copy(_brokerAddress, 15);
-    _logger.log(name(), iot_core::format("Using address '%s'.", _brokerAddress));
+    _logger.log(name(), iot_core::format(F("Using address '%s'."), _brokerAddress));
     reset();
     return true;
   }
 
   bool setBrokerPort(uint16_t port) {
     _brokerPort = port;
-    _logger.log(name(), iot_core::format("Using port %u.", _brokerPort));
+    _logger.log(name(), iot_core::format(F("Using port %u."), _brokerPort));
     reset();
     return true;
   }
 
   bool setTopic(const char* topic) {
     iot_core::str(topic).copy(_topic, 31);
-    _logger.log(name(), iot_core::format("Using topic '%s'.", _topic));
+    _logger.log(name(), iot_core::format(F("Using topic '%s'."), _topic));
     return true;
   }
 
@@ -99,10 +99,10 @@ public:
     _mqttClient.loop();
 
     if (!_mqttClient.connected()) {
-      _mqttClient.connect(iot_core::format("wifi-gateway-%s", _system.id()));
+      _mqttClient.connect(iot_core::format(F("wifi-gateway-%s"), _system.id()));
     } else {
       if (_discardedUpdates != 0u) {
-        _logger.log(iot_core::LogLevel::Warning, name(), iot_core::format("Discarded %u updates while disconnected.", _discardedUpdates));
+        _logger.log(iot_core::LogLevel::Warning, name(), iot_core::format(F("Discarded %u updates while disconnected."), _discardedUpdates));
       }
       _discardedUpdates = 0u;
     }
@@ -125,7 +125,7 @@ private:
 
     if (!_mqttClient.connected()) {
       if (_discardedUpdates == 0u) {
-        _logger.log(iot_core::LogLevel::Warning, name(), "Disconnected, discarding updates.");
+        _logger.log(iot_core::LogLevel::Warning, name(), F("Disconnected, discarding updates."));
       }
       _discardedUpdates += 1u;
       return;
@@ -134,7 +134,11 @@ private:
     _buffer.clear();
     auto writer = iot_core::makeJsonWriter(_buffer);
     serializer::serialize(writer, entry, true, true);
-    _mqttClient.publish(_topic, _buffer.data(), _buffer.size());
+    if (_buffer.overrun()) {
+      _logger.log(iot_core::LogLevel::Warning, name(), F("Serialized data entry too large for buffer."));
+    } else {
+      _mqttClient.publish(_topic, _buffer.data(), _buffer.size());
+    }
   }
 };
 

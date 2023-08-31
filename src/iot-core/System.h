@@ -76,14 +76,14 @@ public:
       setupOTA();
     }
     
-    _logger.log(LogLevel::Info, "sys", "internal setup done.");
+    _logger.log(LogLevel::Info, "sys", F("Internal setup done."));
 
     for (auto component : _components) {
       restoreConfiguration(component);
       component->setup(connected);
     }
 
-    _logger.log(LogLevel::Info, "sys", "all setup done.");
+    _logger.log(LogLevel::Info, "sys", F("All setup done."));
     
     _statusLedPin = false;
   }
@@ -102,7 +102,7 @@ public:
     if (connected()) {
       _status = ConnectionStatus::Connected;      
       if (_disconnectedSinceMs > 0) {
-        _logger.log(LogLevel::Info, "sys", format(F("reconnected after %u ms."), _uptime.millis() - _disconnectedSinceMs));
+        _logger.log(LogLevel::Info, "sys", format(F("Reconnected after %u ms."), _uptime.millis() - _disconnectedSinceMs));
         _disconnectedSinceMs = 0;
         _status = ConnectionStatus::Reconnected;
       }
@@ -124,7 +124,7 @@ public:
       _status = ConnectionStatus::Disconnected;
       if (_disconnectedSinceMs == 0 || _uptime.millis() < _disconnectedSinceMs /* detect millis() wrap-around */) {
         _disconnectedSinceMs = _uptime.millis();
-        _logger.log(LogLevel::Warning, "sys", "disconnected.");
+        _logger.log(LogLevel::Warning, "sys", F("Disconnected."));
         _status = ConnectionStatus::Disconnecting;
       }
 
@@ -169,7 +169,7 @@ public:
     
     _stopped = true;
 
-    _logger.log(LogLevel::Info, "sys", "STOP!");
+    _logger.log(LogLevel::Info, "sys", F("STOP!"));
   }
 
   void factoryReset() override {
@@ -302,8 +302,8 @@ private:
 
   void setupOTA() {
     ArduinoOTA.setPassword(_otaPassword);
-    ArduinoOTA.onStart([this] () { stop(); LittleFS.end(); _logger.log(LogLevel::Info, "sys", "starting OTA update..."); _statusLedPin = true; });
-    ArduinoOTA.onEnd([this] () { _statusLedPin = false; _logger.log(LogLevel::Info, "sys", "OTA update finished."); });
+    ArduinoOTA.onStart([this] () { stop(); LittleFS.end(); _logger.log(LogLevel::Info, "sys", F("Starting OTA update...")); _statusLedPin = true; });
+    ArduinoOTA.onEnd([this] () { _statusLedPin = false; _logger.log(LogLevel::Info, "sys", F("OTA update finished.")); });
     ArduinoOTA.onProgress([this] (unsigned int /*progress*/, unsigned int /*total*/) { _statusLedPin.trigger(true, 10); });
     ArduinoOTA.begin();
   }
@@ -323,9 +323,9 @@ private:
   void restoreConfiguration(IConfigurable* configurable) {
     ConfigParser parser = readConfigFile(format("/config/%s", configurable->name()));
     if (parser.parse([&] (char* name, const char* value) { return configurable->configure(name, value); })) {
-      _logger.log(LogLevel::Info, "sys", format("restored config for '%s'.", configurable->name()));
+      _logger.log(LogLevel::Info, "sys", format(F("Restored config for '%s'."), configurable->name()));
     } else {
-      _logger.log(LogLevel::Error, "sys", format("failed to restore config for '%s'.", configurable->name()));
+      _logger.log(LogLevel::Error, "sys", format(F("failed to restore config for '%s'."), configurable->name()));
     }
   }
 

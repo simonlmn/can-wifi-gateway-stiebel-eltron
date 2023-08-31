@@ -102,7 +102,7 @@ public:
         if (space != nullptr) {
           const char* symbol = unitSymbol(entry.definition->unit);
           if (strcmp(space + 1, symbol) != 0) {
-            _logger.logIf(iot_core::LogLevel::Warning, "api", [&] () { return iot_core::format("PUT data: unit mismatch %s != %s", space + 1, symbol); });
+            _logger.log(iot_core::LogLevel::Warning, "api", [&] () { return iot_core::format(F("PUT data: unit mismatch %s != %s"), space + 1, symbol); });
             return false;
           }
         }
@@ -110,7 +110,7 @@ public:
         uint32_t rawValue = entry.definition->toRaw(valueString, space);
 
         if (Codec::isError(rawValue)) {
-          _logger.logIf(iot_core::LogLevel::Warning, "api", [&] () { return iot_core::format("PUT data: value error %s", valueString); });
+          _logger.log(iot_core::LogLevel::Warning, "api", [&] () { return iot_core::format(F("PUT data: value error %s"), valueString); });
           return false;
         }
   
@@ -372,7 +372,7 @@ private:
   void doItem(std::function<bool(DataAccess::DataKey const&, DataEntry const&)> itemOperation = {}) {
     _system.lyield();
 
-    _logger.logIf(iot_core::LogLevel::Debug, "api", [&] () { return iot_core::format("doItem: %s", _server.arg(FPSTR(ARG_PLAIN)).c_str()); });
+    _logger.log(iot_core::LogLevel::Debug, "api", [&] () { return iot_core::format(F("doItem: %s"), _server.arg(FPSTR(ARG_PLAIN)).c_str()); });
 
     bool validateOnly = _server.hasArg(FPSTR(ARG_VALIDATE_ONLY));
     
@@ -412,7 +412,7 @@ private:
       if (itemOperation(key, *entry)) {
         _server.send(202, FPSTR(CONTENT_TYPE_PLAIN), iot_core::EMPTY_STRING);
       } else {
-        _logger.logIf(iot_core::LogLevel::Warning, name(), [] () { return "doItem: operation failed"; });
+        _logger.log(iot_core::LogLevel::Warning, name(), F("doItem: operation failed"));
         _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), F("operation failed"));
       }
     }

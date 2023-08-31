@@ -172,12 +172,16 @@ private:
 public:
   ConstString(Type string) : _string(string) {}
 
-  size_t copy(char* dest, size_t maxLength, size_t offset = 0u) const {
+  size_t copy(char* dest, size_t maxLength, size_t offset = 0u, size_t* destLength = nullptr) const {
     const size_t length = len(offset);
     size_t lengthToCopy = std::min(length, maxLength);
     
     memcpy(dest, _string + offset, lengthToCopy);
     dest[lengthToCopy] = '\0';
+
+    if (destLength != nullptr) {
+      *destLength += lengthToCopy;
+    }
 
     return length;
   }
@@ -196,12 +200,16 @@ private:
 public:
   ConstString(Type string) : _string(string) {}
 
-  size_t copy(char* dest, size_t maxLength, size_t offset = 0u) const {
+  size_t copy(char* dest, size_t maxLength, size_t offset = 0u, size_t* destLength = nullptr) const {
     const size_t length = len(offset);
     size_t lengthToCopy = std::min(length, maxLength);
     
     memcpy_P(dest, (PGM_P)_string + offset, lengthToCopy);
     dest[lengthToCopy] = '\0';
+
+    if (destLength != nullptr) {
+      *destLength += lengthToCopy;
+    }
 
     return length;
   }

@@ -114,13 +114,13 @@ public:
 
   bool setMode(DataCaptureMode mode) {
     _mode = mode;
-    _logger.log(name(), iot_core::format("Set mode '%s'.", dataCaptureModeToString(_mode)));
+    _logger.log(name(), iot_core::format(F("Set mode '%s'."), dataCaptureModeToString(_mode)));
     return true;
   }
 
   bool setReadOnly(bool readOnly) {
     _readOnly = readOnly;
-    _logger.log(name(), iot_core::format("%s write access (%seffective).", _readOnly ? "Disabled" : "Enabled", effectiveReadOnly() == _readOnly ? "" : "NOT "));
+    _logger.log(name(), iot_core::format(F("%s write access (%seffective)."), _readOnly ? "Disabled" : "Enabled", effectiveReadOnly() == _readOnly ? "" : "NOT "));
     return true;
   }
 

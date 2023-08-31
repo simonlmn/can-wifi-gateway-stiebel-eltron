@@ -1,3 +1,9 @@
+// OTA password
+#ifndef OTA_PASSWORD
+#warning Compiling in default OTA_PASSWORD
+#define OTA_PASSWORD "fzDL9RKdPAhAhFu7"
+#endif
+
 // Feature flags
 //#define DEVELOPMENT_MODE
 #define MQTT_SUPPORT
@@ -37,7 +43,7 @@ pins::DigitalOutput canResetPin { pins::gpios::esp8266::nodemcu::D1, false, pins
 pins::DigitalOutput builtinLed { LED_BUILTIN, false, pins::SignalMode::Inverted };
 }
 
-iot_core::System sys { "fzDL9RKdPAhAhFu7", io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin };
+iot_core::System sys { OTA_PASSWORD, io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin };
 SerialCan can { sys, io::canResetPin, io::txEnablePin };
 StiebelEltronProtocol protocol { sys, can };
 DateTimeSource timeSource { sys.logger(), protocol };
@@ -50,7 +56,7 @@ MqttClient mqtt { sys, access };
 void setup() {
   sys.setDateTimeSource(&timeSource);
 
-  sys.logger().log("ios", iot_core::format("ota=%u write=%u tx=%u debug=%u",
+  sys.logger().log("ios", iot_core::format(F("ota=%u write=%u tx=%u debug=%u"),
     io::otaEnablePin.read(),
     io::writeEnablePin.read(),
     io::txEnablePin.read(),
