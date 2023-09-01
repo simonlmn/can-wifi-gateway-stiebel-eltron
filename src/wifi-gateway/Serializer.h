@@ -9,19 +9,16 @@ namespace serializer {
 
 template<typename JsonWriter>
 void serialize(JsonWriter& writer, const DataEntry& entry, bool compact = false, bool numbersAsDecimals = false) {
-  writer.objectOpen();
-  writer.propertyRaw(F("id"), iot_core::convert<ValueId>::toString(entry.id, 10));
-  writer.separator();
+  writer.openObject();
+  
+  writer.propertyPlain(F("id"), iot_core::convert<ValueId>::toString(entry.id, 10));
   if (entry.hasDefinition()) {
     if (!compact) {
       writer.propertyString(F("name"), entry.definition->name);
-      writer.separator();
       writer.propertyString(F("accessMode"), valueAccessModeToString(entry.definition->accessMode));
-      writer.separator();
     }
     if (entry.definition->unit != Unit::Unknown) {
       writer.propertyString(F("unit"), unitSymbol(entry.definition->unit));
-      writer.separator();
     }
   }
   if (entry.lastUpdate.isSet()) {
@@ -30,39 +27,30 @@ void serialize(JsonWriter& writer, const DataEntry& entry, bool compact = false,
     } else {
       writer.propertyString(F("rawValue"), getRawValueAsHexString(entry.rawValue));
     }
-    writer.separator();
     if (entry.hasDefinition()) {
-      writer.propertyRaw(F("value"), entry.definition->fromRaw(entry.rawValue));
-      writer.separator();
+      writer.propertyPlain(F("value"), entry.definition->fromRaw(entry.rawValue));
     }
   }
   writer.propertyString(F("lastUpdate"), entry.lastUpdate.toString());
-  writer.separator();
   writer.propertyString(F("source"), entry.source.toString());
   if (!compact) {
-    writer.separator();
-    writer.propertyRaw(F("subscribed"), iot_core::convert<bool>::toString(entry.subscribed));
-    writer.separator();
-    writer.propertyRaw(F("writable"), iot_core::convert<bool>::toString(entry.writable));
+    writer.propertyPlain(F("subscribed"), iot_core::convert<bool>::toString(entry.subscribed));
+    writer.propertyPlain(F("writable"), iot_core::convert<bool>::toString(entry.writable));
   }
-  writer.objectClose();
+  writer.close();
 }
 
 template<typename JsonWriter>
 void serialize(JsonWriter& writer, const ValueDefinition& definition) {
-  writer.objectOpen();
+  writer.openObject();
 
-  writer.propertyRaw(F("id"), iot_core::convert<ValueId>::toString(definition.id, 10));
-  writer.separator();
+  writer.propertyPlain(F("id"), iot_core::convert<ValueId>::toString(definition.id, 10));
   writer.propertyString(F("name"), definition.name);
-  writer.separator();
   writer.propertyString(F("unit"), unitSymbol(definition.unit));
-  writer.separator();
   writer.propertyString(F("accessMode"), valueAccessModeToString(definition.accessMode));
-  writer.separator();
   writer.propertyString(F("source"), definition.source.toString());
   
-  writer.objectClose();
+  writer.close();
 }
 
 };

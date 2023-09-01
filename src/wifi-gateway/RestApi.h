@@ -6,7 +6,6 @@
 #include "src/iot-core/Config.h"
 #include "src/iot-core/ChunkedResponse.h"
 #include "src/iot-core/JsonWriter.h"
-#include "src/iot-core/JsonWriter2.h"
 #include "src/iot-core/JsonDiagnosticsCollector.h"
 #include <ESP8266WebServer.h>
 #include <uri/UriBraces.h>
@@ -168,7 +167,7 @@ public:
       }
       
       {
-        auto writer = iot_core::makeJsonWriter2(_response);
+        auto writer = iot_core::makeJsonWriter(_response);
         auto collector = iot_core::makeJsonDiagnosticsCollector(writer);
         _application.getDiagnostics(collector);
       }
@@ -438,13 +437,11 @@ private:
 
     auto writer = iot_core::makeJsonWriter(_response);
 
-    writer.objectOpen();
+    writer.openObject();
     writer.propertyString(F("retrievedOn"), _access.currentDateTime().toString());
-    writer.separator();
-    writer.propertyRaw(F("totalItems"), iot_core::convert<size_t>::toString(collectionData.size(), 10));
-    writer.separator();
-    writer.propertyStart(F("items"));
-    writer.objectOpen();
+    writer.propertyPlain(F("totalItems"), iot_core::convert<size_t>::toString(collectionData.size(), 10));
+    writer.property(F("items"));
+    writer.openObject();
 
     size_t i = 0u;
     DeviceType type;
@@ -454,33 +451,28 @@ private:
         if (i == 0) {
           type = data.first.first.type;
           address = data.first.first.address;
-          writer.propertyStart(deviceTypeToString(type));
-          writer.objectOpen();
-          writer.propertyStart(iot_core::convert<DeviceAddress>::toString(address, 10));
-          writer.objectOpen();
+          writer.property(deviceTypeToString(type));
+          writer.openObject();
+          writer.property(iot_core::convert<DeviceAddress>::toString(address, 10));
+          writer.openObject();
         } else {
           if (type != data.first.first.type) {
+            writer.close();
+            writer.close();
             type = data.first.first.type;
             address = data.first.first.address;
-            writer.objectClose();
-            writer.objectClose();
-            writer.separator();
-            writer.propertyStart(deviceTypeToString(type));
-            writer.objectOpen();
-            writer.propertyStart(iot_core::convert<DeviceAddress>::toString(address, 10));
-            writer.objectOpen();            
+            writer.property(deviceTypeToString(type));
+            writer.openObject();
+            writer.property(iot_core::convert<DeviceAddress>::toString(address, 10));
+            writer.openObject();            
           } else if (address != data.first.first.address) {
+            writer.close();
             address = data.first.first.address;
-            writer.objectClose();
-            writer.separator();
-            writer.propertyStart(iot_core::convert<DeviceAddress>::toString(address, 10));
-            writer.objectOpen();
-          } else {
-            writer.separator();
+            writer.property(iot_core::convert<DeviceAddress>::toString(address, 10));
           }
         }
 
-        writer.propertyStart(iot_core::convert<ValueId>::toString(data.second.id, 10));
+        writer.property(iot_core::convert<ValueId>::toString(data.second.id, 10));
         serializer::serialize(writer, data.second, false, numbersAsDecimals);
 
         ++i;
@@ -490,14 +482,13 @@ private:
     }
 
     if (i > 0) {
-      writer.objectClose();
-      writer.objectClose();
+      writer.close();
+      writer.close();
     }
 
-    writer.objectClose();
-    writer.separator();
-    writer.propertyRaw(F("actualItems"), iot_core::convert<size_t>::toString(i, 10));
-    writer.objectClose();
+    writer.close();
+    writer.propertyPlain(F("actualItems"), iot_core::convert<size_t>::toString(i, 10));
+    writer.close();
     
     _response.end();
   }
@@ -510,21 +501,12 @@ private:
     
     auto writer = iot_core::makeJsonWriter(_response);
 
-    writer.listOpen();
-
-    bool first = true;
+    writer.openList();
     for (auto& definition : DEFINITIONS) {
-        if (!first) {
-          writer.separator();
-        }
-        first = false;
-
-        serializer::serialize(writer, definition);
-        
-        _system.lyield();
+      serializer::serialize(writer, definition);
+      _system.lyield();
     }
-
-    writer.listClose();
+    writer.close();
     
     _response.end();
   }
@@ -537,26 +519,16 @@ private:
 
     auto writer = iot_core::makeJsonWriter(_response);
     
-    writer.objectOpen();
+    writer.openObject();
     writer.propertyString(F("this"), _protocol.getThisDeviceId().toString());
-    writer.separator();
-    writer.propertyStart(F("others"));
-    writer.listOpen();
-
-    bool first = true;
+    writer.property(F("others"));
+    writer.openList();
     for (auto& deviceId : _protocol.getOtherDeviceIds()) {
-        if (!first) {
-          writer.separator();
-        }
-        first = false;
-
-        writer.string(deviceId.toString());
-        
-        _system.lyield();
+      writer.stringValue(deviceId.toString());
+      _system.lyield();
     }
-
-    writer.listClose();
-    writer.objectClose();
+    writer.close();
+    writer.close();
 
     _response.end();
   }

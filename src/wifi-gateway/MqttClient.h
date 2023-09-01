@@ -134,7 +134,9 @@ private:
     _buffer.clear();
     auto writer = iot_core::makeJsonWriter(_buffer);
     serializer::serialize(writer, entry, true, true);
-    if (_buffer.overrun()) {
+    if (writer.failed()) {
+      _logger.log(iot_core::LogLevel::Error, name(), F("Serializing data entry failed."));
+    } else if (_buffer.overrun()) {
       _logger.log(iot_core::LogLevel::Warning, name(), F("Serialized data entry too large for buffer."));
     } else {
       _mqttClient.publish(_topic, _buffer.data(), _buffer.size());

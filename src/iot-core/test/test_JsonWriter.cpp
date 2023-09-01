@@ -1,7 +1,7 @@
 #ifndef ARDUINO
 
 #include "Mocks.h"
-#include "../JsonWriter2.h"
+#include "../JsonWriter.h"
 #include <iostream>
 #include <sstream>
 
@@ -17,7 +17,7 @@ void expect(TestCaseFunction testCase, std::string expected) {
     Out o;
     bool failed = false;
     {
-        auto writer = iot_core::makeJsonWriter2(o);
+        auto writer = iot_core::makeJsonWriter(o);
         testCase(writer);
         failed = writer.failed();
     }
@@ -29,7 +29,7 @@ void expect_failed(TestCaseFunction testCase) {
     Out o;
     bool failed = false;
     {
-        auto writer = iot_core::makeJsonWriter2(o);
+        auto writer = iot_core::makeJsonWriter(o);
         testCase(writer);
         failed = writer.failed();
     }
@@ -37,7 +37,7 @@ void expect_failed(TestCaseFunction testCase) {
 }
 
 int main() {
-    using JsonWriter = iot_core::JsonWriter2<Out>;
+    using JsonWriter = iot_core::JsonWriter<Out>;
 
     expect([] (JsonWriter& writer) {
         writer.end();
