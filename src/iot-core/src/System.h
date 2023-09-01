@@ -5,8 +5,8 @@
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
 #include <ArduinoOTA.h>
-#include "src/pins/DigitalInput.h"
-#include "src/pins/DigitalOutput.h"
+#include "pins/DigitalInput.h"
+#include "pins/DigitalOutput.h"
 #include "Interfaces.h"
 #include "IDateTimeSource.h"
 #include "Config.h"

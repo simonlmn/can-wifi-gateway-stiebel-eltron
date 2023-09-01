@@ -1,10 +1,10 @@
 #!/bin/sh
 
-pushd ../src/wifi-gateway-ui
+pushd ../src/wifi-gateway-ui/src
 
-rm -rf dist/
-parcel build --no-source-maps --no-optimize main.html
-cd dist
+rm -rf ../dist/
+parcel build --dist-dir ../dist/ --no-source-maps --no-optimize main.html
+cd ../dist
 bundled_js_filename=$(ls *.js)
 bundled_js_contents=$(cat "$bundled_js_filename")
 

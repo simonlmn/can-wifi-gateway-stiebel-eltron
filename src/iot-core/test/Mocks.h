@@ -19,7 +19,7 @@ char* ultoa (unsigned long val, char *s, int radix) { radix == 10 ? sprintf(s, "
 
 static unsigned long _mock_millis = 123u;
 unsigned long millis() {
-    return _mock_millis;
+  return _mock_millis;
 }
 
 #endif
