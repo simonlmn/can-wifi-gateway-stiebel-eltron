@@ -1,12 +1,6 @@
 #ifndef IOT_CORE_LOGGER_H_
 #define IOT_CORE_LOGGER_H_
 
-#ifdef TEST_ENV
-#include <cstdio>
-#include <cstring>
-int millis() { return 12345; }
-#endif
-
 #include "Utils.h"
 #include "DateTime.h"
 #include <functional>
@@ -75,8 +69,8 @@ class Logger final {
     if (_logEntryLength == 0u) {
       return;
     }
-    _logEntry[_logEntryLength - 1u] = LOG_ENTRY_SEPARATOR;
-    _logEntry[_logEntryLength] = '\0';
+    _logEntry[_logEntryLength] = LOG_ENTRY_SEPARATOR;
+    _logEntry[_logEntryLength + 1u] = '\0';
 
     for (unsigned short i = 0u; _logEntry[i] != '\0'; ++i) {
       if (_logBufferEnd == LOG_BUFFER_SIZE) {
