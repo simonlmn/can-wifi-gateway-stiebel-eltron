@@ -22,7 +22,7 @@ namespace iot_core {
 
 class System final : public ISystem, public IApplicationContainer {
   static const unsigned long FACTORY_RESET_TRIGGER_TIME = 5000ul; // 5 seconds
-  static const unsigned long DISCONNECTED_RESET_TIMEOUT = 60000ul; // 1 minute
+  static const unsigned long DISCONNECTED_RESET_TIMEOUT = 300000ul; // 5 minutes
   
   char _chipId[9];
   bool _stopped = false;
@@ -72,6 +72,7 @@ public:
     LittleFS.begin();
 
     _wifiManager.setConfigPortalBlocking(false);
+    _wifiManager.setWiFiAutoReconnect(true);
     bool connected = _wifiManager.autoConnect();
 
     if (_otaEnablePin) {
@@ -127,7 +128,7 @@ public:
         _status = ConnectionStatus::Disconnecting;
       }
 
-      if (_uptime.millis() > _disconnectedSinceMs + DISCONNECTED_RESET_TIMEOUT) {
+      if (_wifiManager.getWiFiIsSaved() && _uptime.millis() > _disconnectedSinceMs + DISCONNECTED_RESET_TIMEOUT) {
         reset();
       }
       
