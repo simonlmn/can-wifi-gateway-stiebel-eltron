@@ -43,7 +43,7 @@ pins::DigitalOutput canResetPin { pins::gpios::esp8266::nodemcu::D1, false, pins
 pins::DigitalOutput builtinLed { LED_BUILTIN, false, pins::SignalMode::Inverted };
 }
 
-iot_core::System sys { OTA_PASSWORD, io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin };
+iot_core::System sys { "can-wifi-gw", OTA_PASSWORD, io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin };
 SerialCan can { sys, io::canResetPin, io::txEnablePin };
 StiebelEltronProtocol protocol { sys, can };
 DateTimeSource timeSource { sys.logger(), protocol };

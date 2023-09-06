@@ -34,6 +34,7 @@ class System final : public ISystem, public IApplicationContainer {
   WiFiManager _wifiManager {};
   std::vector<IApplicationComponent*> _components {};
 
+  const char* _name;
   const char* _otaPassword;
   pins::DigitalOutput& _statusLedPin;
   pins::DigitalInput& _otaEnablePin;
@@ -46,8 +47,9 @@ class System final : public ISystem, public IApplicationContainer {
   std::function<void()> _scheduledFunction {};
 
 public:
-  System(const char* otaPassword, pins::DigitalOutput& statusLedPin, pins::DigitalInput& otaEnablePin, pins::DigitalInput& updatePin, pins::DigitalInput& factoryResetPin)
+  System(const char* name, const char* otaPassword, pins::DigitalOutput& statusLedPin, pins::DigitalInput& otaEnablePin, pins::DigitalInput& updatePin, pins::DigitalInput& factoryResetPin)
     : _logger(_uptime),
+    _name(name),
     _otaPassword(otaPassword),
     _statusLedPin(statusLedPin),
     _otaEnablePin(otaEnablePin),
@@ -75,7 +77,8 @@ public:
 
     _wifiManager.setConfigPortalBlocking(false);
     _wifiManager.setWiFiAutoReconnect(true);
-    bool connected = _wifiManager.autoConnect();
+    _wifiManager.setHostname(format("%s-%s", _name, _chipId));
+    bool connected = _wifiManager.autoConnect(format("%s-%s", _name, _chipId));
 
     if (_otaEnablePin) {
       setupOTA();
