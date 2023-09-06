@@ -25,6 +25,7 @@ public:
   virtual Logger& logger() = 0;
   virtual void lyield() = 0;
   virtual DateTime const& currentDateTime() const = 0;
+  virtual void schedule(std::function<void()> function) = 0;
 };
 
 class IDiagnosticsCollector {

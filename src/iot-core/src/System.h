@@ -43,6 +43,8 @@ class System final : public ISystem, public IApplicationContainer {
   TimingStatistics<20> _yieldTiming {};
   ConstStrMap<TimingStatistics<10>> _componentTiming {};
 
+  std::function<void()> _scheduledFunction {};
+
 public:
   System(const char* otaPassword, pins::DigitalOutput& statusLedPin, pins::DigitalInput& otaEnablePin, pins::DigitalInput& updatePin, pins::DigitalInput& factoryResetPin)
     : _logger(_uptime),
@@ -100,6 +102,11 @@ public:
 
     if (_factoryResetPin && _factoryResetPin.hasNotChangedFor(FACTORY_RESET_TRIGGER_TIME)) {
       factoryReset();
+    }
+
+    if (_scheduledFunction) {
+      _scheduledFunction();
+      _scheduledFunction = nullptr;
     }
     
     if (connected()) {
@@ -185,6 +192,18 @@ public:
 
   DateTime const& currentDateTime() const override {
     return _dateTimeSource->currentDateTime();
+  }
+
+  void schedule(std::function<void()> function) override {
+    if (_scheduledFunction) {
+      auto previousFunction = _scheduledFunction;
+      _scheduledFunction = [function,previousFunction] () {
+        previousFunction();
+        function();
+      };
+    } else {
+      _scheduledFunction = function;
+    }
   }
 
   void setDateTimeSource(const IDateTimeSource* dateTimeSource) {

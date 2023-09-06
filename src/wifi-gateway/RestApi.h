@@ -151,7 +151,13 @@ public:
     }));
     
     _server.on(F("/api/system/reset"), HTTP_POST, [this]() {
+      _system.schedule([&] () { _system.reset(); });
       _system.reset();
+      _server.send(204);
+    });
+
+    _server.on(F("/api/system/factory-reset"), HTTP_POST, [this]() {
+      _system.schedule([&] () { _system.factoryReset(); });
       _server.send(204);
     });
 
