@@ -35,6 +35,7 @@ class System final : public ISystem, public IApplicationContainer {
   std::vector<IApplicationComponent*> _components {};
 
   const char* _name;
+  const VersionInfo& _version;
   const char* _otaPassword;
   pins::DigitalOutput& _statusLedPin;
   pins::DigitalInput& _otaEnablePin;
@@ -47,9 +48,10 @@ class System final : public ISystem, public IApplicationContainer {
   std::function<void()> _scheduledFunction {};
 
 public:
-  System(const char* name, const char* otaPassword, pins::DigitalOutput& statusLedPin, pins::DigitalInput& otaEnablePin, pins::DigitalInput& updatePin, pins::DigitalInput& factoryResetPin)
+  System(const char* name, const VersionInfo& version, const char* otaPassword, pins::DigitalOutput& statusLedPin, pins::DigitalInput& otaEnablePin, pins::DigitalInput& updatePin, pins::DigitalInput& factoryResetPin)
     : _logger(_uptime),
     _name(name),
+    _version(version),
     _otaPassword(otaPassword),
     _statusLedPin(statusLedPin),
     _otaEnablePin(otaEnablePin),
@@ -63,6 +65,14 @@ public:
     return _chipId;
   }
 
+  const char* name() const {
+    return _name;
+  }
+
+  const VersionInfo& version() const override {
+    return _version;
+  }
+
   void addComponent(IApplicationComponent* component) override {
     _components.emplace_back(component);
     _componentTiming[component->name()] = {};
@@ -73,12 +83,20 @@ public:
     _logger.log(LogLevel::Warning, "sys", "DEVELOPMENT MODE");
 #endif
     _statusLedPin = true;
+
+    char hostname[33];
+    str(format("%s-%s", _name, _chipId)).copy(hostname, std::size(hostname) - 1);
+
+    _logger.log("sys", format(F("Setting up %s version %s (commit %s)"), name(), version().version_string, version().commit_hash));
+    _logger.log("sys", format(F("Running on device ID %s"), id()));
+    _logger.log("sys", format(F("Using hostname %s"), hostname));
+
     LittleFS.begin();
 
     _wifiManager.setConfigPortalBlocking(false);
     _wifiManager.setWiFiAutoReconnect(true);
-    _wifiManager.setHostname(format("%s-%s", _name, _chipId));
-    bool connected = _wifiManager.autoConnect(format("%s-%s", _name, _chipId));
+    _wifiManager.setHostname(hostname);
+    bool connected = _wifiManager.autoConnect(hostname);
 
     if (_otaEnablePin) {
       setupOTA();
@@ -276,6 +294,8 @@ public:
     collector.addValue("chipId", id());
     collector.addValue("flashChipId", format("%x", ESP.getFlashChipId()));
     collector.addValue("sketchMD5", ESP.getSketchMD5().c_str());
+    collector.addValue("name", name());
+    collector.addValue("version", version().version_string);
     collector.addValue("coreVersion", ESP.getCoreVersion().c_str());
     collector.addValue("sdkVersion", ESP.getSdkVersion());
     collector.addValue("cpuFreq", format("%u", ESP.getCpuFreqMHz()));

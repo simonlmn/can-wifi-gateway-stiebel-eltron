@@ -3,6 +3,7 @@
 
 #include "Logger.h"
 #include "DateTime.h"
+#include "VersionInfo.h"
 #include <functional>
 
 namespace iot_core {
@@ -60,6 +61,7 @@ public:
 
 class IApplicationContainer : public IDiagnosticsProvider {
 public:
+  virtual const VersionInfo& version() const = 0;
   virtual void addComponent(IApplicationComponent* component) = 0;
   virtual bool configure(const char* category, IConfigParser const& config) = 0;
   virtual void getConfig(const char* category, std::function<void(const char*, const char*)> writer) const = 0;

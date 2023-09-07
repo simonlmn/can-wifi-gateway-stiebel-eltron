@@ -12,6 +12,7 @@
 #include "src/pins/DigitalInput.h"
 #include "src/pins/DigitalOutput.h"
 #include "src/pins/Gpios.h"
+#include "Version.h"
 #include "SerialCan.h"
 #include "StiebelEltronProtocol.h"
 #include "DateTimeSource.h"
@@ -43,7 +44,7 @@ pins::DigitalOutput canResetPin { pins::gpios::esp8266::nodemcu::D1, false, pins
 pins::DigitalOutput builtinLed { LED_BUILTIN, false, pins::SignalMode::Inverted };
 }
 
-iot_core::System sys { "can-wifi-gw", OTA_PASSWORD, io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin };
+iot_core::System sys { "can-wifi-gw", VERSION, OTA_PASSWORD, io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin };
 SerialCan can { sys, io::canResetPin, io::txEnablePin };
 StiebelEltronProtocol protocol { sys, can };
 DateTimeSource timeSource { sys.logger(), protocol };

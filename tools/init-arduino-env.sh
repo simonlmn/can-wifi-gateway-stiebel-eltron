@@ -1,6 +1,6 @@
 #!/bin/sh
 
-repository_base_path=$(realpath "$0" | xargs dirname)
+repository_base_path=$(realpath "$0/../..")
 
 export ARDUINO_DIRECTORIES_DATA="$repository_base_path/.arduino"
 export ARDUINO_DIRECTORIES_DOWNLOADS="$repository_base_path/.arduino/staging"

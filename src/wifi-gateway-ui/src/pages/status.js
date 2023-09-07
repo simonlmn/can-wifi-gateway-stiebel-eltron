@@ -71,6 +71,8 @@ export class StatusPage {
             const response = await this.#client.get('/system/status');
             const data = await response.json();
             this.statusList.clear();
+            this.statusList.add('Application name', data.system.name);
+            this.statusList.add('Application version', data.system.version);
             this.statusList.add('Chip ID', data.system.chipId);
             this.statusList.add('Flash chip ID', data.system.flashChipId);
             this.statusList.add('Sketch MD5', data.system.sketchMD5);

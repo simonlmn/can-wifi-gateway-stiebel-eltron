@@ -4,10 +4,8 @@
 #if __has_include("Version.generated.h")
 #  include "Version.generated.h"
 #else
-namespace version {
-  static const char* COMMIT_HASH = "unknown";
-  static const char* VERSION_STRING = "v0.0.0-unknown";
-};
+#include "src/iot-core/VersionInfo.h"
+static const iot_core::VersionInfo VERSION {"unknown", "v0.0.0-unknown"};
 #endif
 
 #endif
