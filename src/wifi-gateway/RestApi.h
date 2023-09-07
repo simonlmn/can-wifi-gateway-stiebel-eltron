@@ -119,11 +119,11 @@ public:
     }));
 
     _server.on(F("/api/subscriptions"), HTTP_GET, _callStatistics.wrap([this]() {
-      getItems([] (DataEntry const& entry) { return entry.subscribed; });
+      getDataConfigs([] (DataEntry const& entry) { return entry.subscribed; });
     }));
 
     _server.on(F("/api/subscriptions"), HTTP_POST, _callStatistics.wrap([this]() {      
-      postItems([&] (DataAccess::DataKey const& key) { return _access.addSubscription(key); });
+      postDataConfig([&] (DataAccess::DataKey const& key) { return _access.addSubscription(key); });
     }));
 
     _server.on(UriBraces(F("/api/subscriptions/{}/{}/{}")), HTTP_DELETE, _callStatistics.wrap([this]() {
@@ -131,11 +131,11 @@ public:
     }));
 
     _server.on(F("/api/writable"), HTTP_GET, _callStatistics.wrap([this]() {
-      getItems([](DataEntry const& entry) { return entry.writable; });
+      getDataConfigs([](DataEntry const& entry) { return entry.writable; });
     }));
 
     _server.on(F("/api/writable"), HTTP_POST, _callStatistics.wrap([this]() {
-      postItems([&] (DataAccess::DataKey const& key) { return _access.addWritable(key); });
+      postDataConfig([&] (DataAccess::DataKey const& key) { return _access.addWritable(key); });
     }));
 
     _server.on(UriBraces(F("/api/writable/{}/{}/{}")), HTTP_DELETE, _callStatistics.wrap([this]() {
@@ -291,8 +291,9 @@ public:
 
 private:
   /**
-   * Do a POST operation for one or more items. The operation is executed for each item independently,
-   * and only if all operations are successful is the whole operation answerd with successful status code.
+   * Do a POST operation for one or more data configurations. The operation is executed for each item
+   * independently, and only if all operations are successful is the whole operation answered with
+   * successful status code.
    * 
    * Expects one or more value IDs with or without device ID. Multiple values are separated by commas.
    * 
@@ -301,7 +302,7 @@ private:
    * 
    * It is allowed to have spaces or other whitespace _after_ the commas.
    */
-  void postItems(std::function<bool(DataAccess::DataKey const&)> itemOperation = {}) {
+  void postDataConfig(std::function<bool(DataAccess::DataKey const&)> itemOperation = {}) {
     _system.lyield();
 
     const char* body = _server.arg(FPSTR(ARG_PLAIN)).c_str();
@@ -365,6 +366,27 @@ private:
     } else {
       _server.send(204, FPSTR(CONTENT_TYPE_PLAIN), iot_core::EMPTY_STRING);
     }
+  }
+
+  /**
+   * Produce a list of data configurations based on the optional predicate.
+   */
+  void getDataConfigs(std::function<bool(DataEntry const&)> predicate = {}) {
+    if (!_response.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
+      _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
+      return;
+    }
+    
+    const auto& collectionData = _access.getData();
+
+    for (auto& data : collectionData) {
+      if (!predicate || predicate(data.second)) {
+        _response.write(iot_core::format("%u@%s,\n", data.second.id, data.second.source.toString()));
+        _system.lyield();
+      }
+    }
+
+    _response.end();
   }
 
   /**
