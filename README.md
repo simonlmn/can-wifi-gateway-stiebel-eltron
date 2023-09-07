@@ -30,28 +30,37 @@ Of course, this is not the only or even the first attempt to reverse engineer th
 Pre-condition: you have built the necessary hardware (e.g. based on https://github.com/simonlmn/can-wifi-gateway-hardware) and have uploaded the `wifi-gateway` sketch to the ESP8266 NodeMCU board and the `serial-can-bridge` to a the Arduino Nano.
 
  1. Connect the gateway to your heatpump's CAN (aka BUS) terminals, which normally includes both the CAN H and L lines as well as the ground and +12V supply lines.
+
+    > [!NOTE]  
+    > Where you find these terminals depends on the heatpump model and setup. As CAN is a _bus_ system, you can basically connect to it at either end or between existing nodes. For example, directly at the heatpump controller or at/after a WPM or room control unit. Bus termination must be set accordingly at the ends only or otherwise the entire communication can break down!
     
-    Note: where you find these terminals depends on the heatpump model and setup. As CAN is a _bus_ system, you can basically connect to it at either end or between existing nodes. For example, directly at the heatpump controller or at/after a WPM or room control unit. Bus termination must be set accordingly at the ends only or otherwise the entire communication can break down!
+    > [!IMPORTANT]  
+    > Connecting a device not officially approved by the manufacturer to your heatpump may void its warranty! It is possible for the gateway to interfere with the normal communication necessary for your heatpump to work correctly, which may lead to, for example, decreased performance, outages and temporary or permanent damage.
+    
+    > [!WARNING]  
+    > Connecting to the bus may require to remove a protective cover of the heatpump to access the terminals. While the CAN terminals are low-voltage/low-power, the mains voltage, high power terminals are usually close by and are also exposed.
+    >
+    > **Working close to exposed mains level electrical installation is dangerous and can be lethal!** It is important to follow certain safety protocols, which usually include turning off the respective breaker(s) and testing/ensuring that power is actually turned off and stays turned off while working on the equipment. Doing any kind of work on mains level installation may also be outright illegal at your location.
 
- 2. When the gateway has power, it will start up into _config mode_ as it does not have a WiFi configuration yet. It starts its own WiFi access point and will appear as `can-wifi-gw-<chip-id>`. The blue LED on the ESP8266 will blink slowly in this mode.
+ 1. When the gateway has power, it will start up into _config mode_ as it does not have a WiFi configuration yet. It starts its own WiFi access point and will appear as `can-wifi-gw-<chip-id>`. The blue LED on the ESP8266 will blink slowly in this mode.
 
- 3. Connect to the WiFi. It should automatically open a captive portal to configure the WiFi to connect to (e.g. your home network).
+ 2. Connect to the WiFi. It should automatically open a captive portal to configure the WiFi to connect to (e.g. your home network).
 
     If the captive portal does not automatically show up, you can manually open a browser and go to `192.168.4.1`.
 
     ![WiFi Configuration](docs/images/wifi-manager-t.png)
 
- 4. Save the configuration, the gateway will automatically restart and will try to connect to the configured WiFi from now on.
+ 3. Save the configuration, the gateway will automatically restart and will try to connect to the configured WiFi from now on.
 
     If the connection fails (e.g. the entered WiFi password is wrong), it will start in _config mode_ again so you can fix the configuration (this will again be indicated by the slow blinking blue LED). It will automatically restart every 5 minutes though in order to prevent staying in _config mode_ if there was only a temporary connection problem.
 
- 5. Find out which IP address was assigned to the gateway. This is typically shown on the administration interface of your WiFi router. The gateway will have the hostname `can-wifi-gw-<chip-id>`.
+ 4. Find out which IP address was assigned to the gateway. This is typically shown on the administration interface of your WiFi router. The gateway will have the hostname `can-wifi-gw-<chip-id>`.
 
- 6. Open the address in a browser (HTTP, not HTTPS!) and the administration UI will show up. The first screen shows the general status and diagnostic information. Especially the logs are useful to diagnose problems.
+ 5. Open the address in a browser (HTTP, not HTTPS!) and the administration UI will show up. The first screen shows the general status and diagnostic information. Especially the logs are useful to diagnose problems.
 
     ![Status Screen](docs/images/ui-status-screen-t.png)
 
- 7. Go to the "Configuration" screen and set the base settings to be able to interact with your heatpump:
+ 6. Go to the "Configuration" screen and set the base settings to be able to interact with your heatpump:
 
     ![Configuration Screen](docs/images/ui-config-screen-t.png)
 
@@ -78,9 +87,9 @@ Pre-condition: you have built the necessary hardware (e.g. based on https://gith
           Note: This is different from "Enable write access", as that setting only prevents writing to parameters, but still allows the gateway to request data from the heatpump controller.
         * "LoopBack": do not connect to the actual bus, but set up the module in "loop back" mode. Any message sent by the gateway will be returned as a received message. This is only useful for development purposes.
 
-8. Save the base settings which will be immediately applied. You can check the logs on the "Status" screen if the settings were applied and if the CAN module was successfully set up (there should be a message like "SETUP OK 96 8 8 8 8 4 1 20000 64")
+7. Save the base settings which will be immediately applied. You can check the logs on the "Status" screen if the settings were applied and if the CAN module was successfully set up (there should be a message like "SETUP OK 96 8 8 8 8 4 1 20000 64")
 
-9. To set up which datapoints and parameters are going to be captured and available for writing by the gateway, go to the "Data configuration" section on the "Configuration" screen and add the desired IDs.
+8. To set up which datapoints and parameters are going to be captured and available for writing by the gateway, go to the "Data configuration" section on the "Configuration" screen and add the desired IDs.
 
    Some IDs require to set the "Source Address" or the "Mode":
 
@@ -92,6 +101,6 @@ Pre-condition: you have built the necessary hardware (e.g. based on https://gith
 
    Currently, there is no way to load a bulk configuration of the datapoints via the UI. This is only available via directly using the REST API.
 
- 10. After some data is configured, go to "Data" screen and see if/how the values are captured.
+ 9. After some data is configured, go to "Data" screen and see if/how the values are captured.
 
 After this initial setup, the gateway should be ready to be integrated into, for example, the home automation system of your choice. There is also basic support for MQTT, which can also be congiured via the UI.
