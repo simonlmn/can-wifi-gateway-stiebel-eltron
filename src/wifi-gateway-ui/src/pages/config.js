@@ -57,6 +57,50 @@ class DataConfigurationView extends ContainerView {
         super(createElement('section'));
         this.#client = client;
         this.h2('Data configuration');
+        this.loadFileFieldset = this.fieldset('Load from file');
+        this.loadFileInput = this.loadFileFieldset.file(this.loadFileFieldset.label('Configuration file'), {}, () => {});
+        this.loadFileUpload = this.loadFileFieldset.button('Load', {}, async () => {
+            const configFile = this.loadFileInput.files.item(0);
+            if (!configFile) {
+                return;
+            }
+
+            if (configFile.size > 2048) {
+                alert('Config file too large.');
+                return;
+            }
+
+            try {
+                this.modalLoader.show();
+                const config = await configFile.text();
+                const matches = config.matchAll(/^#+ *(\w*)\s*$/gm);
+                let iterator = matches.next();
+                while (!iterator.done) {
+                    const sectionName = iterator.value[1];
+                    const sectionStartIndex = iterator.value.index + iterator.value[0].length + 1;
+                    iterator = matches.next();
+                    const sectionEndIndex = iterator.done ? config.length : iterator.value.index;
+                    const sectionContent = config.substring(sectionStartIndex, sectionEndIndex).trim();
+
+                    switch (sectionName) {
+                        case 'Subscriptions':
+                            await this.#client.post('/subscriptions', sectionContent);
+                            break;
+                        case 'Writable':
+                            await this.#client.post('/writable', sectionContent);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            } catch (err) {
+                alert(err);
+            } finally {
+                await this.#loadDataConfigs();
+                this.#refreshTable();
+                this.modalLoader.hide();
+            }
+        });
         this.addFieldset = this.fieldset('Add configuration');
         this.dataId = this.addFieldset.select(this.addFieldset.label('ID'), [], {}, () => this.#updateSourceAndMode());
         this.sourceType = this.addFieldset.select(this.addFieldset.label('Source Type'));
@@ -65,7 +109,29 @@ class DataConfigurationView extends ContainerView {
         this.add = this.addFieldset.button('Add', {}, () => this.#addDataConfig());
         this.addFieldset.disable();
         this.table = this.table();
+        this.clearTable = this.button('Clear all', {}, async () => {
+            if (confirm('Delete all data configurations?')) {
+                try {
+                    this.modalLoader.show();
+                    for (const dataConfig of this.#dataConfigs.items.values()) {
+                        if (dataConfig.subscribed) {
+                            await this.#disableSubscription(dataConfig);
+                        }
+                        if (dataConfig.writable) {
+                            await this.#disableWritable(dataConfig);
+                        }
+                    }
+                    await this.#loadDataConfigs();
+                    this.#refreshTable();
+                } finally {
+                    this.modalLoader.hide();
+                }
+            }
+        });
         this.state = this.p();
+        this.modalLoader = this.modal();
+        this.modalLoader.loader();
+        this.modalLoader.hide();
     }
 
     async show() {

@@ -72,6 +72,67 @@
         fieldset button {
             grid-column: 2;
         }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--accent-bg);
+            display: block;
+            opacity: 0.5;
+            z-index: 999;
+        }
+
+        .loader,
+        .loader:after {
+            border-radius: 50%;
+            width: 10em;
+            height: 10em;
+        }
+        .loader {
+            margin: auto;
+            position: relative;
+            text-indent: -9999em;
+            border-top: 1.1em solid var(--accent-bg);
+            border-right: 1.1em solid var(--accent-bg);
+            border-bottom: 1.1em solid var(--accent-bg);
+            border-left: 1.1em solid var(--accent);
+            -webkit-translate: 0 0 0;
+            -ms-translate: 0 0 0;
+            translate: 0 0 0;
+            -webkit-animation: loader 1.1s infinite linear;
+            animation: loader 1.1s infinite linear;
+        }
+        @-webkit-keyframes loader {
+            0% {
+                -webkit-rotate: 0deg;
+                rotate: 0deg;
+            }
+            100% {
+                -webkit-rotate: 360deg;
+                rotate: 360deg;
+            }
+        }
+        @keyframes loader {
+            0% {
+                -webkit-rotate: 0deg;
+                rotate: 0deg;
+            }
+            100% {
+                -webkit-rotate: 360deg;
+                rotate: 360deg;
+            }
+        }
+        .modal>.loader {
+            -webkit-translate: -50% -50% 0;
+            -ms-translate: -50% -50% 0;
+            translate: -50% -50% 0;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+        }
     </style>
 </head>
 

@@ -60,6 +60,14 @@ export class View {
     scrollToBottom() {
         this._element.scrollTo(0, this._element.scrollHeight);
     }
+
+    show() {
+        this._element.style.display = '';
+    }
+
+    hide() {
+        this._element.style.display = 'none';
+    }
 }
 
 export class ContainerView extends View {
@@ -111,6 +119,10 @@ export class ContainerView extends View {
         return this.addView(new TextView(label, attributes, callback));
     }
 
+    file(label, attributes, callback) {
+        return this.addView(new FileView(label, attributes, callback));
+    }
+
     label(labelText, forView, attributes) {
         return this.addView(new LabelView(labelText, forView, attributes));
     }
@@ -127,6 +139,30 @@ export class ContainerView extends View {
         const view = this.addView(new ContainerView(attributes));
         view.h2(title);
         return view;
+    }
+
+    progress(attributes) {
+        return this.addView(new ProgressView(attributes));
+    }
+
+    modal() {
+        return this.addView(new ModalView());
+    }
+
+    loader() {
+        return this.addView(new LoaderView());
+    }
+}
+
+export class ModalView extends ContainerView {
+    constructor() {
+        super(createElement('div', { className: 'modal' }));
+    }
+}
+
+export class LoaderView extends View {
+    constructor() {
+        super(createElement('div', { className: 'loader centered' }));
     }
 }
 
@@ -148,6 +184,32 @@ export class FieldsetView extends ContainerView {
 
     validate() {
         return this._element.checkValidity();
+    }
+}
+
+export class ProgressView extends View {
+    constructor(attributes) {
+        super(createElement('progress', attributes));
+    }
+
+    set value(value) {
+        this._element.value = value;
+    }
+
+    get value() {
+        return this._element.value;
+    }
+
+    set indeterminate(enable) {
+        if (enable) {
+            this._element.indeterminate = true;
+        } else {
+            this._element.indeterminate = false;
+        }
+    }
+
+    get indeterminate() {
+        return this._element.indeterminate;
     }
 }
 
@@ -270,6 +332,34 @@ export class TextView extends View {
     }
 }
 
+export class FileView extends View {
+    constructor(label, attributes, callback) {
+        super(createElement('input', attributes));
+        this._element.type = 'file';
+        this._element.onchange = (e) => callback(e.target.value, this);
+
+        if (label) {
+            label.forView = this;
+        }
+    }
+
+    disable() {
+        this._element.disabled = true;
+    }
+
+    enable() {
+        this._element.disabled = false;
+    }
+
+    get files() {
+        return this._element.files
+    }
+
+    validate() {
+        return this._element.checkValidity();
+    }
+}
+
 export class SelectView extends View {
     #options
 
@@ -330,7 +420,14 @@ export class ButtonView extends View {
     constructor(text, attributes, callback) {
         super(createElement('button', attributes, text));
         this._element.type = 'button';
-        this._element.onclick = () => callback(this);
+        this._element.onclick = () => {
+            try {
+                this.disable();
+                callback(this);
+            } finally {
+                this.enable();
+            }
+        }
     }
 
     disable() {
