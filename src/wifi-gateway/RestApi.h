@@ -194,6 +194,14 @@ public:
       _response.end();
     });
 
+    _server.on(UriBraces(F("/api/system/log-level")), HTTP_PUT, [this]() {
+      iot_core::LogLevel logLevel = iot_core::logLevelFromString(_server.arg("plain").c_str());
+
+      _logger.initialLogLevel(logLevel);
+      
+      _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), iot_core::logLevelToString(_logger.initialLogLevel()));
+    });
+
     _server.on(UriBraces(F("/api/system/log-level/{}")), HTTP_PUT, [this]() {
       const auto& category = _server.pathArg(0);
       iot_core::LogLevel logLevel = iot_core::logLevelFromString(_server.arg("plain").c_str());

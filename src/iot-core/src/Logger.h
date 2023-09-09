@@ -45,6 +45,7 @@ LogLevel logLevelFromString(const char* level, size_t length = SIZE_MAX) {
 
 class Logger final {
   static const LogLevel DEFAULT_LOG_LEVEL = LogLevel::Info;
+  LogLevel _initialLogLevel = DEFAULT_LOG_LEVEL;
   ConstStrMap<LogLevel> _logLevels = {};
   mutable char _logEntry[MAX_LOG_ENTRY_LENGTH + 1] = {};
   size_t _logEntryLength = 0u;
@@ -102,10 +103,18 @@ public:
     memset(_logBuffer, LOG_ENTRY_SEPARATOR, LOG_BUFFER_SIZE);
   }
 
+  LogLevel initialLogLevel() const {
+    return _initialLogLevel;
+  }
+
+  void initialLogLevel(LogLevel level) {
+    _initialLogLevel = level;
+  }
+
   LogLevel logLevel(const char* category) const {
     auto entry = _logLevels.find(category);
     if (entry == _logLevels.end()) {
-      return DEFAULT_LOG_LEVEL;
+      return _initialLogLevel;
     } else {
       return entry->second;
     }

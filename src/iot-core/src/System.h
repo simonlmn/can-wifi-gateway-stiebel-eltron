@@ -41,6 +41,7 @@ class System final : public ISystem, public IApplicationContainer {
   pins::DigitalInput& _otaEnablePin;
   pins::DigitalInput& _updatePin;
   pins::DigitalInput& _factoryResetPin;
+  pins::DigitalInput& _debugEnablePin;
 
   TimingStatistics<20> _yieldTiming {};
   ConstStrMap<TimingStatistics<10>> _componentTiming {};
@@ -48,7 +49,7 @@ class System final : public ISystem, public IApplicationContainer {
   std::function<void()> _scheduledFunction {};
 
 public:
-  System(const char* name, const VersionInfo& version, const char* otaPassword, pins::DigitalOutput& statusLedPin, pins::DigitalInput& otaEnablePin, pins::DigitalInput& updatePin, pins::DigitalInput& factoryResetPin)
+  System(const char* name, const VersionInfo& version, const char* otaPassword, pins::DigitalOutput& statusLedPin, pins::DigitalInput& otaEnablePin, pins::DigitalInput& updatePin, pins::DigitalInput& factoryResetPin, pins::DigitalInput& debugEnablePin)
     : _logger(_uptime),
     _name(name),
     _version(version),
@@ -56,7 +57,8 @@ public:
     _statusLedPin(statusLedPin),
     _otaEnablePin(otaEnablePin),
     _updatePin(updatePin),
-    _factoryResetPin(factoryResetPin)
+    _factoryResetPin(factoryResetPin),
+    _debugEnablePin(debugEnablePin)
   {
     str(format("%x", ESP.getChipId())).copy(_chipId, 8);
   }
@@ -79,6 +81,10 @@ public:
   }
 
   void setup() {
+    if (_debugEnablePin) {
+      _logger.initialLogLevel(LogLevel::Debug);
+    }
+
 #ifdef DEVELOPMENT_MODE
     _logger.log(LogLevel::Warning, "sys", "DEVELOPMENT MODE");
 #endif

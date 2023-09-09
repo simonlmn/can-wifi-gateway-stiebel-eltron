@@ -33,7 +33,7 @@ pins::DigitalInput debugModePin {true};
 pins::DigitalInput otaEnablePin { pins::gpios::esp8266::nodemcu::D2, pins::InputMode::PullUp, pins::SignalMode::Inverted };
 pins::DigitalInput writeEnablePin { pins::gpios::esp8266::nodemcu::D5, pins::InputMode::PullUp, pins::SignalMode::Inverted };
 pins::DigitalInput txEnablePin { pins::gpios::esp8266::nodemcu::D6, pins::InputMode::PullUp, pins::SignalMode::Inverted };
-pins::DigitalInput debugModePin { pins::gpios::esp8266::nodemcu::D7, pins::InputMode::PullUp, pins::SignalMode::Inverted }; // not used yet
+pins::DigitalInput debugModePin { pins::gpios::esp8266::nodemcu::D7, pins::InputMode::PullUp, pins::SignalMode::Inverted };
 #endif
 // Buttons
 pins::DigitalInput updatePin { pins::gpios::esp8266::nodemcu::D3, pins::InputMode::PullUp, pins::SignalMode::Inverted }; // not used yet
@@ -44,7 +44,7 @@ pins::DigitalOutput canResetPin { pins::gpios::esp8266::nodemcu::D1, false, pins
 pins::DigitalOutput builtinLed { LED_BUILTIN, false, pins::SignalMode::Inverted };
 }
 
-iot_core::System sys { "can-wifi-gw", VERSION, OTA_PASSWORD, io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin };
+iot_core::System sys { "can-wifi-gw", VERSION, OTA_PASSWORD, io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin, io::debugModePin };
 SerialCan can { sys, io::canResetPin, io::txEnablePin };
 StiebelEltronProtocol protocol { sys, can };
 DateTimeSource timeSource { sys.logger(), protocol };
