@@ -74,24 +74,24 @@ private:
   iot_core::Logger& _logger;
   iot_core::ISystem& _system;
   StiebelEltronProtocol& _protocol;
-  DateTimeSource& _dateTimeSource;
   pins::DigitalInput& _writeEnablePin;
   DataCaptureMode _mode;
   bool _readOnly;
+  bool _ignoreDateTime;
   DataMap _data;
   DataMap::iterator _dataIterator;
 
   std::function<void(DataEntry const& entry)> _updateHandler;
 
 public:
-  DataAccess(iot_core::ISystem& system, StiebelEltronProtocol& protocol, DateTimeSource& dateTimeSource, pins::DigitalInput& writeEnablePin)
+  DataAccess(iot_core::ISystem& system, StiebelEltronProtocol& protocol, pins::DigitalInput& writeEnablePin)
     : _logger(system.logger()),
     _system(system),
     _protocol(protocol),
-    _dateTimeSource(dateTimeSource),
     _writeEnablePin(writeEnablePin),
     _mode(DataCaptureMode::Configured),
     _readOnly(true),
+    _ignoreDateTime(false),
     _data(),
     _dataIterator(_data.begin()),
     _updateHandler()
@@ -104,12 +104,14 @@ public:
   bool configure(const char* name, const char* value) override {
     if (strcmp(name, "mode") == 0) return setMode(dataCaptureModeFromString(value));
     if (strcmp(name, "readOnly") == 0) return setReadOnly(iot_core::convert<bool>::fromString(value, true));
+    if (strcmp(name, "ignoreDateTime") == 0) return setIgnoreDateTime(iot_core::convert<bool>::fromString(value, false));
     return false;
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
     writer("mode", dataCaptureModeToString(_mode));
     writer("readOnly", iot_core::convert<bool>::toString(_readOnly));
+    writer("ignoreDateTime", iot_core::convert<bool>::toString(_ignoreDateTime));
   }
 
   bool setMode(DataCaptureMode mode) {
@@ -128,6 +130,12 @@ public:
     return !_writeEnablePin ? true : _readOnly;
   }
 
+  bool setIgnoreDateTime(bool ignoreDateTime) {
+    _ignoreDateTime = ignoreDateTime;
+    _logger.log(name(), iot_core::format(F("%s date/time availability."), _ignoreDateTime ? "Ignoring" : "Waiting for"));
+    return true;
+  }
+
   void setup(bool /*connected*/) override {
     restoreSubscriptions();
     restoreWritables();
@@ -137,7 +145,7 @@ public:
   }
 
   void loop(iot_core::ConnectionStatus /*status*/) override {
-    if (!_protocol.ready() || !_dateTimeSource.available()) {
+    if (!_protocol.ready() || (!_ignoreDateTime && !currentDateTime().isSet())) {
       return;
     }
     
@@ -196,7 +204,7 @@ public:
   }
 
   const iot_core::DateTime& currentDateTime() const {
-    return _dateTimeSource.currentDateTime();
+    return _system.currentDateTime();
   }
 
   bool write(DataKey const& key, uint16_t rawValue, ValueAccessMode accessMode) {
@@ -434,7 +442,7 @@ private:
     _system.lyield();
 
     auto const& now = currentDateTime();
-    if (now.isSet()) {// Only process data if we have established the current date and time
+    if (_ignoreDateTime || now.isSet()) { // Only process data if we have established the current date and time
       DataEntry* entry = nullptr;
       const ValueDefinition* definition = nullptr;
       switch (_mode) {

@@ -48,7 +48,7 @@ iot_core::System sys { "can-wifi-gw", VERSION, OTA_PASSWORD, io::builtinLed, io:
 SerialCan can { sys, io::canResetPin, io::txEnablePin };
 StiebelEltronProtocol protocol { sys, can };
 DateTimeSource timeSource { sys.logger(), protocol };
-DataAccess access { sys, protocol, timeSource, io::writeEnablePin };
+DataAccess access { sys, protocol, io::writeEnablePin };
 RestApi api { sys, sys, access, protocol };
 #ifdef MQTT_SUPPORT
 MqttClient mqtt { sys, access };
