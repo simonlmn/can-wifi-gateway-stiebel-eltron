@@ -376,7 +376,7 @@ private:
       }
 
       if (type == MessageType::Register) {
-        _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type), target.toString(), source.toString(), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
+        _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
       }
 
       if (type == MessageType::Write || type == MessageType::Response || type == MessageType::Request) {
@@ -384,7 +384,7 @@ private:
         ValueId valueId = getValueId(frame.data);
         uint16_t value = getValue(frame.data);
 
-        _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%c%s t:%s s:%s %02X id:%04X v:%04X"), target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(), source.toString(), fix, valueId, value); });
+        _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%c%s t:%s s:%s %02X id:%04X v:%04X"), target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(0), source.toString(1), fix, valueId, value); });
         
         switch (type) {
           case MessageType::Response:

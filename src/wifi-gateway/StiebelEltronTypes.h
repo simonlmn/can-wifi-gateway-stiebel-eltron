@@ -82,8 +82,14 @@ struct DeviceId {
     return (type == DeviceType::Any || type == other.type) && (address == DEVICE_ADDR_ANY || address == other.address);
   }
 
-  const char* toString() const {
-    static char string[8]; // "XXX/XXX";
+  const char* toString(size_t bufferIndex = 0) const {
+    constexpr size_t NUM_BUFFERS = 3;
+    static char buffers[NUM_BUFFERS][8]; // "XXX/XXX";
+    if (bufferIndex > (NUM_BUFFERS - 1)) {
+      return "---/---";
+    }
+
+    char* string = buffers[bufferIndex]; 
     snprintf(string, 8, "%s/%u", deviceTypeToString(type), address);
     if (address == DEVICE_ADDR_ANY) {
       string[4] = '*';

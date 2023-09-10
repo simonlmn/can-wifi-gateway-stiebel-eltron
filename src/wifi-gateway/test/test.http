@@ -25,9 +25,9 @@ PUT http://{{deviceAddress}}/api/system/log-level
 DBG
 
 ###
-PUT http://{{deviceAddress}}/api/system/log-level/can
+PUT http://{{deviceAddress}}/api/system/log-level/sep
 
-DBG
+INF
 
 ###
 PUT http://{{deviceAddress}}/api/system/config/sep
