@@ -95,22 +95,38 @@ MessageType getMessageType(const uint8_t (&data)[8]) {
   return static_cast<MessageType>(type);
 }
 
+bool hasShortValueId(const uint8_t (&data)[8]) {
+  return data[2] < 0xFAu;
+}
+
 void setValueId(ValueId valueId, uint8_t (&data)[8]) {
+  data[2] = 0xFAu; // indicate 2-byte value ID; this should be understood even if the ID could fit in one byte.
   data[3] = (valueId >> 8) & 0xFFu;
   data[4] = valueId & 0xFFu;
 }
 
 ValueId getValueId(const uint8_t (&data)[8]) {
-  return (data[3] << 8) | data[4];
+  if (hasShortValueId(data)) {
+    return data[2];
+  } else {
+    return (data[3] << 8) | data[4];
+  }
+}
+
+size_t getValueIndex(const uint8_t (&data)[8]) {
+  return hasShortValueId(data) ? 3 : 5;
 }
 
 void setValue(uint16_t value, uint8_t (&data)[8]) {
-  data[5] = (value >> 8) & 0xFFu;
-  data[6] = value & 0xFFu;
+  size_t valueIndex = getValueIndex(data);
+  data[valueIndex + 0] = (value >> 8) & 0xFFu;
+  data[valueIndex + 1] = value & 0xFFu; 
 }
 
 uint16_t getValue(const uint8_t (&data)[8]) {
-  return (data[5] << 8) | data[6];
+  size_t valueIndex = getValueIndex(data);
+  return (data[valueIndex + 0] << 8)
+        | data[valueIndex + 1];
 }
 
 // Constants for known IDs and addresses
@@ -380,11 +396,10 @@ private:
       }
 
       if (type == MessageType::Write || type == MessageType::Response || type == MessageType::Request) {
-        uint8_t fix = frame.data[2]; // this should always be 0xFAu
         ValueId valueId = getValueId(frame.data);
         uint16_t value = getValue(frame.data);
 
-        _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%c%s t:%s s:%s %02X id:%04X v:%04X"), target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(0), source.toString(1), fix, valueId, value); });
+        _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%c%s t:%s s:%s id:%04X%c v:%04X"), target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
         
         switch (type) {
           case MessageType::Response:
