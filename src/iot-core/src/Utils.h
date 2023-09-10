@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <functional>
 #include <map>
+#include <set>
 
 namespace iot_core {
 
@@ -385,6 +386,28 @@ struct str_less_than
 
 template<typename T>
 using ConstStrMap = std::map<const char*, T, str_less_than>;
+
+using ConstStrSet = std::set<const char*, str_less_than>;
+
+/**
+ * Turn a dynamically/shared allocated string into a static string with indefinite lifetime.
+ * 
+ * Note: As this allocates memory on the heap which won't be free'd again, use this only for
+ * strings which truly need to live forever, e.g. for keys in a ConstStrMap.
+ */
+const char* make_static(const char* string) {
+  static ConstStrSet strings {};
+  auto entry = strings.find(string);
+  if (entry == strings.end()) {
+    size_t length = strlen(string);
+    char* staticString = new char[length + 1];
+    str(string).copy(staticString, length);
+    strings.insert(staticString);
+    return staticString;
+  } else {
+    return *entry;
+  }
+}
 
 }
 

@@ -120,6 +120,10 @@ public:
     }
   }
 
+  const ConstStrMap<LogLevel>& logLevels() const {
+    return _logLevels;
+  }
+
   void logLevel(const char* category, LogLevel level) {
     _logLevels[category] = level;
   }

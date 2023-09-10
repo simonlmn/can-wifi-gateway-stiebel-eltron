@@ -17,10 +17,12 @@ GET http://{{deviceAddress}}/api/data
 GET http://{{deviceAddress}}/api/devices
 
 ###
+GET http://{{deviceAddress}}/api/system/log-level
+
+###
 PUT http://{{deviceAddress}}/api/system/log-level/can
 
-2
-
+DBG
 
 ###
 PUT http://{{deviceAddress}}/api/system/config/sep

@@ -194,7 +194,26 @@ public:
       _response.end();
     });
 
-    _server.on(UriBraces(F("/api/system/log-level")), HTTP_PUT, [this]() {
+    _server.on(F("/api/system/log-level"), HTTP_GET, [this]() {
+      if (!_response.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
+        _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
+        return;
+      }
+
+      _response.write(iot_core::logLevelToString(_logger.initialLogLevel()));
+      _response.write('\n');
+
+      for (auto entry : _logger.logLevels()) {
+        _response.write(entry.first);
+        _response.write('=');
+        _response.write(iot_core::logLevelToString(entry.second));
+        _response.write('\n');
+      }
+
+      _response.end();
+    });
+
+    _server.on(F("/api/system/log-level"), HTTP_PUT, [this]() {
       iot_core::LogLevel logLevel = iot_core::logLevelFromString(_server.arg("plain").c_str());
 
       _logger.initialLogLevel(logLevel);
@@ -206,7 +225,7 @@ public:
       const auto& category = _server.pathArg(0);
       iot_core::LogLevel logLevel = iot_core::logLevelFromString(_server.arg("plain").c_str());
 
-      _logger.logLevel(category.c_str(), logLevel);
+      _logger.logLevel(iot_core::make_static(category.c_str()), logLevel);
       
       _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), iot_core::logLevelToString(_logger.logLevel(category.c_str())));
     });
