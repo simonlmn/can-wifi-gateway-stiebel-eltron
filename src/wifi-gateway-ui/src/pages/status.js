@@ -30,8 +30,12 @@ export class StatusPage {
 
         view.h1('Logs');
         this.logs = view.pre();
+        this.logCopyToClipboard = view.button('Copy to clipboard', {}, async () => {
+            const logs = this.logs.textContent;
+            await navigator.clipboard.writeText(logs);
+        });
         this.logRefreshToggle = view.checkbox(view.label('Auto-refresh'), { checked: true }, (checked) => this.autoLogRefresh(checked));
-        this.logsState = view.p();      
+        this.logsState = view.p();
         this.autoLogRefresh(true);
     }
 
@@ -66,7 +70,7 @@ export class StatusPage {
 
     async #refreshStatus() {
         this.statusState.attribute('class', null);
-        this.statusState.content(`<small>Loading...</small>`);
+        this.statusState.content = `<small>Loading...</small>`;
         try {
             const response = await this.#client.get('/system/status');
             const data = await response.json();
@@ -88,27 +92,27 @@ export class StatusPage {
             this.statusList.add('WiFI RSSI', data.system.wifiRssi);
             this.statusList.add('IP address', data.system.ip);
             this.statusState.attribute('class', null);
-            this.statusState.content(`<small>Updated on ${new Date().toISOString()}.</small>`);
+            this.statusState.content = `<small>Updated on ${new Date().toISOString()}.</small>`;
         } catch (err) {
             this.statusState.attribute('class', 'notice');
-            this.statusState.content(`${err}`);
+            this.statusState.content = `${err}`;
         }
     }
 
     async #refreshLogs() {
         this.logsState.attribute('class', null);
-        this.logsState.content(`<small>Loading...</small>`);
+        this.logsState.content = `<small>Loading...</small>`;
         try {
             const response = await this.#client.get('/system/logs');
             const data = await response.text();
             this.logs.clear();
-            this.logs.content(data);
+            this.logs.content = data;
             this.logs.scrollToBottom();
             this.logsState.attribute('class', null);
-            this.logsState.content(`<small>Updated on ${new Date().toISOString()}.</small>`);
+            this.logsState.content = `<small>Updated on ${new Date().toISOString()}.</small>`;
         } catch (err) {
             this.logsState.attribute('class', 'notice');
-            this.logsState.content(`${err}`);
+            this.logsState.content = `${err}`;
         }
     }
 }

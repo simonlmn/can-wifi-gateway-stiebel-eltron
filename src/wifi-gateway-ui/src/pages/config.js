@@ -324,10 +324,10 @@ class DataConfigurationView extends ContainerView {
                 ]);
             }
             this.state.attribute('class', null);
-            this.state.content(`<small>Updated on ${new Date().toISOString()}.</small>`);
+            this.state.content = `<small>Updated on ${new Date().toISOString()}.</small>`;
         } else {
             this.state.attribute('class', 'notice');
-            this.state.content('No data has been configured yet.');
+            this.state.content = 'No data has been configured yet.';
         }
     }
 }

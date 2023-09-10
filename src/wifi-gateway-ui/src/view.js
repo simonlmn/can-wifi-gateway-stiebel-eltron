@@ -48,8 +48,20 @@ export class View {
         }
     }
 
-    content(content) {
+    set content(content) {
         this._element.innerHTML = content;
+    }
+
+    get content() {
+        return this._element.innerHTML;
+    }
+
+    set textContent(content) {
+        this._element.innerText = content;
+    }
+
+    get textContent() {
+        return this._element.innerText;
     }
 
     addView(view) {

@@ -64,7 +64,7 @@ export class DataPage {
 
     async #reload() {
         this.state.attribute('class', null);
-        this.state.content(`<small>Loading...</small>`);
+        this.state.content = `<small>Loading...</small>`;
         try {
             const response = await this.#client.get(`/data${this.#getDataQueryParam()}`);
             const data = await response.json();
@@ -97,14 +97,14 @@ export class DataPage {
                     }
                 }
                 this.state.attribute('class', null);
-                this.state.content(`<small>Updated on ${new Date().toISOString()}.</small>`);
+                this.state.content = `<small>Updated on ${new Date().toISOString()}.</small>`;
             } else {
                 this.state.attribute('class', 'notice');
-                this.state.content('No data has been captured yet. You need to configure which datapoints shall be requested and/or captured.');
+                this.state.content = 'No data has been captured yet. You need to configure which datapoints shall be requested and/or captured.';
             }
         } catch (err) {
             this.state.attribute('class', 'notice');
-            this.state.content(`${err}`);
+            this.state.content = `${err}`;
         }
     }
 }
