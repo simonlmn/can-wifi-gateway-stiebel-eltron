@@ -50,3 +50,4 @@ dist/
 .arduino/staging/
 .arduino/packages/
 .arduino/tmp/
+.arduino/internal/

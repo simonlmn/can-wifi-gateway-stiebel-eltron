@@ -18,6 +18,6 @@ metrics:
 output:
   no_color: false
 sketch:
-  always_export_binaries: false
+  always_export_binaries: true
 updater:
   enable_notification: true

@@ -7,3 +7,4 @@ profiles:
         platform_index_url: https://arduino.esp8266.com/stable/package_esp8266com_index.json
     libraries:
       - WiFiManager (2.0.16-rc.2)
+      - PubSubClient (2.8)

@@ -2,5 +2,7 @@ profiles:
   default:
     notes: Standard build for Arduino Nano (currently the only tested option)
     fqbn: arduino:avr:nano:cpu=atmega328old
+    platforms:
+      - platform: arduino:avr (1.8.6)
     libraries:
       - ACAN2515 (2.1.2)

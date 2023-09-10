@@ -1,5 +1,7 @@
 #!/bin/sh
 
+script_base_path=$(realpath "$0/..")
+
 input_file=$1 #e.g. src/test/test-ui.html
 input_name=$(basename "$input_file" .html) # -> test-ui
 input_dir=$(dirname "$input_file") # -> src/test
@@ -13,7 +15,7 @@ export bytes=$(cat "$input_file" | gzip | xxd -i)
 export bytes_size=$(cat "$input_file" | gzip | wc -c)
 
 # generate header from template
-<"embedded-html.h.in" awk '
+<"$script_base_path/embedded-html.h.in" awk '
     {
     gsub(/__INCLUDE_GUARD__/, ENVIRON["include_guard"]);
     gsub(/__namespace__/, ENVIRON["namespace"]);

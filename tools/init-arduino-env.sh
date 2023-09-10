@@ -1,7 +1,5 @@
 #!/bin/sh
 
-repository_base_path=$(realpath "$0/../..")
-
-export ARDUINO_DIRECTORIES_DATA="$repository_base_path/.arduino"
-export ARDUINO_DIRECTORIES_DOWNLOADS="$repository_base_path/.arduino/staging"
-export ARDUINO_DIRECTORIES_USER="$repository_base_path/src"
+export ARDUINO_DIRECTORIES_DATA="$REPOSITORY_BASE_PATH/.arduino"
+export ARDUINO_DIRECTORIES_DOWNLOADS="$REPOSITORY_BASE_PATH/.arduino/staging"
+export ARDUINO_DIRECTORIES_USER="$REPOSITORY_BASE_PATH/src"
