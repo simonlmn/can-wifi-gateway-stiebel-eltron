@@ -427,7 +427,7 @@ private:
   void doItem(std::function<bool(DataAccess::DataKey const&, DataEntry const&)> itemOperation = {}) {
     _system.lyield();
 
-    _logger.log(iot_core::LogLevel::Debug, "api", [&] () { return iot_core::format(F("doItem: %s"), _server.arg(FPSTR(ARG_PLAIN)).c_str()); });
+    _logger.log(iot_core::LogLevel::Debug, "api", [&] () { return iot_core::format(F("doItem '%s': %s"), _server.pathArg(0).c_str(), _server.arg(FPSTR(ARG_PLAIN)).c_str()); });
 
     bool validateOnly = _server.hasArg(FPSTR(ARG_VALIDATE_ONLY));
     
