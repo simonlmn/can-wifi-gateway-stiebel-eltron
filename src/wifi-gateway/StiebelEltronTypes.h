@@ -12,11 +12,21 @@ using ValueId = uint16_t;
 
 const ValueId UNKNOWN_VALUE_ID = 0u;
 
+// "Special" single byte value IDs:
+const uint8_t VALUE_ID_EXTENDED = 0xFAu; // signals that a 16-bit value ID is used for transfer
+const uint8_t VALUE_ID_SYSTEM_RESET = 0xFBu;
+const uint8_t VALUE_ID_CAN_ERROR = 0xFCu;
+const uint8_t VALUE_ID_BUS_CONFIGURATION = 0xFDu;
+const uint8_t VALUE_ID_INITIALIZATION = 0xFEu;
+const uint8_t VALUE_ID_INVALID = 0xFFu;
+
 enum struct DeviceType : uint8_t {
   System = 0x03u,
   HeatingCircuit = 0x06u,
   Sensor = 0x08u,
+  X09 = 0x09u, // TODO Not known what kind of device this is yet
   Display = 0x0Du,
+  X0A = 0x0Au, // TODO Not known what kind of device this is yet
   Any = 0xFFu
 };
 

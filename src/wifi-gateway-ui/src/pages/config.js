@@ -44,7 +44,9 @@ function serializeConfig(config) {
 const SourceTypes = [
     { value: 'SYS', label: 'System' },
     { value: 'HEA', label: 'Heating Circuit' },
+    { value: 'X09', label: '? X09 ?' },
     { value: 'SEN', label: 'Sensor' },
+    { value: 'X0A', label: '? X0A ?' },
     { value: 'DIS', label: 'Display' }
 ];
 
@@ -103,7 +105,7 @@ class DataConfigurationView extends ContainerView {
         });
         this.addFieldset = this.fieldset('Add configuration');
         this.dataId = this.addFieldset.select(this.addFieldset.label('ID'), [], {}, () => this.#updateSourceAndMode());
-        this.sourceType = this.addFieldset.select(this.addFieldset.label('Source Type'));
+        this.sourceType = this.addFieldset.select(this.addFieldset.label('Source Type'), SourceTypes);
         this.sourceAddress = this.addFieldset.number(this.addFieldset.label('Source Address'), { min: 0, max: 127 });
         this.mode = this.addFieldset.select(this.addFieldset.label('Mode'));
         this.add = this.addFieldset.button('Add', {}, () => this.#addDataConfig());
@@ -188,20 +190,16 @@ class DataConfigurationView extends ContainerView {
         const definition = this.#definitions.get(parseInt(this.dataId.selected));
         const [sourceType, sourceAddress] = definition.source.split('/');
 
-        if (sourceType == 'ANY') {
-            this.sourceType.options = SourceTypes;
-            this.sourceType.enable();
-        } else {
-            this.sourceType.options = SourceTypes.filter(type => type.value == sourceType);
-            this.sourceType.disable();
+        this.sourceType.enable();
+        if (sourceType != 'ANY') {
+            this.sourceType.selected = sourceType;   
         }
         
+        this.sourceAddress.enable();
         if (sourceAddress == '*') {
             this.sourceAddress.value = 1;
-            this.sourceAddress.enable();
         } else {
             this.sourceAddress.value = parseInt(sourceAddress);
-            this.sourceAddress.disable();
         }
 
         if (definition.accessMode == 'Readable') {

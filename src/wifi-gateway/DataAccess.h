@@ -244,11 +244,6 @@ private:
       return false;
     }
 
-    if (!definition.source.includes(key.first)) {
-      // Don't allow subscribing to wrong device IDs
-      return false;
-    }
-
     auto& entry = _data[key];
     entry.definition = &definition;
     entry.source = key.first;
@@ -317,11 +312,6 @@ private:
     const auto& definition = getDefinition(key.second);
     if (definition.accessMode < ValueAccessMode::Writable) {
       // Don't allow adding not writable values
-      return false;
-    }
-
-    if (!definition.source.includes(key.first)) {
-      // Don't allow writing to wrong device IDs
       return false;
     }
 

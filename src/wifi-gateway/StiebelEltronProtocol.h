@@ -96,11 +96,11 @@ MessageType getMessageType(const uint8_t (&data)[8]) {
 }
 
 bool hasShortValueId(const uint8_t (&data)[8]) {
-  return data[2] < 0xFAu;
+  return data[2] < VALUE_ID_EXTENDED;
 }
 
 void setValueId(ValueId valueId, uint8_t (&data)[8]) {
-  data[2] = 0xFAu; // indicate 2-byte value ID; this should be understood even if the ID could fit in one byte.
+  data[2] = VALUE_ID_EXTENDED; // indicate 2-byte value ID; this should be understood even if the ID could fit in one byte.
   data[3] = (valueId >> 8) & 0xFFu;
   data[4] = valueId & 0xFFu;
 }
@@ -167,6 +167,7 @@ private:
 
   std::function<void(ResponseData const& data)> _responseHandler;
   std::function<void(WriteData const& data)> _writeHandler;
+  std::function<void(RequestData const& data)> _requestHandler;
   
 public:
   StiebelEltronProtocol(iot_core::ISystem& system, ICanInterface& can)
@@ -179,7 +180,8 @@ public:
     _ready(false),
     _otherDeviceIds(),
     _responseHandler(),
-    _writeHandler()
+    _writeHandler(),
+    _requestHandler()
   { }
 
   const char* name() const override {
@@ -266,7 +268,6 @@ public:
     message.len = 7;
     setTargetId(data.targetId, message.data);
     setMessageType(MessageType::Request, message.data);
-    message.data[2] = 0xFAu;
     setValueId(data.valueId, message.data);
     message.data[5] = 0x00u;
     message.data[6] = 0x00u;
@@ -296,7 +297,34 @@ public:
     message.len = 7;
     setTargetId(data.targetId, message.data);
     setMessageType(MessageType::Write, message.data);
-    message.data[2] = 0xFAu;
+    setValueId(data.valueId, message.data);
+    setValue(data.value, message.data);
+    
+    _can.sendCanMessage(message);
+  }
+
+  void respond(ResponseData const& data) {
+    if (!_ready || _canId == 0u) {
+      return;
+    }
+
+    if (!data.targetId.isExact()) {
+      return;
+    }
+
+    _system.lyield();
+    
+    CanMessage message;
+    if (data.sourceId.isExact()) {
+      message.id = toCanId(data.sourceId);
+    } else {
+      message.id = _canId;
+    }
+    message.ext = false;
+    message.rtr = false;
+    message.len = 7;
+    setTargetId(data.targetId, message.data);
+    setMessageType(MessageType::Response, message.data);
     setValueId(data.valueId, message.data);
     setValue(data.value, message.data);
     
@@ -321,6 +349,15 @@ public:
     }
   }
 
+  void onRequest(std::function<void(RequestData const& data)> requestHandler) {
+    if (_requestHandler) {
+      auto previousHandler = _requestHandler;
+      _requestHandler = [=](RequestData const& data) { previousHandler(data); requestHandler(data); };
+    } else {
+      _requestHandler = requestHandler;
+    }
+  }
+
 private:
   void registerDisplay() {
     if (!_ready || _canId == 0u) {
@@ -337,7 +374,7 @@ private:
     message.len = 7u;
     setTargetId(_deviceId, message.data);
     setMessageType(MessageType::Register, message.data);
-    message.data[2] = 0xFDu; // TODO unclear what these values mean (they seem to be constant)
+    message.data[2] = VALUE_ID_BUS_CONFIGURATION;
     message.data[3] = 0x09u; // TODO unclear what these values mean (they seem to be constant)
     message.data[4] = 0x00u; // TODO unclear what these values mean (they seem to be constant)
     message.data[5] = 0x00u; // TODO unclear what these values mean (they seem to be constant)
@@ -363,7 +400,7 @@ private:
     message.len = 7u;
     setTargetId(sensorId, message.data);
     setMessageType(MessageType::Register, message.data);
-    message.data[2] = 0xFDu; // TODO unclear what these values mean (they seem to be constant)
+    message.data[2] = VALUE_ID_BUS_CONFIGURATION;
     message.data[3] = 0x09u; // TODO unclear what these values mean (they seem to be constant)
     message.data[4] = 0x00u; // TODO unclear what these values mean (they seem to be constant)
     message.data[5] = 0x00u; // TODO unclear what these values mean (they seem to be constant)
@@ -373,13 +410,19 @@ private:
   }
 
   void processProtocol(CanMessage const& frame) {
-    if (!frame.ext && !frame.rtr && frame.len == 7) {
+    if (frame.ext || frame.rtr) {
+      return;
+    }
+
+    if (frame.len == 7) { // TODO Other implementations/variations of the "Elster" protocol also have 5 bytes only for requests
       _system.lyield();
 
       MessageType type = getMessageType(frame.data);
       DeviceId target = getTargetId(frame.data);
       DeviceId source = fromCanId(frame.id);
-      
+      ValueId valueId = getValueId(frame.data);
+      uint16_t value = getValue(frame.data);
+
       if (target.type == DeviceType::Display && target.address == BROADCAST_DISPLAY_ADDRESS) {
         target.address = DEVICE_ADDR_ANY;
       }
@@ -391,31 +434,32 @@ private:
         _otherDeviceIds.insert(source);
       }
 
-      if (type == MessageType::Register) {
+      switch (type)
+      {
+      case MessageType::Register:
         _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
-      }
-
-      if (type == MessageType::Write || type == MessageType::Response || type == MessageType::Request) {
-        ValueId valueId = getValueId(frame.data);
-        uint16_t value = getValue(frame.data);
-
+        break;
+      case MessageType::Write:
         _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%c%s t:%s s:%s id:%04X%c v:%04X"), target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
-        
-        switch (type) {
-          case MessageType::Response:
-            if (_responseHandler) {
-              _responseHandler({ source, target, valueId, value });
-            }
-            break;
-          case MessageType::Write:
-            if (_writeHandler) {
-              _writeHandler({ source, target, valueId, value });
-            }
-            break;
-          default:
-            // do nothing
-            break;
+        if (_writeHandler) {
+          _writeHandler({ source, target, valueId, value });
         }
+        break;
+      case MessageType::Response:
+        _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%c%s t:%s s:%s id:%04X%c v:%04X"), target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
+        if (_responseHandler) {
+          _responseHandler({ source, target, valueId, value });
+        }
+        break;
+      case MessageType::Request:
+        _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%c%s t:%s s:%s id:%04X%c"), target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l'); });
+        if (target.includes(_deviceId) && _requestHandler) {
+          _requestHandler({ source, target, valueId });
+        }
+        break;
+      default:
+        _logger.log(iot_core::LogLevel::Info, name(), [&] () { return iot_core::format(F("%c%s t:%s s:%s %02X %02X %02X %02X %02X"), target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
+        break;
       }
     }
   }
