@@ -1,1 +1,0 @@
-# yatest: yet another test framework
