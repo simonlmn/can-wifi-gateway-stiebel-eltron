@@ -25,7 +25,7 @@ struct DateTimeFields {
   DateTimeFields() : year(), month(), day(), hour(), minute(), availableFields(0) {}
 };
 
-class DateTimeSource final : public iot_core::IDateTimeSource, public iot_core::IApplicationComponent {
+class DateTimeSource final : public iot_core::IDateTimeSource, public iot_core::IApplicationComponent, public IStiebelEltronDevice {
 private:
   iot_core::Logger& _logger;
   StiebelEltronProtocol& _protocol;
@@ -58,6 +58,7 @@ public:
     _dateTimeFields.hour.definition = &getDefinition(DATETIME_HOUR_ID);
     _dateTimeFields.minute.definition = &getDefinition(DATETIME_MINUTE_ID);
     
+    _protocol.addDevice(this);
     _protocol.onResponse([this] (ResponseData data) { processData(data.valueId, data.value); });
     _protocol.onWrite([this] (WriteData data) { processData(data.valueId, data.value); });
   }
@@ -72,6 +73,23 @@ public:
   }
 
   void getDiagnostics(iot_core::IDiagnosticsCollector& /*collector*/) const override {
+  }
+
+  const DeviceId& deviceId() const override {
+    static const DeviceId id {DeviceType::X0E, 1};
+    return id;
+  }
+
+  void request(const RequestData& data) override {
+    // no data to be requested from here
+  }
+
+  void write(const WriteData& data) override {
+    // we capture any writes with a global listener already
+  }
+
+  void receive(const ResponseData& data) override {
+    // we capture any responses with a global listener already
   }
 
   bool available() const override {
@@ -91,23 +109,23 @@ private:
     auto currentMs = millis();
     if (currentMs > (_lastRequestDateTimeFields + _requestDateTimeFieldIntervalMs)) {
       if (currentMs > _dateTimeFields.minute.lastUpdateMs + _dateTimeFieldAgeThresholdMs) {
-        _protocol.request({ SYSTEM_ID, DATETIME_MINUTE_ID });
+        _protocol.request({ deviceId(), SYSTEM_ID, DATETIME_MINUTE_ID });
       }
 
       if (currentMs > _dateTimeFields.hour.lastUpdateMs + _dateTimeFieldAgeThresholdMs) {
-        _protocol.request({ SYSTEM_ID, DATETIME_HOUR_ID });
+        _protocol.request({ deviceId(), SYSTEM_ID, DATETIME_HOUR_ID });
       }
 
       if (currentMs > _dateTimeFields.day.lastUpdateMs + _dateTimeFieldAgeThresholdMs) {
-        _protocol.request({ SYSTEM_ID, DATETIME_DAY_ID });
+        _protocol.request({ deviceId(), SYSTEM_ID, DATETIME_DAY_ID });
       }
 
       if (currentMs > _dateTimeFields.month.lastUpdateMs + _dateTimeFieldAgeThresholdMs) {
-        _protocol.request({ SYSTEM_ID, DATETIME_MONTH_ID });
+        _protocol.request({ deviceId(), SYSTEM_ID, DATETIME_MONTH_ID });
       }
 
       if (currentMs > _dateTimeFields.year.lastUpdateMs + _dateTimeFieldAgeThresholdMs) {
-        _protocol.request({ SYSTEM_ID, DATETIME_YEAR_ID });
+        _protocol.request({ deviceId(), SYSTEM_ID, DATETIME_YEAR_ID });
       }
 
       _lastRequestDateTimeFields = currentMs;

@@ -65,7 +65,7 @@ DataCaptureMode dataCaptureModeFromString(const char* mode, size_t length = SIZE
   return DataCaptureMode::None;
 }
 
-class DataAccess final : public iot_core::IApplicationComponent {
+class DataAccess final : public iot_core::IApplicationComponent, public IStiebelEltronDevice {
 public:
   using DataKey = std::pair<DeviceId, ValueId>;
   using DataMap = std::map<DataKey, DataEntry>;
@@ -75,6 +75,7 @@ private:
   iot_core::ISystem& _system;
   StiebelEltronProtocol& _protocol;
   pins::DigitalInput& _writeEnablePin;
+  DeviceId _deviceId;
   DataCaptureMode _mode;
   bool _readOnly;
   bool _ignoreDateTime;
@@ -89,6 +90,7 @@ public:
     _system(system),
     _protocol(protocol),
     _writeEnablePin(writeEnablePin),
+    _deviceId(),
     _mode(DataCaptureMode::Configured),
     _readOnly(true),
     _ignoreDateTime(false),
@@ -102,6 +104,7 @@ public:
   }
 
   bool configure(const char* name, const char* value) override {
+    if (strcmp(name, "deviceId") == 0) return DeviceId::fromString(value).then([this] (DeviceId id) { return setDeviceId(id); }).otherwise([] () { return false; });
     if (strcmp(name, "mode") == 0) return setMode(dataCaptureModeFromString(value));
     if (strcmp(name, "readOnly") == 0) return setReadOnly(iot_core::convert<bool>::fromString(value, true));
     if (strcmp(name, "ignoreDateTime") == 0) return setIgnoreDateTime(iot_core::convert<bool>::fromString(value, false));
@@ -109,9 +112,20 @@ public:
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
+    writer("deviceId", _deviceId.toString());
     writer("mode", dataCaptureModeToString(_mode));
     writer("readOnly", iot_core::convert<bool>::toString(_readOnly));
     writer("ignoreDateTime", iot_core::convert<bool>::toString(_ignoreDateTime));
+  }
+
+  bool setDeviceId(DeviceId deviceId) {
+    if (!deviceId.isExact()) {
+      _logger.log(iot_core::LogLevel::Warning, name(), iot_core::format(F("Cannot set device ID with wildcards '%s'."), deviceId.toString()));
+      return false;
+    }
+    _deviceId = deviceId;
+    _logger.log(name(), iot_core::format(F("Set device ID '%s'."), _deviceId.toString()));
+    return true;
   }
 
   bool setMode(DataCaptureMode mode) {
@@ -140,12 +154,13 @@ public:
     restoreSubscriptions();
     restoreWritables();
 
+    _protocol.addDevice(this);
     _protocol.onResponse([this] (ResponseData const& data) { processData({data.sourceId, data.valueId}, data.value); });
     _protocol.onWrite([this] (WriteData const& data) { processData({data.targetId.isExact() ? data.targetId : data.sourceId, data.valueId}, data.value); });
   }
 
   void loop(iot_core::ConnectionStatus /*status*/) override {
-    if (!_protocol.ready() || (!_ignoreDateTime && !currentDateTime().isSet())) {
+    if (!_deviceId.isExact() || !_protocol.ready() || (!_ignoreDateTime && !currentDateTime().isSet())) {
       return;
     }
     
@@ -153,6 +168,22 @@ public:
   }
 
   void getDiagnostics(iot_core::IDiagnosticsCollector& /*collector*/) const override {
+  }
+
+  const DeviceId& deviceId() const override {
+    return _deviceId;
+  }
+
+  void request(const RequestData& data) override {
+    // no data to be requested from here
+  }
+
+  void write(const WriteData& data) override {
+    // we capture any writes with a global listener already
+  }
+
+  void receive(const ResponseData& data) override {
+    // we capture any responses with a global listener already
   }
 
   void onUpdate(std::function<void(DataEntry const& entry)> updateHandler) {
@@ -396,20 +427,20 @@ private:
         if (entry.writable) {
           if (entry.lastUpdateMs != 0) { // we already have received a value from the source
             if (entry.lastWriteMs != 0 && (currentMs > entry.lastWriteMs + WRITE_INTERVAL_MS)) {
-              _protocol.write({ entry.source, entry.id, entry.toWrite }); --remainingRequests;
+              _protocol.write({ _deviceId, entry.source, entry.id, entry.toWrite }); --remainingRequests;
               entry.lastWriteMs = currentMs;
               entry.lastUpdateMs = 0; // triggers request for new value from source
             }
           } else { // request the value from the source first before allowing to write it
             if (currentMs > entry.lastRequestMs + MIN_UPDATE_INTERVAL_MS) {
-              _protocol.request({ entry.source, entry.id }); --remainingRequests;
+              _protocol.request({ _deviceId, entry.source, entry.id }); --remainingRequests;
               entry.lastRequestMs = currentMs;
             }
           }
         } else if (entry.subscribed) {
           if (currentMs > entry.lastUpdateMs + std::max(MIN_UPDATE_INTERVAL_MS, entry.definition->updateIntervalMs)
            && currentMs > entry.lastRequestMs + MIN_UPDATE_INTERVAL_MS) {
-            _protocol.request({ entry.source, entry.id }); --remainingRequests;
+            _protocol.request({ _deviceId, entry.source, entry.id }); --remainingRequests;
             entry.lastRequestMs = currentMs;
           }
         }

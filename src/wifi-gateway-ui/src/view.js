@@ -393,7 +393,11 @@ export class SelectView extends View {
     }
 
     set selected(option) {
-        this.#options[option].selected = true;
+        if (this.#options.has(option)) {
+            this.#options.get(option).selected = true;
+        } else {
+            this._element.selectedIndex = -1;
+        }
     }
 
     get selected() {
@@ -419,7 +423,7 @@ export class SelectView extends View {
                 optionValue = optionLabel = option;
             }
             let e = this.addElement('option', { value: optionValue }, optionLabel);
-            this.#options[optionValue] = e;
+            this.#options.set(optionValue, e);
         }
     }
 

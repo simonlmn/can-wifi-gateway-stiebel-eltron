@@ -43,11 +43,18 @@ function serializeConfig(config) {
 
 const SourceTypes = [
     { value: 'SYS', label: 'System' },
+    { value: 'X04', label: '? X04 ?' },
+    { value: 'X05', label: '? X05 ?' },
     { value: 'HEA', label: 'Heating Circuit' },
-    { value: 'X09', label: '? X09 ?' },
+    { value: 'X07', label: '? X07 ?' },
     { value: 'SEN', label: 'Sensor' },
+    { value: 'X09', label: '? X09 ?' },
     { value: 'X0A', label: '? X0A ?' },
-    { value: 'DIS', label: 'Display' }
+    { value: 'X0B', label: '? X0B ?' },
+    { value: 'X0C', label: '? X0C ?' },
+    { value: 'DIS', label: 'Display' },
+    { value: 'X0E', label: '? X0E ?' },
+    { value: 'X0F', label: '? X0F ?' }
 ];
 
 class DataConfigurationView extends ContainerView {
@@ -358,7 +365,8 @@ export class ConfigPage {
         const fieldset = view.fieldset('Base Settings');
         fieldset.disable();
 
-        const displayAddress = fieldset.number(fieldset.label('Display address'), { required: true, min: 1, max: 4 }, (value) => { displayAddress.validate(); });
+        const deviceType = fieldset.select(fieldset.label('Device Type'), SourceTypes, {}, (value) => { deviceType.validate(); });
+        const deviceAddress = fieldset.number(fieldset.label('Device Address'), { required: true, min: 0, max: 127 }, (value) => { deviceAddress.validate(); });
         const writeEnabled = fieldset.checkbox(fieldset.label('Enable write access'), { indeterminate: true }, (checked) => { writeEnabled.validate(); });
         const dataAccessMode = fieldset.select(fieldset.label('Data capture mode'), ['None', 'Configured', 'Defined', 'Any'], {}, (value) => { dataAccessMode.validate(); });
         const canMode = fieldset.select(fieldset.label('CAN mode'), ['Normal', 'ListenOnly', 'LoopBack'], {}, (value) => { canMode.validate(); });
@@ -373,10 +381,8 @@ export class ConfigPage {
             const config = {
                 dta: {
                     mode: dataAccessMode.selected,
-                    readOnly: writeEnabled.checked ? 'false' : 'true'
-                },
-                sep: {
-                    display: displayAddress.value - 1
+                    readOnly: writeEnabled.checked ? 'false' : 'true',
+                    deviceId: `${deviceType.selected}/${deviceAddress.value}`
                 },
                 can: {
                     mode: canMode.selected
@@ -395,8 +401,9 @@ export class ConfigPage {
             const response = await this.#client.get('/system/config');
             const config = parseAllConfig(await response.text());
             dataAccessMode.selected = config.dta.mode;
-            writeEnabled.checked = (config.dta.readOnly == "false");
-            displayAddress.value = parseInt(config.sep.display) + 1;
+            writeEnabled.checked = (config.dta.readOnly == 'false');
+            deviceType.selected = config.dta.deviceId.split('/')[0];
+            deviceAddress.value = config.dta.deviceId.split('/')[1];
             canMode.selected = config.can.mode;
         } catch (err) {
             alert(err);

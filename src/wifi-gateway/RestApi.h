@@ -575,7 +575,13 @@ private:
     auto writer = iot_core::makeJsonWriter(_response);
     
     writer.openObject();
-    writer.propertyString(F("this"), _protocol.getThisDeviceId().toString());
+    writer.property(F("this"));
+    writer.openList();
+    for (auto& [name, device] : _protocol.getDevices()) {
+      writer.stringValue(device->deviceId().toString());
+      _system.lyield();
+    }
+    writer.close();
     writer.property(F("others"));
     writer.openList();
     for (auto& deviceId : _protocol.getOtherDeviceIds()) {

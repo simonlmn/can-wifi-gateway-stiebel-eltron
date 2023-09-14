@@ -129,59 +129,35 @@ uint16_t getValue(const uint8_t (&data)[8]) {
         | data[valueIndex + 1];
 }
 
-// Constants for known IDs and addresses
-
-const DeviceId SYSTEM_ID = {DeviceType::System, 0u};
-const DeviceId HEATING_CIRCUIT_1_ID = {DeviceType::HeatingCircuit, 1u};
-const DeviceId HEATING_CIRCUIT_2_ID = {DeviceType::HeatingCircuit, 2u};
-
-/* 
- * Available "display" addresses, which can be used by devices on the bus to interact with the system.
- * The built-in control panel/display uses one and, for example, the ISG too.
- * 
- * The built-in display uses number 4 (index = 3) by default.
- * 
- * In order to use a "display" for room temperature/humidity monitoring, it must use numer 1 or 2 (= index 0 or 1).
- */
-const uint8_t DISPLAY_ADDRESSES[] = { 0x1Eu, 0x1Fu, 0x20u, 0x21u, 0x22u };
-
-/*
- * This ID gets addressed (as a sub-target) by the system with the current date/time information and operating mode and status.
- * 
- * It is unclear why this is different from the "normal" IDs. Maybe this is some kind of "broadcast" ID, as
- * all FES units will display this information on the main screen.
- */
-const uint8_t BROADCAST_DISPLAY_ADDRESS = 0x3Cu;
+class IStiebelEltronDevice {
+public:
+  virtual const char* name() const = 0;
+  virtual const DeviceId& deviceId() const = 0;
+  virtual void request(const RequestData& data) = 0;
+  virtual void write(const WriteData& data) = 0;
+  virtual void receive(const ResponseData& data) = 0;
+};
 
 class StiebelEltronProtocol final : public iot_core::IApplicationComponent {
 private:
   iot_core::Logger& _logger;
   iot_core::ISystem& _system;
   ICanInterface& _can;
-  uint8_t _displayIndex;
-  DeviceId _deviceId;
-  uint32_t _canId;
-  bool _ready;
+  bool _ready = false;
 
-  std::set<DeviceId> _otherDeviceIds;
+  iot_core::ConstStrMap<IStiebelEltronDevice*> _devices {};
 
-  std::function<void(ResponseData const& data)> _responseHandler;
-  std::function<void(WriteData const& data)> _writeHandler;
-  std::function<void(RequestData const& data)> _requestHandler;
+  std::set<DeviceId> _otherDeviceIds {};
+
+  std::function<void(ResponseData const& data)> _responseListener {};
+  std::function<void(WriteData const& data)> _writeListener {};
+  std::function<void(RequestData const& data)> _requestListener {};
   
 public:
   StiebelEltronProtocol(iot_core::ISystem& system, ICanInterface& can)
     : _logger(system.logger()),
     _system(system),
-    _can(can),
-    _displayIndex(),
-    _deviceId(),
-    _canId(0u),
-    _ready(false),
-    _otherDeviceIds(),
-    _responseHandler(),
-    _writeHandler(),
-    _requestHandler()
+    _can(can)
   { }
 
   const char* name() const override {
@@ -189,42 +165,22 @@ public:
   }
 
   bool configure(const char* name, const char* value) override {
-    if (strcmp(name, "display") == 0) return setDisplayIndex(iot_core::convert<uint8_t>::fromString(value, nullptr, 10));
     return false;
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
-    writer("display", iot_core::convert<long>::toString(_displayIndex, 10));
   }
 
-  bool setDisplayIndex(uint8_t displayIndex) {
-    if (displayIndex >= std::size(DISPLAY_ADDRESSES)) {
-      return false;
-    }
-
-    _displayIndex = displayIndex;
-    _deviceId = {DeviceType::Display, DISPLAY_ADDRESSES[displayIndex]};  
-    _canId = toCanId(_deviceId);
-
-    _logger.log(name(), iot_core::format(F("Set display index '%u' (deviceId=%s, canId=%lX)"), _displayIndex, _deviceId.toString(), _canId));
-
-    if (_ready) {
-      registerDisplay();
-      registerSensor();
-    }
-
-    return true;
-  }
-  
   void setup(bool /*connected*/) override {
     _can.onReady([this] () {
-      registerDisplay();
-      registerSensor();
-      _ready = true;
+            for (auto& [name, device] : _devices) {
+                registerDevice(*device);
+      }
+            _ready = true;
     });
 
     _can.onMessage([this] (CanMessage const& message) {
-      processProtocol(message);
+            processProtocol(message);
     });
   }
 
@@ -238,8 +194,16 @@ public:
     return _ready;
   }
 
-  const DeviceId& getThisDeviceId() const {
-    return _deviceId;
+  void addDevice(IStiebelEltronDevice* device) {
+    _devices[device->name()] = device;
+  }
+
+  void removeDevice(IStiebelEltronDevice* device) {
+    _devices.erase(device->name());
+  }
+
+  const iot_core::ConstStrMap<IStiebelEltronDevice*>& getDevices() const {
+    return _devices;
   }
 
   const std::set<DeviceId>& getOtherDeviceIds() const {
@@ -247,22 +211,20 @@ public:
   }
 
   void request(RequestData const& data) {
-    if (!_ready || _canId == 0u) {
+    if (!_ready) {
       return;
     }
 
-    if (!data.targetId.isExact()) {
+    if (!data.targetId.isExact() || !data.sourceId.isExact()) {
+      _logger.log(iot_core::LogLevel::Error, name(), iot_core::format(F("Request source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
       return;
     }
 
     _system.lyield();
 
     CanMessage message;
-    if (data.sourceId.isExact()) {
-      message.id = toCanId(data.sourceId);
-    } else {
-      message.id = _canId;
-    }
+
+    message.id = toCanId(data.sourceId);
     message.ext = false;
     message.rtr = false;
     message.len = 7;
@@ -276,22 +238,20 @@ public:
   }
 
   void write(WriteData const& data) {
-    if (!_ready || _canId == 0u) {
+    if (!_ready) {
       return;
     }
 
-    if (!data.targetId.isExact()) {
+    if (!data.targetId.isExact() || !data.sourceId.isExact()) {
+      _logger.log(iot_core::LogLevel::Error, name(), iot_core::format(F("Write source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
       return;
     }
 
     _system.lyield();
     
     CanMessage message;
-    if (data.sourceId.isExact()) {
-      message.id = toCanId(data.sourceId);
-    } else {
-      message.id = _canId;
-    }
+    
+    message.id = toCanId(data.sourceId);
     message.ext = false;
     message.rtr = false;
     message.len = 7;
@@ -304,22 +264,20 @@ public:
   }
 
   void respond(ResponseData const& data) {
-    if (!_ready || _canId == 0u) {
+    if (!_ready) {
       return;
     }
 
-    if (!data.targetId.isExact()) {
+    if (!data.targetId.isExact() || !data.sourceId.isExact()) {
+      _logger.log(iot_core::LogLevel::Error, name(), iot_core::format(F("Response source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
       return;
     }
 
     _system.lyield();
     
     CanMessage message;
-    if (data.sourceId.isExact()) {
-      message.id = toCanId(data.sourceId);
-    } else {
-      message.id = _canId;
-    }
+    
+    message.id = toCanId(data.sourceId);
     message.ext = false;
     message.rtr = false;
     message.len = 7;
@@ -332,35 +290,36 @@ public:
   }
 
   void onResponse(std::function<void(ResponseData const& data)> responseHandler) {
-    if (_responseHandler) {
-      auto previousHandler = _responseHandler;
-      _responseHandler = [=](ResponseData const& data) { previousHandler(data); responseHandler(data); };
+    if (_responseListener) {
+      auto previousHandler = _responseListener;
+      _responseListener = [=](ResponseData const& data) { previousHandler(data); responseHandler(data); };
     } else {
-      _responseHandler = responseHandler;
+      _responseListener = responseHandler;
     }
   }
 
   void onWrite(std::function<void(WriteData const& data)> writeHandler) {
-    if (_writeHandler) {
-      auto previousHandler = _writeHandler;
-      _writeHandler = [=](WriteData const& data) { previousHandler(data); writeHandler(data); };
+    if (_writeListener) {
+      auto previousHandler = _writeListener;
+      _writeListener = [=](WriteData const& data) { previousHandler(data); writeHandler(data); };
     } else {
-      _writeHandler = writeHandler;
+      _writeListener = writeHandler;
     }
   }
 
   void onRequest(std::function<void(RequestData const& data)> requestHandler) {
-    if (_requestHandler) {
-      auto previousHandler = _requestHandler;
-      _requestHandler = [=](RequestData const& data) { previousHandler(data); requestHandler(data); };
+    if (_requestListener) {
+      auto previousHandler = _requestListener;
+      _requestListener = [=](RequestData const& data) { previousHandler(data); requestHandler(data); };
     } else {
-      _requestHandler = requestHandler;
+      _requestListener = requestHandler;
     }
   }
 
 private:
-  void registerDisplay() {
-    if (!_ready || _canId == 0u) {
+  void registerDevice(const IStiebelEltronDevice& device) {
+    auto id = device.deviceId();
+    if (!id.isExact()) {
       return;
     }
 
@@ -368,37 +327,12 @@ private:
     //      there are however screenshots of other models where a list of CAN bus nodes is shown.
     // TODO maybe check/listen first if the ID is alread in use?
     CanMessage message;
-    message.id = _canId;
+
+    message.id = toCanId(id);
     message.ext = false;
     message.rtr = false;
     message.len = 7u;
-    setTargetId(_deviceId, message.data);
-    setMessageType(MessageType::Register, message.data);
-    message.data[2] = VALUE_ID_BUS_CONFIGURATION;
-    message.data[3] = 0x09u; // TODO unclear what these values mean (they seem to be constant)
-    message.data[4] = 0x00u; // TODO unclear what these values mean (they seem to be constant)
-    message.data[5] = 0x00u; // TODO unclear what these values mean (they seem to be constant)
-    message.data[6] = 0x00u; // TODO unclear what these values mean (they seem to be constant)
-    
-    _can.sendCanMessage(message);
-  }
-
-  // TODO the official display also registers as a sensor (?) but it is unclear how that is used
-  //      assumption: when using it as a room temperature/humidity sensor, it sends the data from that ID?
-  void registerSensor() {
-    if (!_ready || _canId == 0u) {
-      return;
-    }
-
-    DeviceId sensorId = {DeviceType::Sensor, _displayIndex + 1};
-    uint32_t sensorCanId = toCanId(sensorId);
-
-    CanMessage message;
-    message.id = sensorCanId;
-    message.ext = false;
-    message.rtr = false;
-    message.len = 7u;
-    setTargetId(sensorId, message.data);
+    setTargetId(id, message.data);
     setMessageType(MessageType::Register, message.data);
     message.data[2] = VALUE_ID_BUS_CONFIGURATION;
     message.data[3] = 0x09u; // TODO unclear what these values mean (they seem to be constant)
@@ -427,41 +361,82 @@ private:
         target.address = DEVICE_ADDR_ANY;
       }
 
-      if (target.isExact() && target != _deviceId) {
-        _otherDeviceIds.insert(target);
-      }
-      if (source.isExact() && source != _deviceId) {
-        _otherDeviceIds.insert(source);
-      }
+      logMessage(frame, type, target, source, valueId, value);
+
+      bool handled = false;
 
       switch (type)
       {
-      case MessageType::Register:
-        _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
-        break;
       case MessageType::Write:
-        _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%c%s t:%s s:%s id:%04X%c v:%04X"), target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
-        if (_writeHandler) {
-          _writeHandler({ source, target, valueId, value });
+        {
+          WriteData data {source, target, valueId, value};
+          handled = forwardMessage(target, data, &IStiebelEltronDevice::write);
+          if (_writeListener) {
+            _writeListener(data);
+          }
         }
         break;
       case MessageType::Response:
-        _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%c%s t:%s s:%s id:%04X%c v:%04X"), target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
-        if (_responseHandler) {
-          _responseHandler({ source, target, valueId, value });
+        {
+          ResponseData data {source, target, valueId, value};
+          handled = forwardMessage(target, data, &IStiebelEltronDevice::receive);
+          if (_responseListener) {
+            _responseListener({ source, target, valueId, value });
+          }
         }
         break;
       case MessageType::Request:
-        _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%c%s t:%s s:%s id:%04X%c"), target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l'); });
-        if (target.includes(_deviceId) && _requestHandler) {
-          _requestHandler({ source, target, valueId });
+        {
+          RequestData data {source, target, valueId};
+          handled = forwardMessage(target, data, &IStiebelEltronDevice::request);
+          if (_requestListener) {
+            _requestListener({ source, target, valueId });
+          }
         }
         break;
-      default:
-        _logger.log(iot_core::LogLevel::Info, name(), [&] () { return iot_core::format(F("%c%s t:%s s:%s %02X %02X %02X %02X %02X"), target.includes(_deviceId) ? '>' : '*', messageTypeToString(type), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
-        break;
+      }
+
+      if (source.isExact()) {
+        _otherDeviceIds.insert(source);
+      }
+
+      if (!handled && target.isExact()) {
+        _otherDeviceIds.insert(target);
       }
     }
+  }
+
+  void logMessage(CanMessage const& frame, MessageType type, DeviceId target, DeviceId source, ValueId valueId, uint16_t value) {
+    switch (type)
+    {
+    case MessageType::Register:
+      _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
+      break;
+    case MessageType::Write:
+      _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%s t:%s s:%s id:%04X%c v:%04X"), messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
+      break;
+    case MessageType::Response:
+      _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%s t:%s s:%s id:%04X%c v:%04X"), messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
+      break;
+    case MessageType::Request:
+      _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%s t:%s s:%s id:%04X%c"), messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l'); });
+      break;
+    default:
+      _logger.log(iot_core::LogLevel::Info, name(), [&] () { return iot_core::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
+      break;
+    }
+  }
+
+  template<typename Message>
+  bool forwardMessage(DeviceId target, const Message& message, void (IStiebelEltronDevice::*handlerFunction)(const Message&)) {
+    bool forwarded = false;
+    for (auto& [name, device] : _devices) {
+      if (target.includes(device->deviceId())) {
+        std::invoke(handlerFunction, device, message);
+        forwarded = true;
+      }
+    }
+    return forwarded;
   }
 };
 

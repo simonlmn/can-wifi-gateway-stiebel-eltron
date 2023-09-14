@@ -5,6 +5,7 @@
 #include <functional>
 #include <map>
 #include <set>
+#include <type_traits>
 
 namespace iot_core {
 
@@ -96,6 +97,7 @@ public:
   }
 };
 
+
 template<typename T>
 struct Maybe final {
   bool hasValue;
@@ -104,6 +106,24 @@ struct Maybe final {
   Maybe() : hasValue(false), value() {}
   Maybe(T value) : hasValue(true), value(value) {}
   Maybe(bool hasValue, T value) : hasValue(hasValue), value(value) {}
+
+  template<typename F>
+  Maybe<typename std::invoke_result<F, T>::type> then(F f) const {
+    if (hasValue) {
+      return f(value);
+    } else {
+      return {};
+    }
+  }
+
+  template<typename F>
+  T otherwise(F f) const {
+    if (hasValue) {
+      return value;
+    } else {
+      return f();
+    }
+  }
 };
 
 Maybe<long int> asInteger(const char* value) {
