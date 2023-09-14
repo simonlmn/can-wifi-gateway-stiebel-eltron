@@ -1,20 +1,14 @@
 #!/bin/sh
 
-export REPOSITORY_BASE_PATH=$(realpath "$0/..")
-. "$REPOSITORY_BASE_PATH/tools/init-arduino-env.sh"
-
-if [ "$(git status --porcelain)" ]; then
+if [ "$1" != "-f" -a "$(git status --porcelain)" ]; then
     echo "Won't make a release, there are uncommitted changes."
     exit 1
 fi
 
-git_description=$(git describe --tags)
+git_description=$(git describe --tags > /dev/null 2>&1)
 if [ $? -ne 0 ]; then
-    echo "Failed to get latest tag information."
-    exit 2
+    git_description='v0.0.0'
 fi
-
-echo $git_description
 
 version=${git_description#v}
 version=${version//./ }
@@ -23,8 +17,10 @@ major=${version[0]}
 minor=${version[1]}
 patch=${version[2]}
 pre_release_label=${version[3]}
-
 last_version=$major.$minor.$patch
+
+new_target_version='0.0.0'
+new_pre_release_label=''
 
 echo "Last version was '${last_version}'."
 
@@ -37,13 +33,11 @@ if [[ "$pre_release_label" =~ ^[a-z].*$ ]]; then
         read -p "  Make another pre-release? (y/n) " make_prerelease
     done
     if [ "$make_prerelease" == "y" ]; then
-        new_pre_release_label=_
         while [[ ! "$new_pre_release_label" =~ ^[a-z].*$ ]]
         do
             read -p "  New pre-release label: " new_pre_release_label
         done
-        new_version=$major.$minor.$patch
-        new_tag=v$new_version-$new_pre_release_label
+        new_target_version=$last_version
         tag_message="pre-release $new_pre_release_label for"
     else
         make_release_from_prerelease=_
@@ -52,8 +46,7 @@ if [[ "$pre_release_label" =~ ^[a-z].*$ ]]; then
             read -p "  Make release from pre-release? (y/n) " make_release_from_prerelease
         done
         if [ "$make_release_from_prerelease" == "y" ]; then
-            new_version=$major.$minor.$patch
-            new_tag=v$new_version
+            new_target_version=$last_version
             tag_message="final release from $pre_release_label for"
         fi
     fi
@@ -96,8 +89,7 @@ if [ -z "$new_tag" ]; then
         fi
     fi
 
-    new_version=$major.$minor.$patch
-    new_tag=v$new_version
+    new_target_version=$major.$minor.$patch
 
     make_prerelease=_
     while [ "$make_prerelease" != "y" -a "$make_prerelease" != "n" ]
@@ -105,25 +97,37 @@ if [ -z "$new_tag" ]; then
         read -p "  Make a pre-release? (y/n) " make_prerelease
     done
     if [ "$make_prerelease" == "y" ]; then
-        new_pre_release_label=_
         while [[ ! "$new_pre_release_label" =~ ^[a-z].*$ ]]
         do
             read -p "  Pre-release label: " new_pre_release_label
         done
-        new_tag=$new_tag-$new_pre_release_label
         tag_message="pre-release $new_pre_release_label for $tag_message"
     fi
 fi
 
-tag_message="$tag_message $new_version"
+if [ -z "$new_pre_release_label" ]; then
+    new_version="$new_target_version"
+else
+    new_version="$new_target_version-$new_pre_release_label"
+fi
+
+new_tag="v$new_version"
+tag_message="$tag_message $new_target_version"
 
 echo "Creating new release version of '$new_version' with tag '$new_tag' and message '$tag_message'..."
 
+library_properties="library.properties"
+if [ -f "$library_properties" ]; then
+    temporary_library_properties=$(mktemp)
+    sed "s/^version=.*$/version=$new_version/" "$library_properties" > "$temporary_library_properties"
+    cat $temporary_library_properties > "$library_properties"
+    rm "$temporary_library_properties"
+    git add "$library_properties"
+    git commit -m "$tag_message"
+fi
+
 git tag -a "$new_tag" -m "$tag_message"
 
-./build-all.sh
-
-rm -rf dist
-mkdir dist
-cp src/serial-can-bridge/build/*/serial-can-bridge.ino.hex "dist/serial-can-bridge-$new_tag.hex"
-cp src/wifi-gateway/build/*/wifi-gateway.ino.bin "dist/wifi-gateway-$new_tag.bin"
+if command -v './post-release.sh' &> /dev/null; then
+    ./post-release.sh
+fi
