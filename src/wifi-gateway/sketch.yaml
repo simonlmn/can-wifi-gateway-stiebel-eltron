@@ -8,3 +8,4 @@ profiles:
     libraries:
       - WiFiManager (2.0.16-rc.2)
       - PubSubClient (2.8)
+      - GPIObj (0.1)

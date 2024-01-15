@@ -3,10 +3,9 @@
 
 #include "src/iot-core/Interfaces.h"
 #include "src/iot-core/Utils.h"
-#include "src/pins/DigitalOutput.h"
-#include "src/pins/DigitalInput.h"
 #include "src/serial-protocol/Endpoint.h"
 #include "CanInterface.h"
+#include <gpiobj.h>
 
 class SerialCan final : public ICanInterface, public iot_core::IApplicationComponent {
 private:
@@ -15,8 +14,8 @@ private:
 
   iot_core::Logger& _logger;
   iot_core::ISystem& _system;
-  pins::DigitalOutput& _resetPin;
-  pins::DigitalInput& _txEnablePin;
+  gpiobj::DigitalOutput& _resetPin;
+  gpiobj::DigitalInput& _txEnablePin;
   bool _canAvailable;
   iot_core::IntervalTimer _resetInterval;
   std::function<void()> _readyHandler;
@@ -28,7 +27,7 @@ private:
   serial_protocol::Endpoint _serial;
 
 public:
-  SerialCan(iot_core::ISystem& system, pins::DigitalOutput& resetPin, pins::DigitalInput& txEnablePin) :
+  SerialCan(iot_core::ISystem& system, gpiobj::DigitalOutput& resetPin, gpiobj::DigitalInput& txEnablePin) :
     _logger(system.logger()),
     _system(system),
     _resetPin(resetPin),

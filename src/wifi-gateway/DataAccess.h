@@ -4,7 +4,6 @@
 #include "src/iot-core/Interfaces.h"
 #include "src/iot-core/DateTime.h"
 #include "src/iot-core/Utils.h"
-#include "src/pins/DigitalInput.h"
 #include "DateTimeSource.h"
 #include "StiebelEltronProtocol.h"
 #include "ValueDefinitions.h"
@@ -12,6 +11,7 @@
 #include <map>
 #include <algorithm>
 #include <LittleFS.h>
+#include <gpiobj/DigitalInput.h>
 
 struct DataEntry {
   ValueId id;
@@ -74,7 +74,7 @@ private:
   iot_core::Logger& _logger;
   iot_core::ISystem& _system;
   StiebelEltronProtocol& _protocol;
-  pins::DigitalInput& _writeEnablePin;
+  gpiobj::DigitalInput& _writeEnablePin;
   DeviceId _deviceId;
   DataCaptureMode _mode;
   bool _readOnly;
@@ -85,7 +85,7 @@ private:
   std::function<void(DataEntry const& entry)> _updateHandler;
 
 public:
-  DataAccess(iot_core::ISystem& system, StiebelEltronProtocol& protocol, pins::DigitalInput& writeEnablePin)
+  DataAccess(iot_core::ISystem& system, StiebelEltronProtocol& protocol, gpiobj::DigitalInput& writeEnablePin)
     : _logger(system.logger()),
     _system(system),
     _protocol(protocol),

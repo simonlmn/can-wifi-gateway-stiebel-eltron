@@ -1,1 +1,0 @@
-# pins: Manage GPIOs as objects

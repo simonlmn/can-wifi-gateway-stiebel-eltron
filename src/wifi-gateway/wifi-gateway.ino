@@ -8,10 +8,8 @@
 //#define DEVELOPMENT_MODE
 #define MQTT_SUPPORT
 
+#include <gpiobj.h>
 #include "src/iot-core/System.h"
-#include "src/pins/DigitalInput.h"
-#include "src/pins/DigitalOutput.h"
-#include "src/pins/Gpios.h"
 #include "Version.h"
 #include "SerialCan.h"
 #include "StiebelEltronProtocol.h"
@@ -25,23 +23,23 @@
 namespace io {
 // Switches
 #ifdef DEVELOPMENT_MODE
-pins::DigitalInput otaEnablePin {true};
-pins::DigitalInput writeEnablePin {true};
-pins::DigitalInput txEnablePin {true};
-pins::DigitalInput debugModePin {true};
+gpiobj::DigitalInput otaEnablePin {true};
+gpiobj::DigitalInput writeEnablePin {true};
+gpiobj::DigitalInput txEnablePin {true};
+gpiobj::DigitalInput debugModePin {true};
 #else
-pins::DigitalInput otaEnablePin { pins::gpios::esp8266::nodemcu::D2, pins::InputMode::PullUp, pins::SignalMode::Inverted };
-pins::DigitalInput writeEnablePin { pins::gpios::esp8266::nodemcu::D5, pins::InputMode::PullUp, pins::SignalMode::Inverted };
-pins::DigitalInput txEnablePin { pins::gpios::esp8266::nodemcu::D6, pins::InputMode::PullUp, pins::SignalMode::Inverted };
-pins::DigitalInput debugModePin { pins::gpios::esp8266::nodemcu::D7, pins::InputMode::PullUp, pins::SignalMode::Inverted };
+gpiobj::DigitalInput otaEnablePin { gpiobj::gpios::esp8266::nodemcu::D2, gpiobj::InputMode::PullUp, gpiobj::SignalMode::Inverted };
+gpiobj::DigitalInput writeEnablePin { gpiobj::gpios::esp8266::nodemcu::D5, gpiobj::InputMode::PullUp, gpiobj::SignalMode::Inverted };
+gpiobj::DigitalInput txEnablePin { gpiobj::gpios::esp8266::nodemcu::D6, gpiobj::InputMode::PullUp, gpiobj::SignalMode::Inverted };
+gpiobj::DigitalInput debugModePin { gpiobj::gpios::esp8266::nodemcu::D7, gpiobj::InputMode::PullUp, gpiobj::SignalMode::Inverted };
 #endif
 // Buttons
-pins::DigitalInput updatePin { pins::gpios::esp8266::nodemcu::D3, pins::InputMode::PullUp, pins::SignalMode::Inverted }; // not used yet
-pins::DigitalInput factoryResetPin { pins::gpios::esp8266::nodemcu::D8, pins::InputMode::Normal, pins::SignalMode::Normal };
+gpiobj::DigitalInput updatePin { gpiobj::gpios::esp8266::nodemcu::D3, gpiobj::InputMode::PullUp, gpiobj::SignalMode::Inverted }; // not used yet
+gpiobj::DigitalInput factoryResetPin { gpiobj::gpios::esp8266::nodemcu::D8, gpiobj::InputMode::Normal, gpiobj::SignalMode::Normal };
 
 // Control lines
-pins::DigitalOutput canResetPin { pins::gpios::esp8266::nodemcu::D1, false, pins::SignalMode::Inverted };
-pins::DigitalOutput builtinLed { LED_BUILTIN, false, pins::SignalMode::Inverted };
+gpiobj::DigitalOutput canResetPin { gpiobj::gpios::esp8266::nodemcu::D1, false, gpiobj::SignalMode::Inverted };
+gpiobj::DigitalOutput builtinLed { LED_BUILTIN, false, gpiobj::SignalMode::Inverted };
 }
 
 iot_core::System sys { "can-wifi-gw", VERSION, OTA_PASSWORD, io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin, io::debugModePin };
