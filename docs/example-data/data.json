@@ -1,0 +1,91 @@
+{
+    "retrievedOn": "2024-01-11T20:12:15.673",
+    "totalItems": 5,
+    "items": {
+        "SYS": {
+            "0": {
+                "12": {
+                    "id": 12,
+                    "name": "outside temperature",
+                    "accessMode": "Readable",
+                    "unit": "°C",
+                    "rawValue": "0xFFF1",
+                    "value": -1.5,
+                    "lastUpdate": "2024-01-11T20:12:15.219",
+                    "source": "SYS/0",
+                    "subscribed": true,
+                    "writable": false
+                },
+                "14": {
+                    "id": 14,
+                    "name": "DHW temperature",
+                    "accessMode": "Readable",
+                    "unit": "°C",
+                    "rawValue": "0x01E7",
+                    "value": 48.7,
+                    "lastUpdate": "2024-01-11T20:12:15.243",
+                    "source": "SYS/0",
+                    "subscribed": true,
+                    "writable": false
+                },
+                "374": {
+                    "id": 374,
+                    "name": "operating status",
+                    "accessMode": "Readable",
+                    "unit": "",
+                    "rawValue": "0x0507",
+                    "value": {
+                        "AUTO": true,
+                        "COMPR": true,
+                        "HEAT": true,
+                        "COOL": false,
+                        "DHW": false,
+                        "ELHEAT": false,
+                        "SERV": false,
+                        "PWROFF": false,
+                        "FILTER": true,
+                        "VENT": false,
+                        "HCPUMP": true,
+                        "DEFROS": false,
+                        "FILTXA": false,
+                        "FILTVA": false,
+                        "HEATUP": false
+                    },
+                    "lastUpdate": "2024-01-11T20:12:03.484",
+                    "source": "SYS/0",
+                    "subscribed": true,
+                    "writable": false
+                }
+            }
+        },
+        "HEA": {
+            "1": {
+                "15": {
+                    "id": 15,
+                    "name": "HC temperature",
+                    "accessMode": "Readable",
+                    "unit": "°C",
+                    "rawValue": "0x0146",
+                    "value": 32.6,
+                    "lastUpdate": "2024-01-11T20:12:15.237",
+                    "source": "HEA/1",
+                    "subscribed": true,
+                    "writable": false
+                },
+                "17": {
+                    "id": 17,
+                    "name": "room temperature",
+                    "accessMode": "Writable",
+                    "unit": "°C",
+                    "rawValue": "0x00D5",
+                    "value": 21.3,
+                    "lastUpdate": "2024-01-11T20:11:51.170",
+                    "source": "HEA/1",
+                    "subscribed": false,
+                    "writable": true
+                }
+            }
+        }
+    },
+    "actualItems": 5
+}
