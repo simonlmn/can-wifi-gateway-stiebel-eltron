@@ -418,7 +418,7 @@ export class ConfigPage {
         const enabled = fieldset.checkbox(fieldset.label('Enable MQTT protocol'), { required: true, indeterminate: true }, (value) => { enabled.validate(); });
         const brokerAddress = fieldset.text(fieldset.label('Broker IP'), { required: true, pattern: '([1-9]|[1-9][0-9]|1[1-9][0-9]|2[0-5][0-5])\.([0-9]|[1-9][0-9]|1[1-9][0-9]|2[0-5][0-5])\.([0-9]|[1-9][0-9]|1[1-9][0-9]|2[0-5][0-5])\.([1-9]|[1-9][0-9]|1[1-9][0-9]|2[0-5][0-3])', maxlength: 15 }, (checked) => { brokerAddress.validate(); });
         const brokerPort = fieldset.number(fieldset.label('Broker port'), { required: true, min: 1, max: 65535 }, (value) => { brokerPort.validate(); });
-        const topic = fieldset.text(fieldset.label('Topic'), { required: true, maxlength: 31 }, (value) => { topic.validate(); });
+        const topic = fieldset.text(fieldset.label('Base Topic'), { required: true, maxlength: 31 }, (value) => { topic.validate(); });
 
         fieldset.button('Save', {}, async () => {
             if (!fieldset.validate()) {

@@ -4,6 +4,7 @@
 #include "src/iot-core/Interfaces.h"
 #include "src/iot-core/Buffer.h"
 #include "src/iot-core/JsonWriter.h"
+#include "src/iot-core/Utils.h"
 #include <PubSubClient.h>
 #include <ESP8266WiFi.h>
 #include "DataAccess.h"
@@ -139,7 +140,11 @@ private:
     } else if (_buffer.overrun()) {
       _logger.log(iot_core::LogLevel::Warning, name(), F("Serialized data entry too large for buffer."));
     } else {
-      _mqttClient.publish(_topic, _buffer.data(), _buffer.size());
+      _mqttClient.publish(
+        iot_core::format("%s/%s/%u/%u", _topic, deviceTypeToString(entry.source.type), entry.source.address, entry.id),
+        _buffer.data(),
+        _buffer.size()
+      );
     }
   }
 };
