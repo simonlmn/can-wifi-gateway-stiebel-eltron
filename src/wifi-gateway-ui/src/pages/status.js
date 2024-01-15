@@ -37,11 +37,17 @@ export class StatusPage {
         this.logRefreshToggle = view.checkbox(view.label('Auto-refresh'), { checked: true }, (checked) => this.autoLogRefresh(checked));
         this.logsState = view.p();
         this.autoLogRefresh(true);
+
+        view.h1('Devices');
+        this.devicesList = view.dl();
+        this.devicesState = view.p();
+        this.autoDevicesRefresh(true);
     }
 
     async leave() {
         this.autoStatusRefresh(false);
         this.autoLogRefresh(false);
+        this.autoDevicesRefresh(false);
     }
 
     autoStatusRefresh(enable) {
@@ -64,6 +70,18 @@ export class StatusPage {
                 .finally(() => {
                     clearTimeout(this.logsTimeout);
                     this.logsTimeout = setTimeout(() => this.autoLogRefresh(true), 5000);
+                });
+        }
+    }
+
+    autoDevicesRefresh(enable) {
+        clearTimeout(this.devicesTimeout);
+        
+        if (enable) {
+            this.#refreshDevices()
+                .finally(() => {
+                    clearTimeout(this.devicesTimeout);
+                    this.devicesTimeout = setTimeout(() => this.autoDevicesRefresh(true), 5000);
                 });
         }
     }
@@ -113,6 +131,27 @@ export class StatusPage {
         } catch (err) {
             this.logsState.attribute('class', 'notice');
             this.logsState.content = `${err}`;
+        }
+    }
+
+    async #refreshDevices() {
+        this.devicesState.attribute('class', null);
+        this.devicesState.content = `<small>Loading...</small>`;
+        try {
+            const response = await this.#client.get('/devices');
+            const data = await response.json();
+            this.devicesList.clear();
+            for (const deviceId in data['this']) {
+                this.devicesList.add(deviceId, data['this'][deviceId]);
+            }
+            for (const deviceId of data['others']) {
+                this.devicesList.add(deviceId, '&lt;other device&gt;');
+            }
+            this.devicesState.attribute('class', null);
+            this.devicesState.content = `<small>Updated on ${new Date().toISOString()}.</small>`;
+        } catch (err) {
+            this.devicesState.attribute('class', 'notice');
+            this.devicesState.content = `${err}`;
         }
     }
 }

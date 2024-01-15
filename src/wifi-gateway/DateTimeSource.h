@@ -44,6 +44,10 @@ public:
     return "dts";
   }
 
+  const char* description() const override {
+    return "Date Time Source";
+  }
+
   bool configure(const char* /*name*/, const char* /*value*/) override {
     return false;
   }

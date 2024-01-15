@@ -132,6 +132,7 @@ uint16_t getValue(const uint8_t (&data)[8]) {
 class IStiebelEltronDevice {
 public:
   virtual const char* name() const = 0;
+  virtual const char* description() const = 0;
   virtual const DeviceId& deviceId() const = 0;
   virtual void request(const RequestData& data) = 0;
   virtual void write(const WriteData& data) = 0;

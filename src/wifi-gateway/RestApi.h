@@ -576,9 +576,9 @@ private:
     
     writer.openObject();
     writer.property(F("this"));
-    writer.openList();
+    writer.openObject();
     for (auto& [name, device] : _protocol.getDevices()) {
-      writer.stringValue(device->deviceId().toString());
+      writer.propertyString(device->deviceId().toString(), device->description()),
       _system.lyield();
     }
     writer.close();

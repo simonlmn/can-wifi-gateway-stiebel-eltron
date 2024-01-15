@@ -103,6 +103,10 @@ public:
     return "dta";
   }
 
+  const char* description() const override {
+    return "Data Access";
+  }
+
   bool configure(const char* name, const char* value) override {
     if (strcmp(name, "deviceId") == 0) return DeviceId::fromString(value).then([this] (DeviceId id) { return setDeviceId(id); }).otherwise([] () { return false; });
     if (strcmp(name, "mode") == 0) return setMode(dataCaptureModeFromString(value));
