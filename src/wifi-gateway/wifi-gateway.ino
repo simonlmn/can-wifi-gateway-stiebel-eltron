@@ -9,8 +9,8 @@
 #define MQTT_SUPPORT
 
 #include <gpiobj.h>
-#include "src/iot-core/System.h"
-#include "Version.h"
+#include <iot_core/System.h>
+#include "AppVersion.h"
 #include "SerialCan.h"
 #include "StiebelEltronProtocol.h"
 #include "DateTimeSource.h"
@@ -42,7 +42,7 @@ gpiobj::DigitalOutput canResetPin { gpiobj::gpios::esp8266::nodemcu::D1, false, 
 gpiobj::DigitalOutput builtinLed { LED_BUILTIN, false, gpiobj::SignalMode::Inverted };
 }
 
-iot_core::System sys { "can-wifi-gw", VERSION, OTA_PASSWORD, io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin, io::debugModePin };
+iot_core::System sys { "can-wifi-gw", APP_VERSION, OTA_PASSWORD, io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin, io::debugModePin };
 SerialCan can { sys, io::canResetPin, io::txEnablePin };
 StiebelEltronProtocol protocol { sys, can };
 DateTimeSource timeSource { sys.logger(), protocol };

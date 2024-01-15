@@ -1,8 +1,8 @@
 #ifndef DATETIMESOURCE_H_
 #define DATETIMESOURCE_H_
 
-#include "src/iot-core/IDateTimeSource.h"
-#include "src/iot-core/Logger.h"
+#include <iot_core/IDateTimeSource.h>
+#include <iot_core/Logger.h>
 #include "StiebelEltronProtocol.h"
 #include "ValueDefinitions.h"
 

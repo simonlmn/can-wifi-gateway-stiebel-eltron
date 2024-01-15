@@ -1,12 +1,12 @@
 #ifndef RESTAPI_H_
 #define RESTAPI_H_
 
-#include "src/iot-core/Interfaces.h"
-#include "src/iot-core/Utils.h"
-#include "src/iot-core/Config.h"
-#include "src/iot-core/ChunkedResponse.h"
-#include "src/iot-core/JsonWriter.h"
-#include "src/iot-core/JsonDiagnosticsCollector.h"
+#include <iot_core/Interfaces.h>
+#include <iot_core/Utils.h>
+#include <iot_core/Config.h>
+#include <iot_core/ChunkedResponse.h>
+#include <iot_core/JsonWriter.h>
+#include <iot_core/JsonDiagnosticsCollector.h>
 #include <ESP8266WebServer.h>
 #include <uri/UriBraces.h>
 #include <uri/UriGlob.h>

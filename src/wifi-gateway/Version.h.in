@@ -1,8 +1,8 @@
 #ifndef VERSION_GENERATED_H_
 #define VERSION_GENERATED_H_
 
-#include "src/iot-core/VersionInfo.h"
+#include <iot_core/VersionInfo.h>
 
-static const iot_core::VersionInfo VERSION {"/*COMMIT_HASH*/", "/*VERSION_STRING*/"};
+static const iot_core::VersionInfo APP_VERSION {"/*COMMIT_HASH*/", "/*VERSION_STRING*/"};
 
 #endif

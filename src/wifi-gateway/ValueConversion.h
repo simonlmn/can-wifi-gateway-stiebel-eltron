@@ -7,7 +7,7 @@
 #include <cstring>
 #endif
 
-#include "src/iot-core/Utils.h"
+#include <iot_core/Utils.h>
 
 /*
    From https://www.stiebel-eltron.de/content/dam/ste/cdbassets/historic/bedienungs-_u_installationsanleitungen/ISG_Modbus__b89c1c53-6d34-4243-a630-b42cf0633361.pdf

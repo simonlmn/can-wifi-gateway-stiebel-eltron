@@ -9,3 +9,4 @@ profiles:
       - WiFiManager (2.0.16-rc.2)
       - PubSubClient (2.8)
       - GPIObj (0.1)
+      - ESP IoT Core (0.1)

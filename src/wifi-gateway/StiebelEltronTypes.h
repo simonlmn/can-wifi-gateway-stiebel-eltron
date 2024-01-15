@@ -6,7 +6,7 @@
 #include <cstdio>
 #endif
 
-#include "src/iot-core/Utils.h"
+#include <iot_core/Utils.h>
 
 // Note: the device type gets encoded in the CAN ID on the bus, which has an influence on priorization
 // of messages. In CAN arbitration, lower numbers have priority and may prevent other devices from

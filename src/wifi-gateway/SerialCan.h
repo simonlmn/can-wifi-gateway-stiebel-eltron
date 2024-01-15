@@ -1,8 +1,8 @@
 #ifndef SERIALCAN_H_
 #define SERIALCAN_H_
 
-#include "src/iot-core/Interfaces.h"
-#include "src/iot-core/Utils.h"
+#include <iot_core/Interfaces.h>
+#include <iot_core/Utils.h>
 #include "src/serial-protocol/Endpoint.h"
 #include "CanInterface.h"
 #include <gpiobj.h>

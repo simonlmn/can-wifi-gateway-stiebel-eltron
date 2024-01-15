@@ -1,9 +1,9 @@
 #ifndef DATAACCESS_H_
 #define DATAACCESS_H_
 
-#include "src/iot-core/Interfaces.h"
-#include "src/iot-core/DateTime.h"
-#include "src/iot-core/Utils.h"
+#include <iot_core/Interfaces.h>
+#include <iot_core/DateTime.h>
+#include <iot_core/Utils.h>
 #include "DateTimeSource.h"
 #include "StiebelEltronProtocol.h"
 #include "ValueDefinitions.h"

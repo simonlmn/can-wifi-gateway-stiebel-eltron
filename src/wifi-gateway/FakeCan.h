@@ -1,8 +1,8 @@
 #ifndef FAKECAN_H_
 #define FAKECAN_H_
 
-#include "src/iot-core/Interfaces.h"
-#include "src/iot-core/Utils.h"
+#include <iot_core/Interfaces.h>
+#include <iot_core/Utils.h>
 #include "CanInterface.h"
 
 class FakeCan final : public ICanInterface, public iot_core::IApplicationComponent {

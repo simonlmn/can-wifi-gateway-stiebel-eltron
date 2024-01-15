@@ -1,10 +1,10 @@
 #ifndef MQTTCLIENT_H_
 #define MQTTCLIENT_H_
 
-#include "src/iot-core/Interfaces.h"
-#include "src/iot-core/Buffer.h"
-#include "src/iot-core/JsonWriter.h"
-#include "src/iot-core/Utils.h"
+#include <iot_core/Interfaces.h>
+#include <iot_core/Buffer.h>
+#include <iot_core/JsonWriter.h>
+#include <iot_core/Utils.h>
 #include <PubSubClient.h>
 #include <ESP8266WiFi.h>
 #include "DataAccess.h"

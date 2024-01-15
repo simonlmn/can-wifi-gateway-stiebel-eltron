@@ -1,8 +1,8 @@
 #ifndef SERIALIZER_H_
 #define SERIALIZER_H_
 
-#include "src/iot-core/Utils.h"
-#include "src/iot-core/JsonWriter.h"
+#include <iot_core/Utils.h>
+#include <iot_core/JsonWriter.h>
 #include "DataAccess.h"
 
 namespace serializer {

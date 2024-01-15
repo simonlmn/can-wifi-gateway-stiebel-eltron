@@ -5,7 +5,7 @@ if [ "$1" != "-f" -a "$(git status --porcelain)" ]; then
     exit 1
 fi
 
-git_description=$(git describe --tags > /dev/null 2>&1)
+git_description=$(git describe --tags 2> /dev/null)
 if [ $? -ne 0 ]; then
     git_description='v0.0.0'
 fi
@@ -123,6 +123,23 @@ if [ -f "$library_properties" ]; then
     cat $temporary_library_properties > "$library_properties"
     rm "$temporary_library_properties"
     git add "$library_properties"
+fi
+
+if [ -f src/*/Version.h ]; then
+    version_header=$(realpath src/*/Version.h)
+    library_name=$(basename "$(dirname "$version_header")" | tr '[:lower:]' '[:upper:]')
+
+    echo "Updating version header '$version_header' of '$library_name' with tag '$new_version'..."
+
+    temporary_version_header=$(mktemp)
+
+    sed "s/^#define ${library_name}_VERSION .*$/#define ${library_name}_VERSION $new_version/" "$version_header" > "$temporary_version_header"
+    cat $temporary_version_header > "$version_header"
+    rm "$temporary_version_header"
+    git add "$version_header"
+fi
+
+if [ "$(git status --porcelain)" ]; then
     git commit -m "$tag_message"
 fi
 

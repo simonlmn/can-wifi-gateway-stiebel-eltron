@@ -6,7 +6,7 @@
 #include <cstdio>
 #endif
 
-#include "src/iot-core/Interfaces.h"
+#include <iot_core/Interfaces.h>
 #include "StiebelEltronTypes.h"
 #include "CanInterface.h"
 #include <functional>
