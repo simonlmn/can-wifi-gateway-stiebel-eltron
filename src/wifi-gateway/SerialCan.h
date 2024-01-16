@@ -3,9 +3,9 @@
 
 #include <iot_core/Interfaces.h>
 #include <iot_core/Utils.h>
-#include "src/serial-protocol/Endpoint.h"
-#include "CanInterface.h"
+#include <serial_transport.h>
 #include <gpiobj.h>
+#include "CanInterface.h"
 
 class SerialCan final : public ICanInterface, public iot_core::IApplicationComponent {
 private:
@@ -24,7 +24,7 @@ private:
   CanMode _mode = CanMode::ListenOnly;
   CanCounters _counters;
 
-  serial_protocol::Endpoint _serial;
+  serial_transport::Endpoint _serial;
 
 public:
   SerialCan(iot_core::ISystem& system, gpiobj::DigitalOutput& resetPin, gpiobj::DigitalInput& txEnablePin) :
@@ -35,7 +35,7 @@ public:
     _canAvailable(false),
     _resetInterval(30000),
     _counters(),
-    _serial([this] (const char* message, serial_protocol::Endpoint& serial) { processReceived(message, serial); }, [this] (serial_protocol::ErrorCode errorCode, serial_protocol::Endpoint& serial) { handleError(errorCode, serial); })
+    _serial([this] (const char* message, serial_transport::Endpoint& serial) { processReceived(message, serial); }, [this] (serial_transport::ErrorCode errorCode, serial_transport::Endpoint& serial) { handleError(errorCode, serial); })
   {
   }
 
@@ -144,12 +144,12 @@ private:
     _resetInterval.restart();
   }
 
-  void handleError(serial_protocol::ErrorCode errorCode, serial_protocol::Endpoint& /*serial*/) {
-    _logger.log(iot_core::LogLevel::Warning, name(), [&] () { return iot_core::format(F("Serial error %c: %s"), static_cast<char>(errorCode), serial_protocol::describe(errorCode)); });
+  void handleError(serial_transport::ErrorCode errorCode, serial_transport::Endpoint& /*serial*/) {
+    _logger.log(iot_core::LogLevel::Warning, name(), [&] () { return iot_core::format(F("Serial error %c: %s"), static_cast<char>(errorCode), serial_transport::describe(errorCode)); });
     _counters.err += 1;
   }
 
-  void processReceived(const char* message, serial_protocol::Endpoint& serial) {
+  void processReceived(const char* message, serial_transport::Endpoint& serial) {
     const char* start = message;
     char* end = nullptr;
 

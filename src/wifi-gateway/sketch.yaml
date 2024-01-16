@@ -8,5 +8,6 @@ profiles:
     libraries:
       - WiFiManager (2.0.16-rc.2)
       - PubSubClient (2.8)
-      - GPIObj (0.1)
-      - ESP IoT Core (0.1)
+      - gpiobj (0.3.0)
+      - esp-iot-core (0.2.1)
+      - serial-transport (0.1.0)

@@ -1,5 +1,5 @@
 #include <ACAN2515.h>
-#include "src/serial-protocol/Endpoint.h"
+#include <serial_transport.h>
 
 // CAN interface
 static const int MCP2515_CS_PIN  = 5;
@@ -9,7 +9,7 @@ static bool canAvailable = false;
 
 ACAN2515 can (MCP2515_CS_PIN, SPI, MCP2515_INT_PIN);
 
-void processReceived(const char* message, serial_protocol::Endpoint& serial) {
+void processReceived(const char* message, serial_transport::Endpoint& serial) {
   const char* start = message;
   char* end = nullptr;
 
@@ -109,11 +109,11 @@ void processReceived(const char* message, serial_protocol::Endpoint& serial) {
   }
 }
 
-void handleError(serial_protocol::ErrorCode errorCode, serial_protocol::Endpoint& serial) {
+void handleError(serial_transport::ErrorCode errorCode, serial_transport::Endpoint& serial) {
   serial.queue("ERROR %c", static_cast<char>(errorCode));
 }
 
-serial_protocol::Endpoint serial { processReceived, handleError };
+serial_transport::Endpoint serial { processReceived, handleError };
 
 void setup() {
   serial.setup();
