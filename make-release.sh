@@ -133,7 +133,7 @@ if [ -f src/*/Version.h ]; then
 
     temporary_version_header=$(mktemp)
 
-    sed "s/^#define ${library_name}_VERSION .*$/#define ${library_name}_VERSION $new_version/" "$version_header" > "$temporary_version_header"
+    sed "s/^#define ${library_name}_VERSION .*$/#define ${library_name}_VERSION \"$new_version\"/" "$version_header" > "$temporary_version_header"
     cat $temporary_version_header > "$version_header"
     rm "$temporary_version_header"
     git add "$version_header"
