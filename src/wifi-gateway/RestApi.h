@@ -1,15 +1,9 @@
 #ifndef RESTAPI_H_
 #define RESTAPI_H_
 
-#include <iot_core/Interfaces.h>
-#include <iot_core/Utils.h>
-#include <iot_core/Config.h>
-#include <iot_core/ChunkedResponse.h>
+#include <iot_core/api/Interfaces.h>
 #include <iot_core/JsonWriter.h>
-#include <iot_core/JsonDiagnosticsCollector.h>
-#include <ESP8266WebServer.h>
 #include <uri/UriBraces.h>
-#include <uri/UriGlob.h>
 #include "Serializer.h"
 #include "DataAccess.h"
 #include "StiebelEltronProtocol.h"
@@ -20,83 +14,57 @@
 #  include "no-ui.generated.h"
 #endif
 
-static const char CONTENT_TYPE_PLAIN[] PROGMEM = "text/plain";
-static const char CONTENT_TYPE_HTML[] PROGMEM = "text/html";
-static const char CONTENT_TYPE_JSON[] PROGMEM = "application/json";
-static const char HEADER_ACCEPT[] PROGMEM = "Accept";
-static const char ARG_PLAIN[] PROGMEM = "plain";
-static const char ARG_UPDATED_SINCE[] PROGMEM = "updatedSince";
-static const char ARG_ONLY_UNDEFINED[] PROGMEM = "onlyUndefined";
-static const char ARG_ONLY_CONFIGURED[] PROGMEM = "onlyConfigured";
-static const char ARG_NUMBERS_AS_DECIMALS[] PROGMEM = "numbersAsDecimals";
-static const char ARG_ACCESS_MODE[] PROGMEM = "accessMode";
-static const char ARG_VALIDATE_ONLY[] PROGMEM = "validateOnly";
+static const char ARG_UPDATED_SINCE[] = "updatedSince";
+static const char ARG_ONLY_UNDEFINED[] = "onlyUndefined";
+static const char ARG_ONLY_CONFIGURED[] = "onlyConfigured";
+static const char ARG_NUMBERS_AS_DECIMALS[] = "numbersAsDecimals";
+static const char ARG_ACCESS_MODE[] = "accessMode";
+static const char ARG_VALIDATE_ONLY[] = "validateOnly";
 
-class RestApi final : public iot_core::IApplicationComponent {
+class RestApi final : public iot_core::api::IProvider {
 private:
   iot_core::Logger& _logger;
   iot_core::ISystem& _system;
-  iot_core::IApplicationContainer& _application;
 
   DataAccess& _access;
   StiebelEltronProtocol& _protocol;
-
-  ESP8266WebServer _server;
-  iot_core::ChunkedResponse<ESP8266WebServer> _response;
-
-  iot_core::TimingStatistics<10u> _callStatistics;
   
 public:
-  RestApi(iot_core::ISystem& system, iot_core::IApplicationContainer& application, DataAccess& access, StiebelEltronProtocol& protocol)
-  : _logger(system.logger()), _system(system), _application(application), _access(access), _protocol(protocol), _server(80), _response(_server) {}
+  RestApi(iot_core::ISystem& system, DataAccess& access, StiebelEltronProtocol& protocol)
+  : _logger(system.logger()), _system(system), _access(access), _protocol(protocol) {}
   
-  const char* name() const override {
-    return "api";
-  }
-
-  bool configure(const char* /*name*/, const char* /*value*/) override {
-    return false;
-  }
-
-  void getConfig(std::function<void(const char*, const char*)> /*writer*/) const override {
-  }
-
-  void setup(bool /*connected*/) override {
-    _server.enableCORS(true);
-    _server.collectHeaders(FPSTR(HEADER_ACCEPT));
-
-    _server.on(UriGlob(F("*")), HTTP_OPTIONS, [this]() { // generic reply to make "pre-flight" checks work
-      _server.sendHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-      _server.send(204);
-    });
-    
-    _server.on(F("/"), HTTP_GET, _callStatistics.wrap([this]() {
-      _server.sendHeader("Content-Encoding", "gzip");
+  void setupApi(iot_core::api::IServer& server) override {
+    server.on(F("/"), iot_core::api::HttpMethod::GET, [this](const iot_core::api::IRequest&, iot_core::api::IResponse& response) {
+      response
+        .code(iot_core::api::ResponseCode::Ok)
+        .contentType(iot_core::api::ContentType::TextHtml)
+        .header("Content-Encoding", "gzip")
+        .sendSingleBody()
       #ifdef WIFI_GATEWAY_UI_H
-        _server.send_P(200, CONTENT_TYPE_HTML, wifi_gateway_ui::HTML, wifi_gateway_ui::HTML_SIZE);
+        .write(wifi_gateway_ui::HTML, wifi_gateway_ui::HTML_SIZE);
       #else
-        _server.send_P(200, CONTENT_TYPE_HTML, no_ui::HTML, no_ui::HTML_SIZE);
+        .write(no_ui::HTML, no_ui::HTML_SIZE);
       #endif
-    }));
+    });
 
-    _server.on(F("/api/data"), HTTP_GET, _callStatistics.wrap([this]() {
-      if (_server.hasArg(FPSTR(ARG_ONLY_UNDEFINED))) {
-        getItems([] (DataEntry const& entry) { return !entry.hasDefinition(); });
-      } else if (_server.hasArg(FPSTR(ARG_ONLY_CONFIGURED))) {
-        getItems([] (DataEntry const& entry) { return entry.isConfigured(); });
+    server.on(F("/api/data"), iot_core::api::HttpMethod::GET, [this](const iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      if (request.hasArg(ARG_ONLY_UNDEFINED)) {
+        getItems(request, response, [] (DataEntry const& entry) { return !entry.hasDefinition(); });
+      } else if (request.hasArg(ARG_ONLY_CONFIGURED)) {
+        getItems(request, response, [] (DataEntry const& entry) { return entry.isConfigured(); });
       } else {
-        getItems();
+        getItems(request, response);
       }
-    }));
+    });
 
-    _server.on(UriBraces(F("/api/data/{}/{}/{}")), HTTP_PUT, _callStatistics.wrap([this]() {
-      doItem([&] (DataAccess::DataKey const& key, DataEntry const& entry) {
+    server.on(UriBraces(F("/api/data/{}/{}/{}")), iot_core::api::HttpMethod::PUT, [this](const iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      doItem(request, response, [&] (DataAccess::DataKey const& key, DataEntry const& entry) {
         if (!entry.writable || !entry.hasDefinition()) {
           return false;
         }
         
-        ValueAccessMode accessMode = valueAccessModeFromString(_server.arg(FPSTR(ARG_ACCESS_MODE)).c_str());
-        const char* valueString = _server.arg(FPSTR(ARG_PLAIN)).c_str();
+        ValueAccessMode accessMode = valueAccessModeFromString(request.arg(ARG_ACCESS_MODE));
+        const char* valueString = request.body().content();
 
         const char* space = strrchr(valueString, ' ');
         if (space != nullptr) {
@@ -116,204 +84,39 @@ public:
   
         return _access.write(key, rawValue, accessMode);
       });
-    }));
-
-    _server.on(F("/api/subscriptions"), HTTP_GET, _callStatistics.wrap([this]() {
-      getDataConfigs([] (DataEntry const& entry) { return entry.subscribed; });
-    }));
-
-    _server.on(F("/api/subscriptions"), HTTP_POST, _callStatistics.wrap([this]() {      
-      postDataConfig([&] (DataAccess::DataKey const& key) { return _access.addSubscription(key); });
-    }));
-
-    _server.on(UriBraces(F("/api/subscriptions/{}/{}/{}")), HTTP_DELETE, _callStatistics.wrap([this]() {
-      doItem([&] (DataAccess::DataKey const& key, DataEntry const& entry) { _access.removeSubscription(key); return true; });
-    }));
-
-    _server.on(F("/api/writable"), HTTP_GET, _callStatistics.wrap([this]() {
-      getDataConfigs([](DataEntry const& entry) { return entry.writable; });
-    }));
-
-    _server.on(F("/api/writable"), HTTP_POST, _callStatistics.wrap([this]() {
-      postDataConfig([&] (DataAccess::DataKey const& key) { return _access.addWritable(key); });
-    }));
-
-    _server.on(UriBraces(F("/api/writable/{}/{}/{}")), HTTP_DELETE, _callStatistics.wrap([this]() {
-      doItem([&] (DataAccess::DataKey const& key, DataEntry const& entry) { _access.removeWritable(key); return true; });
-    }));
-
-    _server.on(F("/api/definitions"), HTTP_GET, _callStatistics.wrap([this]() {
-      getDefinitions();
-    }));
-
-    _server.on(F("/api/devices"), HTTP_GET, _callStatistics.wrap([this]() {
-      getDevices();
-    }));
-    
-    _server.on(F("/api/system/reset"), HTTP_POST, [this]() {
-      _system.schedule([&] () { _system.reset(); });
-      _system.reset();
-      _server.send(204);
     });
 
-    _server.on(F("/api/system/factory-reset"), HTTP_POST, [this]() {
-      _system.schedule([&] () { _system.factoryReset(); });
-      _server.send(204);
+    server.on(F("/api/subscriptions"), iot_core::api::HttpMethod::GET, [this](const iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      getDataConfigs(request, response, [] (DataEntry const& entry) { return entry.subscribed; });
     });
 
-    _server.on(F("/api/system/stop"), HTTP_POST, [this]() {
-      _system.stop();
-      _server.send(204);
+    server.on(F("/api/subscriptions"), iot_core::api::HttpMethod::POST, [this](const iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      postDataConfig(request, response, [&] (DataAccess::DataKey const& key) { return _access.addSubscription(key); });
     });
 
-    _server.on(F("/api/system/status"), HTTP_GET, [this]() {
-      if (!_response.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
-        _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
-        return;
-      }
-      
-      {
-        auto writer = iot_core::makeJsonWriter(_response);
-        auto collector = iot_core::makeJsonDiagnosticsCollector(writer);
-        _application.getDiagnostics(collector);
-      }
-
-      _response.end();
+    server.on(UriBraces(F("/api/subscriptions/{}/{}/{}")), iot_core::api::HttpMethod::DELETE, [this](const iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      doItem(request, response, [&] (DataAccess::DataKey const& key, DataEntry const& entry) { _access.removeSubscription(key); return true; });
     });
 
-    _server.on(F("/api/system/logs"), HTTP_GET, [this]() {
-      if (!_response.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
-        _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
-        return;
-      }
-      
-      _logger.output([&] (const char* entry) {
-        _response.write(entry);
-      });
-
-      _response.end();
+    server.on(F("/api/writable"), iot_core::api::HttpMethod::GET, [this](const iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      getDataConfigs(request, response, [](DataEntry const& entry) { return entry.writable; });
     });
 
-    _server.on(F("/api/system/log-level"), HTTP_GET, [this]() {
-      if (!_response.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
-        _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
-        return;
-      }
-
-      _response.write(iot_core::logLevelToString(_logger.initialLogLevel()));
-      _response.write('\n');
-
-      for (auto entry : _logger.logLevels()) {
-        _response.write(entry.first);
-        _response.write('=');
-        _response.write(iot_core::logLevelToString(entry.second));
-        _response.write('\n');
-      }
-
-      _response.end();
+    server.on(F("/api/writable"), iot_core::api::HttpMethod::POST, [this](const iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      postDataConfig(request, response, [&] (DataAccess::DataKey const& key) { return _access.addWritable(key); });
     });
 
-    _server.on(F("/api/system/log-level"), HTTP_PUT, [this]() {
-      iot_core::LogLevel logLevel = iot_core::logLevelFromString(_server.arg("plain").c_str());
-
-      _logger.initialLogLevel(logLevel);
-      
-      _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), iot_core::logLevelToString(_logger.initialLogLevel()));
+    server.on(UriBraces(F("/api/writable/{}/{}/{}")), iot_core::api::HttpMethod::DELETE, [this](const iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      doItem(request, response, [&] (DataAccess::DataKey const& key, DataEntry const& entry) { _access.removeWritable(key); return true; });
     });
 
-    _server.on(UriBraces(F("/api/system/log-level/{}")), HTTP_PUT, [this]() {
-      const auto& category = _server.pathArg(0);
-      iot_core::LogLevel logLevel = iot_core::logLevelFromString(_server.arg("plain").c_str());
-
-      _logger.logLevel(iot_core::make_static(category.c_str()), logLevel);
-      
-      _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), iot_core::logLevelToString(_logger.logLevel(category.c_str())));
+    server.on(F("/api/definitions"), iot_core::api::HttpMethod::GET, [this](const iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      getDefinitions(request, response);
     });
 
-    _server.on(F("/api/system/config"), HTTP_GET, [this]() {
-      if (!_response.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
-        _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
-        return;
-      }
-
-      _application.getAllConfig([&] (const char* path, const char* value) {
-        _response.write(path);
-        _response.write(iot_core::ConfigParser::SEPARATOR);
-        _response.write(value);
-        _response.write(iot_core::ConfigParser::END);
-        _response.write('\n');
-      });
-
-      _response.end();
-    });
-
-    _server.on(F("/api/system/config"), HTTP_PUT, [this]() {
-      const char* body = _server.arg("plain").c_str();
-
-      iot_core::ConfigParser config {const_cast<char*>(body)};
-
-      if (_application.configureAll(config)) {
-        _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), body);
-      } else {
-        _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::EMPTY_STRING);
-      }
-    });
-
-    _server.on(UriBraces(F("/api/system/config/{}")), HTTP_GET, [this]() {
-      const auto& category = _server.pathArg(0);
-
-      if (!_response.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
-        _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
-        return;
-      }
-
-      _application.getConfig(category.c_str(), [&] (const char* name, const char* value) {
-        _response.write(name);
-        _response.write(iot_core::ConfigParser::SEPARATOR);
-        _response.write(value);
-        _response.write(iot_core::ConfigParser::END);
-        _response.write('\n');
-      });
-
-      _response.end();
-    });
-
-    _server.on(UriBraces(F("/api/system/config/{}")), HTTP_PUT, [this]() {
-      const auto& category = _server.pathArg(0);
-      const char* body = _server.arg("plain").c_str();
-
-      iot_core::ConfigParser config {const_cast<char*>(body)};
-
-      if (_application.configure(category.c_str(), config)) {
-        _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), body);
-      } else {
-        _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::EMPTY_STRING);
-      }
-    });
-  }
-
-  void loop(iot_core::ConnectionStatus status) override {
-    switch (status) {
-      case iot_core::ConnectionStatus::Reconnected:
-        _server.begin();
-        break;
-      case iot_core::ConnectionStatus::Connected:
-        _server.handleClient();
-        break;
-      case iot_core::ConnectionStatus::Disconnecting:
-        _server.close();
-        break;
-      case iot_core::ConnectionStatus::Disconnected:
-        // do nothing
-        break;
-    }
-  }
-
-  void getDiagnostics(iot_core::IDiagnosticsCollector& collector) const override {
-    collector.addValue("callCount", iot_core::convert<size_t>::toString(_callStatistics.count(), 10));
-    collector.addValue("callAvg", iot_core::convert<unsigned long>::toString(_callStatistics.avg(), 10));
-    collector.addValue("callMin", iot_core::convert<unsigned long>::toString(_callStatistics.min(), 10));
-    collector.addValue("callMax", iot_core::convert<unsigned long>::toString(_callStatistics.max(), 10));
+    server.on(F("/api/devices"), iot_core::api::HttpMethod::GET, [this](const iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      getDevices(request, response);
+    });  
   }
 
 private:
@@ -329,10 +132,10 @@ private:
    * 
    * It is allowed to have spaces or other whitespace _after_ the commas.
    */
-  void postDataConfig(std::function<bool(DataAccess::DataKey const&)> itemOperation = {}) {
+  void postDataConfig(const iot_core::api::IRequest& request, iot_core::api::IResponse& response, std::function<bool(DataAccess::DataKey const&)> itemOperation = {}) {
     _system.lyield();
 
-    const char* body = _server.arg(FPSTR(ARG_PLAIN)).c_str();
+    const char* body = request.body().content();
     char* next;
     while (true) {
       ValueId valueId = iot_core::convert<ValueId>::fromString(body, &next, 0);
@@ -341,7 +144,10 @@ private:
       }
       const auto& definition = getDefinition(valueId);
       if (definition.isUnknown()) {
-        _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::format(F("unknown ID: %u"), valueId));
+        response
+          .code(iot_core::api::ResponseCode::BadRequest)
+          .contentType(iot_core::api::ContentType::TextPlain)
+          .sendSingleBody().write(iot_core::format(F("unknown ID: %u"), valueId));
         return;
       }
       
@@ -351,11 +157,17 @@ private:
         {
           // plain valueId
           if (!definition.source.isExact()) {
-            _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::format(F("device ID required for %u"), valueId));
+            response
+              .code(iot_core::api::ResponseCode::BadRequest)
+              .contentType(iot_core::api::ContentType::TextPlain)
+              .sendSingleBody().write(iot_core::format(F("device ID required for %u"), valueId));
             return;
           }
           if (!itemOperation({definition.source, valueId})) {
-            _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::format(F("operation failed for %u"), valueId));
+            response
+              .code(iot_core::api::ResponseCode::BadRequest)
+              .contentType(iot_core::api::ContentType::TextPlain)
+              .sendSingleBody().write(iot_core::format(F("operation failed for %u"), valueId));
             return;
           }
           break;
@@ -365,18 +177,27 @@ private:
           // <valueId>@<DeviceType>/<address>
           iot_core::Maybe<DeviceId> key = DeviceId::fromString(next + 1, &next);
           if (!key.hasValue) {
-            _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::format(F("device ID invalid for %u"), valueId));
+            response
+              .code(iot_core::api::ResponseCode::BadRequest)
+              .contentType(iot_core::api::ContentType::TextPlain)
+              .sendSingleBody().write(iot_core::format(F("device ID invalid for %u"), valueId));
             return;
           }
           if (!itemOperation({key.value, valueId})) {
-            _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::format(F("operation failed for %u@%s"), valueId, key.value.toString()));
+            response
+              .code(iot_core::api::ResponseCode::BadRequest)
+              .contentType(iot_core::api::ContentType::TextPlain)
+              .sendSingleBody().write(iot_core::format(F("operation failed for %u@%s"), valueId, key.value.toString()));
             return;
           }
           break;
         }
         default:
         {
-          _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::format(F("unexpected format: %s"), next));
+          response
+            .code(iot_core::api::ResponseCode::BadRequest)
+            .contentType(iot_core::api::ContentType::TextPlain)
+            .sendSingleBody().write(iot_core::format(F("unexpected format: %s"), next));
           return;
         }
       }
@@ -389,18 +210,25 @@ private:
     }
 
     if (strlen(body) > 0) {
-      _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), iot_core::format(F("unrecognized value: %s"), body));
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(iot_core::format(F("unrecognized value: %s"), body));
     } else {
-      _server.send(204, FPSTR(CONTENT_TYPE_PLAIN), iot_core::EMPTY_STRING);
+      response.code(iot_core::api::ResponseCode::OkNoContent);
     }
   }
 
   /**
    * Produce a list of data configurations based on the optional predicate.
    */
-  void getDataConfigs(std::function<bool(DataEntry const&)> predicate = {}) {
-    if (!_response.begin(200, FPSTR(CONTENT_TYPE_PLAIN))) {
-      _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
+  void getDataConfigs(const iot_core::api::IRequest&, iot_core::api::IResponse& response, std::function<bool(DataEntry const&)> predicate = {}) {
+    auto& body = response
+      .code(iot_core::api::ResponseCode::Ok)
+      .contentType(iot_core::api::ContentType::ApplicationJson)
+      .sendChunkedBody();
+
+    if (!body.valid()) {
       return;
     }
     
@@ -408,12 +236,10 @@ private:
 
     for (auto& data : collectionData) {
       if (!predicate || predicate(data.second)) {
-        _response.write(iot_core::format("%u@%s,\n", data.second.id, data.second.source.toString()));
+        body.write(iot_core::format("%u@%s,\n", data.second.id, data.second.source.toString()));
         _system.lyield();
       }
     }
-
-    _response.end();
   }
 
   /**
@@ -424,51 +250,69 @@ private:
    *  2. DeviceAddress
    *  3. ValueId
    */
-  void doItem(std::function<bool(DataAccess::DataKey const&, DataEntry const&)> itemOperation = {}) {
+  void doItem(const iot_core::api::IRequest& request, iot_core::api::IResponse& response, std::function<bool(DataAccess::DataKey const&, DataEntry const&)> itemOperation = {}) {
     _system.lyield();
 
-    _logger.log(iot_core::LogLevel::Debug, "api", [&] () { return iot_core::format(F("doItem '%s/%s/%s': %s"), _server.pathArg(0).c_str(), _server.pathArg(1).c_str(), _server.pathArg(2).c_str(), _server.arg(FPSTR(ARG_PLAIN)).c_str()); });
+    _logger.log(iot_core::LogLevel::Debug, "api", [&] () { return iot_core::format(F("doItem '%s/%s/%s': %s"), request.pathArg(0), request.pathArg(1), request.pathArg(2), request.body().content()); });
 
-    bool validateOnly = _server.hasArg(FPSTR(ARG_VALIDATE_ONLY));
+    bool validateOnly = request.hasArg(ARG_VALIDATE_ONLY);
     
-    DeviceType type = deviceTypeFromString(_server.pathArg(0).c_str());
+    DeviceType type = deviceTypeFromString(request.pathArg(0));
     if (type == DeviceType::Any) {
-      _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), F("device type invalid"));
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(F("device type invalid"));
       return;
     }
 
     char* end;
-    const char* addressArg = _server.pathArg(1).c_str();
+    const char* addressArg = request.pathArg(1);
     long addressNumber = iot_core::convert<long>::fromString(addressArg, &end, 10);
     if (end == addressArg || addressNumber < 0 || addressNumber > 0x7F) {
-      _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), F("device address invalid"));
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(F("device address invalid"));
       return;
     }
 
-    const char* valueIdArg = _server.pathArg(2).c_str();
+    const char* valueIdArg = request.pathArg(2);
     long valueIdNumber = iot_core::convert<long>::fromString(valueIdArg, &end, 0);
     if (end == valueIdArg || valueIdNumber < 0 || valueIdNumber > 0xFFFF) {
-      _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), F("value ID invalid"));
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(F("value ID invalid"));
       return;
     }
 
     const DataAccess::DataKey key {DeviceId{type, DeviceAddress(addressNumber)}, ValueId(valueIdNumber)};
     const DataEntry* entry = _access.getEntry(key);
     if (entry == nullptr) {
-      _server.send(404, FPSTR(CONTENT_TYPE_PLAIN), F("item not found"));
+      response
+        .code(iot_core::api::ResponseCode::BadRequestNotFound)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(F("item not found"));
       return;
     }
 
     _system.lyield();
 
     if (validateOnly) {
-      _server.send(200, FPSTR(CONTENT_TYPE_PLAIN), _server.arg(FPSTR(ARG_PLAIN)));
+      response
+        .code(iot_core::api::ResponseCode::Ok)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(request.body().content());
     } else {
       if (itemOperation(key, *entry)) {
-        _server.send(202, FPSTR(CONTENT_TYPE_PLAIN), iot_core::EMPTY_STRING);
+        response.code(iot_core::api::ResponseCode::OkAccepted);
       } else {
-        _logger.log(iot_core::LogLevel::Warning, name(), F("doItem: operation failed"));
-        _server.send(400, FPSTR(CONTENT_TYPE_PLAIN), F("operation failed"));
+        _logger.log(iot_core::LogLevel::Warning, "api", F("doItem: operation failed"));
+        response
+          .code(iot_core::api::ResponseCode::BadRequest)
+          .contentType(iot_core::api::ContentType::TextPlain)
+          .sendSingleBody().write(F("operation failed"));
       }
     }
   }
@@ -476,21 +320,25 @@ private:
   /**
    * Produce a list of items based on the optional predicate.
    */
-  void getItems(std::function<bool(DataEntry const&)> predicate = {}) {
+  void getItems(const iot_core::api::IRequest& request, iot_core::api::IResponse& response, std::function<bool(DataEntry const&)> predicate = {}) {
     iot_core::DateTime updatedSince;
-    if (_server.hasArg(FPSTR(ARG_UPDATED_SINCE))) {
-      updatedSince.fromString(_server.arg(FPSTR(ARG_UPDATED_SINCE)).c_str());
+    if (request.hasArg(ARG_UPDATED_SINCE)) {
+      updatedSince.fromString(request.arg(ARG_UPDATED_SINCE));
     }
-    bool numbersAsDecimals = _server.hasArg(FPSTR(ARG_NUMBERS_AS_DECIMALS));
+    bool numbersAsDecimals = request.hasArg(ARG_NUMBERS_AS_DECIMALS);
 
-    if (!_response.begin(200, FPSTR(CONTENT_TYPE_JSON))) {
-      _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
+    auto& body = response
+      .code(iot_core::api::ResponseCode::Ok)
+      .contentType(iot_core::api::ContentType::ApplicationJson)
+      .sendChunkedBody();
+
+    if (!body.valid()) {
       return;
     }
     
     const auto& collectionData = _access.getData();
 
-    auto writer = iot_core::makeJsonWriter(_response);
+    auto writer = iot_core::makeJsonWriter(body);
 
     writer.openObject();
     writer.propertyString(F("retrievedOn"), _access.currentDateTime().toString());
@@ -544,17 +392,19 @@ private:
     writer.close();
     writer.propertyPlain(F("actualItems"), iot_core::convert<size_t>::toString(i, 10));
     writer.close();
-    
-    _response.end();
   }
 
-  void getDefinitions() {
-    if (!_response.begin(200, FPSTR(CONTENT_TYPE_JSON))) {
-      _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
+  void getDefinitions(const iot_core::api::IRequest&, iot_core::api::IResponse& response) {
+    auto& body = response
+      .code(iot_core::api::ResponseCode::Ok)
+      .contentType(iot_core::api::ContentType::ApplicationJson)
+      .sendChunkedBody();
+
+    if (!body.valid()) {
       return;
     }
-    
-    auto writer = iot_core::makeJsonWriter(_response);
+
+    auto writer = iot_core::makeJsonWriter(body);
 
     writer.openList();
     for (auto& definition : DEFINITIONS) {
@@ -562,17 +412,19 @@ private:
       _system.lyield();
     }
     writer.close();
-    
-    _response.end();
   }
 
-  void getDevices() {
-    if (!_response.begin(200, FPSTR(CONTENT_TYPE_JSON))) {
-      _server.send(505, FPSTR(CONTENT_TYPE_PLAIN), F("HTTP1.1 required"));
+  void getDevices(const iot_core::api::IRequest&, iot_core::api::IResponse& response) {
+    auto& body = response
+      .code(iot_core::api::ResponseCode::Ok)
+      .contentType(iot_core::api::ContentType::ApplicationJson)
+      .sendChunkedBody();
+
+    if (!body.valid()) {
       return;
     }
 
-    auto writer = iot_core::makeJsonWriter(_response);
+    auto writer = iot_core::makeJsonWriter(body);
     
     writer.openObject();
     writer.property(F("this"));
@@ -590,8 +442,6 @@ private:
     }
     writer.close();
     writer.close();
-
-    _response.end();
   }
 };
 

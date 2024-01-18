@@ -98,8 +98,9 @@ export class StatusPage {
             this.statusList.add('Chip ID', data.system.chipId);
             this.statusList.add('Flash chip ID', data.system.flashChipId);
             this.statusList.add('Sketch MD5', data.system.sketchMD5);
-            this.statusList.add('Core version', data.system.coreVersion);
-            this.statusList.add('SDK version', data.system.sdkVersion);
+            this.statusList.add('IoT Core version', data.system.iotCoreVersion);
+            this.statusList.add('ESP Core version', data.system.espCoreVersion);
+            this.statusList.add('ESP SDK version', data.system.espSdkVersion);
             this.statusList.add('Supply voltage', `${data.system.chipVcc} V`);
             this.statusList.add('CPU frequency', `${data.system.cpuFreq} MHz`);
             this.statusList.add('Reset reason', data.system.resetReason);

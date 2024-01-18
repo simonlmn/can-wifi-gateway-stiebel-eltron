@@ -9,7 +9,9 @@
 #define MQTT_SUPPORT
 
 #include <gpiobj.h>
-#include <iot_core/System.h>
+#include <iot_core.h>
+#include <iot_core/api/Server.h>
+#include <iot_core/api/SystemApi.h>
 #include "AppVersion.h"
 #include "SerialCan.h"
 #include "StiebelEltronProtocol.h"
@@ -43,11 +45,14 @@ gpiobj::DigitalOutput builtinLed { LED_BUILTIN, false, gpiobj::SignalMode::Inver
 }
 
 iot_core::System sys { "can-wifi-gw", APP_VERSION, OTA_PASSWORD, io::builtinLed, io::otaEnablePin, io::updatePin, io::factoryResetPin, io::debugModePin };
+iot_core::api::Server api { sys };
+iot_core::api::SystemApi systemApi { sys, sys };
+
 SerialCan can { sys, io::canResetPin, io::txEnablePin };
 StiebelEltronProtocol protocol { sys, can };
 DateTimeSource timeSource { sys.logger(), protocol };
 DataAccess access { sys, protocol, io::writeEnablePin };
-RestApi api { sys, sys, access, protocol };
+RestApi appApi { sys, access, protocol };
 #ifdef MQTT_SUPPORT
 MqttClient mqtt { sys, access };
 #endif
@@ -62,14 +67,17 @@ void setup() {
     io::debugModePin.read()
   ));
 
+  sys.addComponent(&api);
   sys.addComponent(&can);
   sys.addComponent(&protocol);
   sys.addComponent(&timeSource);
   sys.addComponent(&access);
-  sys.addComponent(&api);
 #ifdef MQTT_SUPPORT
   sys.addComponent(&mqtt);
 #endif
+
+  api.addProvider(&systemApi);
+  api.addProvider(&appApi);
 
   sys.setup();
 }

@@ -3,6 +3,8 @@
 export REPOSITORY_BASE_PATH=$(realpath "$0/..")
 . "$REPOSITORY_BASE_PATH/tools/init-arduino-env.sh"
 
+arduino-cli lib update-index
+
 "$REPOSITORY_BASE_PATH/tools/generate-all-versions.sh"
 
 arduino-cli compile --profile default "$REPOSITORY_BASE_PATH/src/serial-can-bridge"
