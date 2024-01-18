@@ -146,5 +146,5 @@ fi
 git tag -a "$new_tag" -m "$tag_message"
 
 if command -v './post-release.sh' &> /dev/null; then
-    ./post-release.sh
+    new_tag=$new_tag ./post-release.sh
 fi
