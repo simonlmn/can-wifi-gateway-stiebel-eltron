@@ -7,7 +7,7 @@
 
 class FakeCan final : public ICanInterface, public iot_core::IApplicationComponent {
 private:
-  iot_core::Logger& _logger;
+  iot_core::Logger _logger;
   iot_core::ISystem& _system;
   bool _canAvailable;
   std::function<void()> _readyHandler;
@@ -15,7 +15,7 @@ private:
   
 public:
   FakeCan(iot_core::ISystem& system) :
-    _logger(system.logger()),
+    _logger(system.logger("fan")),
     _system(system),
     _canAvailable(false)
   {

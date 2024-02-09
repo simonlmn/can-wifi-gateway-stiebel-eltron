@@ -1,0 +1,765 @@
+{
+    "0x0003": {
+        "name": "DHW set temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x0004": {
+        "name": "HC set temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x0005": {
+        "name": "set room temperature day",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Writable"
+    },
+    "0x0008": {
+        "name": "set room temperature night",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Writable"
+    },
+    "0x000B": {
+        "name": "device ID",
+        "unit": "None",
+        "codec": "S16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x000C": {
+        "name": "outside temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x000D": {
+        "name": "flow temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x000E": {
+        "name": "DHW temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x000F": {
+        "name": "HC temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x0011": {
+        "name": "room temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Writable"
+    },
+    "0x0012": {
+        "name": "set room temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x0013": {
+        "name": "DHW set temperature day",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Writable"
+    },
+    "0x0014": {
+        "name": "evaporator temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x0016": {
+        "name": "return temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x001A": {
+        "name": "collector temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x0026": {
+        "name": "? HC max flow temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x0027": {
+        "name": "HC max curve set temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x0028": {
+        "name": "? HC max flow temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x0060": {
+        "name": "defrost evaporator",
+        "unit": "None",
+        "codec": "U8",
+        "converter": "bool",
+        "access": "Readable"
+    },
+    "0x0075": {
+        "name": "room humidity",
+        "unit": "RelativeHumidity",
+        "codec": "U16",
+        "converter": "10^-1",
+        "access": "Writable"
+    },
+    "0x008E": {
+        "name": "humidity hysteresis",
+        "unit": "Percent",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x010C": {
+        "name": "outside temperature damping",
+        "unit": "Hours",
+        "codec": "U8",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x010E": {
+        "name": "HC curve gradient slope",
+        "unit": "Percent",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x010F": {
+        "name": "HC room influence",
+        "unit": "Percent",
+        "codec": "U8",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x0112": {
+        "name": "operating mode",
+        "unit": "None",
+        "codec": "U8",
+        "converter": "OperatingMode",
+        "access": "Writable"
+    },
+    "0x0121": {
+        "name": "current weekday",
+        "unit": "Weekday",
+        "codec": "U8",
+        "converter": "Weekday",
+        "access": "Readable"
+    },
+    "0x0122": {
+        "name": "current day",
+        "unit": "Day",
+        "codec": "U8",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0123": {
+        "name": "current month",
+        "unit": "Month",
+        "codec": "U8",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0124": {
+        "name": "current year",
+        "unit": "Year",
+        "codec": "U8",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0125": {
+        "name": "current hour",
+        "unit": "Hour",
+        "codec": "U8",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0126": {
+        "name": "current minute",
+        "unit": "Minute",
+        "codec": "U8",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0176": {
+        "name": "operating status",
+        "unit": "None",
+        "codec": "U16",
+        "converter": "OperatingStatus",
+        "access": "Readable"
+    },
+    "0x01DA": {
+        "name": "flow rate",
+        "unit": "LiterPerMinute",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x0264": {
+        "name": "dew-point temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x0265": {
+        "name": "hot gas temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x0341": {
+        "name": "ventilation filter runtime",
+        "unit": "Days",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x03AE": {
+        "name": "HRV heat quant. per day (% 1000)",
+        "unit": "WattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x03AF": {
+        "name": "HRV heat quant. per day (/ 1000)",
+        "unit": "KiloWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x03B0": {
+        "name": "HRV heat quant. total (% 1000)",
+        "unit": "KiloWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x03B1": {
+        "name": "HRV heat quant. total (/ 1000)",
+        "unit": "MegaWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x056C": {
+        "name": "ventilation level day",
+        "unit": "None",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x056D": {
+        "name": "ventilation level night",
+        "unit": "None",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x056F": {
+        "name": "ventilation level standby",
+        "unit": "None",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x0570": {
+        "name": "ventilation level party",
+        "unit": "None",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x0571": {
+        "name": "unscheduled vent. level 0 duration",
+        "unit": "Minutes",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x0572": {
+        "name": "unscheduled vent. level 1 duration",
+        "unit": "Minutes",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x0573": {
+        "name": "unscheduled vent. level 2 duration",
+        "unit": "Minutes",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x0574": {
+        "name": "unscheduled vent. level 3 duration",
+        "unit": "Minutes",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x0576": {
+        "name": "air ventilation level 1",
+        "unit": "CubicmeterPerHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x0577": {
+        "name": "air ventilation level 2",
+        "unit": "CubicmeterPerHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x0578": {
+        "name": "air ventilation level 3",
+        "unit": "CubicmeterPerHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x0579": {
+        "name": "air extraction level 1",
+        "unit": "CubicmeterPerHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x057A": {
+        "name": "air extraction level 2",
+        "unit": "CubicmeterPerHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x057B": {
+        "name": "air extraction level 3",
+        "unit": "CubicmeterPerHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x0596": {
+        "name": "air ventilation current setpoint",
+        "unit": "CubicmeterPerHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0597": {
+        "name": "air ventilation actual",
+        "unit": "Hertz",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0598": {
+        "name": "air extraction current setpoint",
+        "unit": "CubicmeterPerHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0599": {
+        "name": "air extraction actual",
+        "unit": "Hertz",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x059A": {
+        "name": "exhaust air current setpoint",
+        "unit": "Percent",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x059B": {
+        "name": "exhaust air actual",
+        "unit": "Hertz",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x059C": {
+        "name": "condenser temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x059D": {
+        "name": "HC flow temp. influence",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Writable"
+    },
+    "0x059E": {
+        "name": "HC curve gradient base",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Writable"
+    },
+    "0x05BB": {
+        "name": "heating level",
+        "unit": "None",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x05DD": {
+        "name": "unscheduled ventilation level",
+        "unit": "None",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Writable"
+    },
+    "0x064A": {
+        "name": "HC pressure",
+        "unit": "Bar",
+        "codec": "U16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x064B": {
+        "name": "HC/DHW valve position",
+        "unit": "None",
+        "codec": "U16",
+        "converter": "ValvePosition",
+        "access": "Readable"
+    },
+    "0x0652": {
+        "name": "HC/DHW valve: force to HC",
+        "unit": "None",
+        "codec": "U16",
+        "converter": "bool",
+        "access": "WritableExtraProtected"
+    },
+    "0x0653": {
+        "name": "HC/DHW valve: force to DHW",
+        "unit": "None",
+        "codec": "U16",
+        "converter": "bool",
+        "access": "WritableExtraProtected"
+    },
+    "0x0654": {
+        "name": "mixing circuit pump: force enable",
+        "unit": "None",
+        "codec": "U16",
+        "converter": "bool",
+        "access": "WritableExtraProtected"
+    },
+    "0x0694": {
+        "name": "air extraction temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x0698": {
+        "name": "PWM solar pump",
+        "unit": "Percent",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0699": {
+        "name": "PWM mixing circuit pump",
+        "unit": "Percent",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x069A": {
+        "name": "relative heating power",
+        "unit": "Percent",
+        "codec": "S16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x069B": {
+        "name": "compressor current setpoint",
+        "unit": "Percent",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x069C": {
+        "name": "compressor freq. setpoint (unlimited)",
+        "unit": "Hertz",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x069D": {
+        "name": "compressor freq. setpoint (limited)",
+        "unit": "Hertz",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x069E": {
+        "name": "compressor freq.",
+        "unit": "Hertz",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x069F": {
+        "name": "compressor current",
+        "unit": "Ampere",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x06A0": {
+        "name": "compressor power",
+        "unit": "Watt",
+        "codec": "U16",
+        "converter": "10^1",
+        "access": "Readable"
+    },
+    "0x06A1": {
+        "name": "compressor voltage",
+        "unit": "Volt",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x06A2": {
+        "name": "compressor temperature",
+        "unit": "Celsius",
+        "codec": "U16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x06A3": {
+        "name": "compressor fault",
+        "unit": "None",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x07A9": {
+        "name": "evaporator outlet temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0x080D": {
+        "name": "low pressure (filtered)",
+        "unit": "Bar",
+        "codec": "U16",
+        "converter": "10^-2",
+        "access": "Readable"
+    },
+    "0x091A": {
+        "name": "DHW el. cons. per day (% 1000)",
+        "unit": "WattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x091B": {
+        "name": "DHW el. cons. per day (/ 1000)",
+        "unit": "KiloWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x091C": {
+        "name": "DHW el. cons. total (% 1000)",
+        "unit": "KiloWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x091D": {
+        "name": "DHW el. cons. total (/ 1000)",
+        "unit": "MegaWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x091E": {
+        "name": "heating el. cons. per day (% 1000)",
+        "unit": "WattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x091F": {
+        "name": "heating el. cons. per day (/ 1000)",
+        "unit": "KiloWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0920": {
+        "name": "heating el. cons. total (% 1000)",
+        "unit": "KiloWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0921": {
+        "name": "heating el. cons. total (/ 1000)",
+        "unit": "MegaWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0924": {
+        "name": "DHW EH heat quant. total (% 1000)",
+        "unit": "KiloWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0925": {
+        "name": "DHW EH heat quant. total (/ 1000)",
+        "unit": "MegaWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0928": {
+        "name": "heating EH heat quant. total (% 1000)",
+        "unit": "KiloWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0929": {
+        "name": "heating EH heat quant. total (/ 1000)",
+        "unit": "MegaWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x092A": {
+        "name": "DHW heat quant. per day (% 1000)",
+        "unit": "WattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x092B": {
+        "name": "DHW heat quant. per day (/ 1000)",
+        "unit": "KiloWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x092C": {
+        "name": "DHW heat quant. total (% 1000)",
+        "unit": "KiloWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x092D": {
+        "name": "DHW heat quant. total (/ 1000)",
+        "unit": "MegaWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x092E": {
+        "name": "heating heat quant. per day (% 1000)",
+        "unit": "WattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x092F": {
+        "name": "heating heat quant. per day (/ 1000)",
+        "unit": "KiloWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0930": {
+        "name": "heating heat quant. total (% 1000)",
+        "unit": "KiloWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0x0931": {
+        "name": "heating heat quant. total (/ 1000)",
+        "unit": "MegaWattHour",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0xC0EF": {
+        "name": "air extraction humidity",
+        "unit": "RelativeHumidity",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0xC0F4": {
+        "name": "compressor starts (% 1000)",
+        "unit": "Hours",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0xC0F5": {
+        "name": "compressor starts (/ 1000)",
+        "unit": "ThousandHours",
+        "codec": "U16",
+        "converter": "10^0",
+        "access": "Readable"
+    },
+    "0xC0F6": {
+        "name": "air extraction dew point",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    }
+}

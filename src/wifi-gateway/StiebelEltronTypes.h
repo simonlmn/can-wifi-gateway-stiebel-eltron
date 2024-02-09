@@ -47,14 +47,14 @@ const char* deviceTypeToString(DeviceType type) {
   }
 }
 
-DeviceType deviceTypeFromString(const char* type, size_t length = SIZE_MAX) {
-  if (strncmp(type, "SYS", length) == 0) return DeviceType::System;
-  if (strncmp(type, "HEA", length) == 0) return DeviceType::HeatingCircuit;
-  if (strncmp(type, "SEN", length) == 0) return DeviceType::Sensor;
-  if (strncmp(type, "DIS", length) == 0) return DeviceType::Display;
-  if (strncmp(type, "ANY", length) == 0) return DeviceType::Any;
-  if (strnlen(type, length) == 3 && (type[0] == 'X')) {
-    return DeviceType(iot_core::convert<uint8_t>::fromString(type + 1, nullptr, 16));
+DeviceType deviceTypeFromString(const toolbox::strref& type) {
+  if (type == "SYS") return DeviceType::System;
+  if (type == "HEA") return DeviceType::HeatingCircuit;
+  if (type == "SEN") return DeviceType::Sensor;
+  if (type == "DIS") return DeviceType::Display;
+  if (type == "ANY") return DeviceType::Any;
+  if (type.length() == 3 && (type.charAt(0) == 'X')) {
+    return DeviceType(iot_core::convert<uint8_t>::fromString(type.skip(1).toString().c_str(), nullptr, 16));
   }
   
   return DeviceType::Any;
@@ -106,23 +106,20 @@ struct DeviceId {
     return string;
   }
 
-  static iot_core::Maybe<DeviceId> fromString(const char* string, char** end = nullptr) {
-    if (strnlen(string, 5) < 5) {
+  static toolbox::Maybe<DeviceId> fromString(const toolbox::strref& string) {
+    if (string.length() < 5) {
       return {};
     }
-    if (string[3] != '/') {
+    if (string.charAt(3) != '/') {
       return {};
     }
 
-    DeviceType type = deviceTypeFromString(string, 3);
+    DeviceType type = deviceTypeFromString(string.leftmost(3));
     DeviceAddress address;
-    if (string[4] == '*') {
+    if (string.charAt(4) == '*') {
       address = DEVICE_ADDR_ANY;
-      if (end != nullptr) {
-        *end = const_cast<char*>(&string[5]);
-      }
     } else {
-      address = iot_core::convert<DeviceAddress>::fromString(string + 4, end, 10);
+      address = iot_core::convert<DeviceAddress>::fromString(string.skip(4).cstr(), nullptr, 10);
     }
     return DeviceId{type, address};
   }

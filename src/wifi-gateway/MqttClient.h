@@ -3,8 +3,8 @@
 
 #include <iot_core/Interfaces.h>
 #include <iot_core/Buffer.h>
-#include <iot_core/JsonWriter.h>
 #include <iot_core/Utils.h>
+#include <jsons/Writer.h>
 #include <PubSubClient.h>
 #include <ESP8266WiFi.h>
 #include "DataAccess.h"
@@ -12,10 +12,12 @@
 
 class MqttClient final : public iot_core::IApplicationComponent {
 private:
-  iot_core::Logger& _logger;
+  iot_core::Logger _logger;
   iot_core::ISystem& _system;
 
   DataAccess& _access;
+  IConversionService& _conversion;
+  IDefinitionRepository& _definitions;
   WiFiClient _wifiClient;
   PubSubClient _mqttClient;
   iot_core::Buffer<640u> _buffer;
@@ -28,15 +30,17 @@ private:
   size_t _discardedUpdates = 0u;
 
 public:
-  MqttClient(iot_core::ISystem& system, DataAccess& access) :
-    _logger(system.logger()),
+  MqttClient(iot_core::ISystem& system, DataAccess& access, IConversionService& conversion, IDefinitionRepository& definitions) :
+    _logger(system.logger("mqc")),
     _system(system),
     _access(access),
+    _conversion(conversion),
+    _definitions(definitions),
     _wifiClient(),
     _mqttClient(_wifiClient)
   {
-    iot_core::str(F("52.29.250.158") /* broker.hivemq.com */).copy(_brokerAddress, 15);
-    iot_core::str(F("can-wifi-gateway-stiebel-eltron")).copy(_topic, 31);
+    toolbox::strref(F("52.29.250.158") /* broker.hivemq.com */).copy(_brokerAddress, 16, true);
+    toolbox::strref(F("can-wifi-gateway-stiebel-eltron")).copy(_topic, 32, true);
   }
 
   const char* name() const override {
@@ -63,27 +67,27 @@ public:
       _enabled = enabled;
       reset();
     }
-    _logger.log(name(), iot_core::format(F("MQTT client %s."), _enabled ? "enabled" : "disabled"));
+    _logger.log(toolbox::format(F("MQTT client %s."), _enabled ? "enabled" : "disabled"));
     return true;
   }
 
   bool setBrokerAddress(const char* address) {
-    iot_core::str(address).copy(_brokerAddress, 15);
-    _logger.log(name(), iot_core::format(F("Using address '%s'."), _brokerAddress));
+    toolbox::strref(address).copy(_brokerAddress, 16, true);
+    _logger.log(toolbox::format(F("Using address '%s'."), _brokerAddress));
     reset();
     return true;
   }
 
   bool setBrokerPort(uint16_t port) {
     _brokerPort = port;
-    _logger.log(name(), iot_core::format(F("Using port %u."), _brokerPort));
+    _logger.log(toolbox::format(F("Using port %u."), _brokerPort));
     reset();
     return true;
   }
 
   bool setTopic(const char* topic) {
-    iot_core::str(topic).copy(_topic, 31);
-    _logger.log(name(), iot_core::format(F("Using topic '%s'."), _topic));
+    toolbox::strref(topic).copy(_topic, 32, true);
+    _logger.log(toolbox::format(F("Using topic '%s'."), _topic));
     return true;
   }
 
@@ -100,10 +104,10 @@ public:
     _mqttClient.loop();
 
     if (!_mqttClient.connected()) {
-      _mqttClient.connect(iot_core::format(F("wifi-gateway-%s"), _system.id()));
+      _mqttClient.connect(toolbox::format(F("wifi-gateway-%s"), _system.id()));
     } else {
       if (_discardedUpdates != 0u) {
-        _logger.log(iot_core::LogLevel::Warning, name(), iot_core::format(F("Discarded %u updates while disconnected."), _discardedUpdates));
+        _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Discarded %u updates while disconnected."), _discardedUpdates));
       }
       _discardedUpdates = 0u;
     }
@@ -126,22 +130,22 @@ private:
 
     if (!_mqttClient.connected()) {
       if (_discardedUpdates == 0u) {
-        _logger.log(iot_core::LogLevel::Warning, name(), F("Disconnected, discarding updates."));
+        _logger.log(iot_core::LogLevel::Warning, F("Disconnected, discarding updates."));
       }
       _discardedUpdates += 1u;
       return;
     }
     
     _buffer.clear();
-    auto writer = iot_core::makeJsonWriter(_buffer);
-    serializer::serialize(writer, entry, true, true);
+    auto writer = jsons::makeWriter(_buffer);
+    serializer::serialize(writer, _conversion, _definitions, entry, true, true);
     if (writer.failed()) {
-      _logger.log(iot_core::LogLevel::Error, name(), F("Serializing data entry failed."));
+      _logger.log(iot_core::LogLevel::Error, F("Serializing data entry failed."));
     } else if (_buffer.overrun()) {
-      _logger.log(iot_core::LogLevel::Warning, name(), F("Serialized data entry too large for buffer."));
+      _logger.log(iot_core::LogLevel::Warning, F("Serialized data entry too large for buffer."));
     } else {
       _mqttClient.publish(
-        iot_core::format("%s/%s/%u/%u", _topic, deviceTypeToString(entry.source.type), entry.source.address, entry.id),
+        toolbox::format("%s/%s/%u/%u", _topic, deviceTypeToString(entry.source.type), entry.source.address, entry.id),
         _buffer.data(),
         _buffer.size()
       );

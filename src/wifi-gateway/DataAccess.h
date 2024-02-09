@@ -24,12 +24,10 @@ struct DataEntry {
   unsigned long lastWriteMs;
   bool subscribed;
   bool writable; // NOTE: this only means that this entry has been marked for writing via the API
-  const ValueDefinition* definition;
 
-  bool hasDefinition() const { return definition != NULL && !definition->isUnknown(); }
   bool isConfigured() const { return subscribed || writable; }
 
-  DataEntry() : id(0), source(), rawValue(0), toWrite(0), lastUpdate(), lastUpdateMs(0), lastRequestMs(0), lastWriteMs(0), subscribed(false), writable(false), definition(NULL) {}
+  DataEntry() : id(0), source(), rawValue(0), toWrite(0), lastUpdate(), lastUpdateMs(0), lastRequestMs(0), lastWriteMs(0), subscribed(false), writable(false) {}
 };
 
 static const char SUBSCRIPTIONS_FILE_HEADER[] = "~S1.0";
@@ -71,9 +69,10 @@ public:
   using DataMap = std::map<DataKey, DataEntry>;
 
 private:
-  iot_core::Logger& _logger;
+  iot_core::Logger _logger;
   iot_core::ISystem& _system;
   StiebelEltronProtocol& _protocol;
+  IDefinitionRepository& _definitions;
   gpiobj::DigitalInput& _writeEnablePin;
   DeviceId _deviceId;
   DataCaptureMode _mode;
@@ -85,10 +84,11 @@ private:
   std::function<void(DataEntry const& entry)> _updateHandler;
 
 public:
-  DataAccess(iot_core::ISystem& system, StiebelEltronProtocol& protocol, gpiobj::DigitalInput& writeEnablePin)
-    : _logger(system.logger()),
+  DataAccess(iot_core::ISystem& system, StiebelEltronProtocol& protocol, IDefinitionRepository& definitions, gpiobj::DigitalInput& writeEnablePin)
+    : _logger(system.logger("dta")),
     _system(system),
     _protocol(protocol),
+    _definitions(definitions),
     _writeEnablePin(writeEnablePin),
     _deviceId(),
     _mode(DataCaptureMode::Configured),
@@ -124,23 +124,23 @@ public:
 
   bool setDeviceId(DeviceId deviceId) {
     if (!deviceId.isExact()) {
-      _logger.log(iot_core::LogLevel::Warning, name(), iot_core::format(F("Cannot set device ID with wildcards '%s'."), deviceId.toString()));
+      _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Cannot set device ID with wildcards '%s'."), deviceId.toString()));
       return false;
     }
     _deviceId = deviceId;
-    _logger.log(name(), iot_core::format(F("Set device ID '%s'."), _deviceId.toString()));
+    _logger.log(toolbox::format(F("Set device ID '%s'."), _deviceId.toString()));
     return true;
   }
 
   bool setMode(DataCaptureMode mode) {
     _mode = mode;
-    _logger.log(name(), iot_core::format(F("Set mode '%s'."), dataCaptureModeToString(_mode)));
+    _logger.log(toolbox::format(F("Set mode '%s'."), dataCaptureModeToString(_mode)));
     return true;
   }
 
   bool setReadOnly(bool readOnly) {
     _readOnly = readOnly;
-    _logger.log(name(), iot_core::format(F("%s write access (%seffective)."), _readOnly ? "Disabled" : "Enabled", effectiveReadOnly() == _readOnly ? "" : "NOT "));
+    _logger.log(toolbox::format(F("%s write access (%seffective)."), _readOnly ? "Disabled" : "Enabled", effectiveReadOnly() == _readOnly ? "" : "NOT "));
     return true;
   }
 
@@ -150,7 +150,7 @@ public:
 
   bool setIgnoreDateTime(bool ignoreDateTime) {
     _ignoreDateTime = ignoreDateTime;
-    _logger.log(name(), iot_core::format(F("%s date/time availability."), _ignoreDateTime ? "Ignoring" : "Waiting for"));
+    _logger.log(toolbox::format(F("%s date/time availability."), _ignoreDateTime ? "Ignoring" : "Waiting for"));
     return true;
   }
 
@@ -248,7 +248,7 @@ public:
     }
 
     DataEntry* entry = getEntryInternal(key);
-    if (entry != nullptr && entry->writable && entry->definition->accessMode == accessMode) {
+    if (entry != nullptr && entry->writable && getDefinition(entry->id).accessMode == accessMode) {
       entry->toWrite = rawValue;
       entry->lastWriteMs = 1;
       return true;
@@ -258,6 +258,10 @@ public:
   }
 
 private:
+  const ValueDefinition& getDefinition(ValueId id) const {
+    return _definitions.get(id);
+  }
+
   DataEntry* getEntryInternal(DataKey const& key) {
     auto result = _data.find(key);
     if (result == _data.end()) {
@@ -273,14 +277,12 @@ private:
       return false;
     }
 
-    const auto& definition = getDefinition(key.second);
-    if (definition.accessMode == ValueAccessMode::None) {
+    if (getDefinition(key.second).accessMode == ValueAccessMode::None) {
       // Don't allow subscribing to inaccessible values
       return false;
     }
 
     auto& entry = _data[key];
-    entry.definition = &definition;
     entry.source = key.first;
     entry.id = key.second;
     entry.subscribed = true;
@@ -344,14 +346,12 @@ private:
       return false;
     }
 
-    const auto& definition = getDefinition(key.second);
-    if (definition.accessMode < ValueAccessMode::Writable) {
+    if (getDefinition(key.second).accessMode < ValueAccessMode::Writable) {
       // Don't allow adding not writable values
       return false;
     }
 
     auto& entry = _data[key];
-    entry.definition = &definition;
     entry.source = key.first;
     entry.id = key.second;
     entry.writable = true;
@@ -409,7 +409,7 @@ private:
     }
   }
 
-  static constexpr unsigned long MIN_UPDATE_INTERVAL_MS = 30000;
+  static constexpr uint32_t MIN_UPDATE_INTERVAL_MS = 30000;
   static constexpr unsigned long WRITE_INTERVAL_MS = 30000;
   static constexpr unsigned long MAINTENANCE_INTERVAL_MS = 375;
   static constexpr size_t MAX_CONCURRENT_OPERATIONS = 2;
@@ -442,7 +442,7 @@ private:
             }
           }
         } else if (entry.subscribed) {
-          if (currentMs > entry.lastUpdateMs + std::max(MIN_UPDATE_INTERVAL_MS, entry.definition->updateIntervalMs)
+          if (currentMs > entry.lastUpdateMs + std::max(MIN_UPDATE_INTERVAL_MS, getDefinition(entry.id).updateIntervalMs)
            && currentMs > entry.lastRequestMs + MIN_UPDATE_INTERVAL_MS) {
             _protocol.request({ _deviceId, entry.source, entry.id }); --remainingRequests;
             entry.lastRequestMs = currentMs;
@@ -469,22 +469,17 @@ private:
     auto const& now = currentDateTime();
     if (_ignoreDateTime || now.isSet()) { // Only process data if we have established the current date and time
       DataEntry* entry = nullptr;
-      const ValueDefinition* definition = nullptr;
       switch (_mode) {
         case DataCaptureMode::Configured:
-          // we don't need the definition as it already is in the entry when configured.
           entry = getEntryInternal(key);
           break;
         case DataCaptureMode::Defined:
-          definition = &getDefinition(key.second);
-          entry = definition->isUnknown() ? nullptr : &_data[key];
+          entry = getDefinition(key.second).isUndefined() ? nullptr : &_data[key];
           break;
         case DataCaptureMode::Any:
-          definition = &getDefinition(key.second);
           entry = &_data[key];
           break;
         default:
-          definition = nullptr;
           entry = nullptr;
           break;
       }
@@ -493,11 +488,8 @@ private:
         return;
       }
 
-      if (entry->definition == nullptr) {
-        entry->definition = definition;
-        entry->source = key.first;
-        entry->id = key.second;
-      }
+      entry->source = key.first;
+      entry->id = key.second;
       entry->rawValue = value;
       entry->lastUpdate = now;
       entry->lastUpdateMs = millis();

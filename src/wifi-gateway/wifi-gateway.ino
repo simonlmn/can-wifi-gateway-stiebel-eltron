@@ -8,6 +8,7 @@
 //#define DEVELOPMENT_MODE
 #define MQTT_SUPPORT
 
+#include <toolbox.h>
 #include <gpiobj.h>
 #include <iot_core.h>
 #include <iot_core/api/Server.h>
@@ -15,6 +16,7 @@
 #include "AppVersion.h"
 #include "SerialCan.h"
 #include "StiebelEltronProtocol.h"
+#include "ValueDefinitions.h"
 #include "DateTimeSource.h"
 #include "DataAccess.h"
 #include "RestApi.h"
@@ -50,17 +52,20 @@ iot_core::api::SystemApi systemApi { sys, sys };
 
 SerialCan can { sys, io::canResetPin, io::txEnablePin };
 StiebelEltronProtocol protocol { sys, can };
-DateTimeSource timeSource { sys.logger(), protocol };
-DataAccess access { sys, protocol, io::writeEnablePin };
-RestApi appApi { sys, access, protocol };
+ConversionRepository conversions { sys };
+DefinitionRepository definitions { sys, conversions };
+ConversionService conversionService { conversions, definitions };
+DateTimeSource timeSource { sys.logger("dts"), protocol, conversionService };
+DataAccess access { sys, protocol, definitions, io::writeEnablePin };
+RestApi appApi { sys, access, protocol, conversionService, conversions, definitions };
 #ifdef MQTT_SUPPORT
-MqttClient mqtt { sys, access };
+MqttClient mqtt { sys, access, conversionService, definitions };
 #endif
 
 void setup() {
   sys.setDateTimeSource(&timeSource);
 
-  sys.logger().log("ios", iot_core::format(F("ota=%u write=%u tx=%u debug=%u"),
+  sys.logs().log("ios", toolbox::format(F("ota=%u write=%u tx=%u debug=%u"),
     io::otaEnablePin.read(),
     io::writeEnablePin.read(),
     io::txEnablePin.read(),
@@ -70,6 +75,8 @@ void setup() {
   sys.addComponent(&api);
   sys.addComponent(&can);
   sys.addComponent(&protocol);
+  sys.addComponent(&conversions);
+  sys.addComponent(&definitions);
   sys.addComponent(&timeSource);
   sys.addComponent(&access);
 #ifdef MQTT_SUPPORT
