@@ -1,5 +1,5 @@
-#ifndef RESTAPI_H_
-#define RESTAPI_H_
+#ifndef DATAACCESSAPI_H_
+#define DATAACCESSAPI_H_
 
 #include <iot_core/api/Interfaces.h>
 #include <uri/UriBraces.h>
@@ -7,55 +7,39 @@
 #include <toolbox/Repository.h>
 #include "Serializer.h"
 #include "DataAccess.h"
-#include "StiebelEltronProtocol.h"
-
-#if __has_include("src/wifi-gateway-ui/dist/wifi-gateway-ui.generated.h")
-#  include "src/wifi-gateway-ui/dist/wifi-gateway-ui.generated.h"
-#else
-#  include "no-ui.generated.h"
-#endif
+#include "ValueConversion.h"
 
 static const char ARG_UPDATED_SINCE[] = "updatedSince";
-static const char ARG_ONLY_UNDEFINED[] = "onlyUndefined";
-static const char ARG_ONLY_CONFIGURED[] = "onlyConfigured";
+static const char ARG_ITEM_FILTER[] = "filter";
+static const char ARG_ITEM_FILTER_CONFIGURED[] = "configured";
+static const char ARG_ITEM_FILTER_NOT_CONFIGURED[] = "notConfigured";
 static const char ARG_NUMBERS_AS_DECIMALS[] = "numbersAsDecimals";
 static const char ARG_ACCESS_MODE[] = "accessMode";
 static const char ARG_VALIDATE_ONLY[] = "validateOnly";
 
-class RestApi final : public iot_core::api::IProvider {
+class DataAccessApi final : public iot_core::api::IProvider {
 private:
   iot_core::Logger _logger;
   iot_core::ISystem& _system;
 
   DataAccess& _access;
-  StiebelEltronProtocol& _protocol;
   IConversionService& _conversionService;
-  IConversionRepository& _conversions;
   IDefinitionRepository& _definitions;
 
 public:
-  RestApi(iot_core::ISystem& system, DataAccess& access, StiebelEltronProtocol& protocol, IConversionService& conversionService, IConversionRepository& conversions, IDefinitionRepository& definitions)
-  : _logger(system.logger("api")), _system(system), _access(access), _protocol(protocol), _conversionService(conversionService), _conversions(conversions), _definitions(definitions) {}
+  DataAccessApi(iot_core::ISystem& system, DataAccess& access, IConversionService& conversionService, IDefinitionRepository& definitions)
+  : _logger(system.logger("api")), _system(system), _access(access), _conversionService(conversionService), _definitions(definitions) {}
   
   void setupApi(iot_core::api::IServer& server) override {
-    server.on(F("/"), iot_core::api::HttpMethod::GET, [this](iot_core::api::IRequest&, iot_core::api::IResponse& response) {
-      response
-        .code(iot_core::api::ResponseCode::Ok)
-        .contentType(iot_core::api::ContentType::TextHtml)
-        .header("Content-Encoding", "gzip")
-        .sendSingleBody()
-      #ifdef WIFI_GATEWAY_UI_H
-        .write(toolbox::strref{FPSTR(wifi_gateway_ui::HTML), wifi_gateway_ui::HTML_SIZE});
-      #else
-        .write(toolbox::strref{FPSTR(no_ui::HTML), no_ui::HTML_SIZE});
-      #endif
-    });
-
     server.on(F("/api/data"), iot_core::api::HttpMethod::GET, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      if (request.hasArg(ARG_ONLY_UNDEFINED)) {
-        getItems(request, response, [this] (DataEntry const& entry) { return !_definitions.get(entry.id).isUndefined(); });
-      } else if (request.hasArg(ARG_ONLY_CONFIGURED)) {
-        getItems(request, response, [] (DataEntry const& entry) { return entry.isConfigured(); });
+      if (request.hasArg(ARG_ITEM_FILTER)) {
+        if (request.arg(ARG_ITEM_FILTER) == ARG_ITEM_FILTER_CONFIGURED) {
+          getItems(request, response, [] (DataEntry const& entry) { return entry.isConfigured(); });
+        } else if (request.arg(ARG_ITEM_FILTER) == ARG_ITEM_FILTER_NOT_CONFIGURED) {
+          getItems(request, response, [] (DataEntry const& entry) { return !entry.isConfigured(); });
+        } else {
+          getItems(request, response);
+        }
       } else {
         getItems(request, response);
       }
@@ -106,34 +90,6 @@ public:
     server.on(UriBraces(F("/api/writable/{}/{}/{}")), iot_core::api::HttpMethod::DELETE, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
       doItem(request, response, [&] (DataAccess::DataKey const& key, DataEntry const& entry) { _access.removeWritable(key); return true; });
     });
-
-    server.on(F("/api/definitions"), iot_core::api::HttpMethod::GET, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      getDefinitions(request, response);
-    });
-
-    server.on(UriBraces(F("/api/definitions")), iot_core::api::HttpMethod::PUT, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      putDefinitions(request, response);
-    });
-
-    server.on(UriBraces(F("/api/definitions")), iot_core::api::HttpMethod::DELETE, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      deleteDefinitions(request, response);
-    });
-
-    server.on(UriBraces(F("/api/definitions/{}")), iot_core::api::HttpMethod::GET, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      getDefinition(request, response);
-    });
-
-    server.on(UriBraces(F("/api/definitions/{}")), iot_core::api::HttpMethod::PUT, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      putDefinition(request, response);
-    });
-
-    server.on(UriBraces(F("/api/definitions/{}")), iot_core::api::HttpMethod::DELETE, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      deleteDefinition(request, response);
-    });
-
-    server.on(F("/api/devices"), iot_core::api::HttpMethod::GET, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      getDevices(request, response);
-    });  
   }
 
 private:
@@ -371,156 +327,6 @@ private:
 
     writer.close();
     writer.property(F("actualItems")).number(i);
-    writer.close();
-
-    writer.end();
-  }
-
-  void getDefinitions(iot_core::api::IRequest&, iot_core::api::IResponse& response) {
-    auto& body = response
-      .code(iot_core::api::ResponseCode::Ok)
-      .contentType(iot_core::api::ContentType::ApplicationJson)
-      .sendChunkedBody();
-
-    if (!body.valid()) {
-      return;
-    }
-
-    auto writer = jsons::makeWriter(body);
-
-    writer.openObject();
-    for (auto& mapping : _definitions.all()) {
-      writer.property(iot_core::convert<long>::toString(mapping.key, 10));
-      mapping.value.serialize(writer, _conversions);
-    }
-    writer.close();
-
-    writer.end();
-  }
-
-  void putDefinitions(iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-    auto transaction = toolbox::beginTransaction(_definitions);
-
-    auto reader = jsons::makeReader(request.body());
-    auto json = reader.begin();
-    for (auto& property : json.asObject()) {
-      ValueId valueId = iot_core::convert<ValueId>::fromString(property.name().cstr(), nullptr, 10); // TODO validation
-      ValueDefinition definition {};
-      if (!definition.deserialize(property, _conversions) || reader.failed()) {
-        response
-          .code(iot_core::api::ResponseCode::BadRequest)
-          .contentType(iot_core::api::ContentType::TextPlain)
-          .sendSingleBody().write(toolbox::format(F("JSON error: %s"), reader.diagnostics().errorMessage.cstr()));
-        return;
-      }
-      
-      if (!_definitions.store(valueId, definition)) {
-        response.code(iot_core::api::ResponseCode::InsufficientStorage);
-        return;
-      }
-    }
-
-    if (reader.end().failed()) {
-      response
-        .code(iot_core::api::ResponseCode::BadRequest)
-        .contentType(iot_core::api::ContentType::TextPlain)
-        .sendSingleBody().write(toolbox::format(F("JSON error: %s"), reader.diagnostics().errorMessage.cstr()));
-      return;
-    }
-
-    transaction.commit();
-
-    getDefinitions(request, response);
-  }
-
-  void deleteDefinitions(iot_core::api::IRequest&, iot_core::api::IResponse& response) {
-    _definitions.removeAll();
-    _definitions.commit();
-    response.code(iot_core::api::ResponseCode::OkNoContent);
-  }
-
-  void getDefinition(iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-    ValueId valueId = iot_core::convert<ValueId>::fromString(request.pathArg(0).cstr(), nullptr, 10); // TODO validation
-
-    auto& definition = _definitions.get(valueId);
-
-    if (definition.isUndefined()) {
-      response.code(iot_core::api::ResponseCode::BadRequestNotFound);
-      return;
-    }
-
-    auto& body = response
-      .code(iot_core::api::ResponseCode::Ok)
-      .contentType(iot_core::api::ContentType::ApplicationJson)
-      .sendChunkedBody();
-
-    if (!body.valid()) {
-      return;
-    }
-
-    auto writer = jsons::makeWriter(body);
-    definition.serialize(writer, _conversions);
-    writer.end();
-  }
-
-  void putDefinition(iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-    auto transaction = toolbox::beginTransaction(_definitions);
-
-    ValueId valueId = iot_core::convert<ValueId>::fromString(request.pathArg(0).cstr(), nullptr, 10); // TODO validation
-    ValueDefinition definition {};
-    
-    auto reader = jsons::makeReader(request.body());
-    auto json = reader.begin();
-    if (!definition.deserialize(json, _conversions) || reader.end().failed()) {
-      response
-        .code(iot_core::api::ResponseCode::BadRequest)
-        .contentType(iot_core::api::ContentType::TextPlain)
-        .sendSingleBody().write(toolbox::format(F("JSON error: %s"), reader.diagnostics().errorMessage.cstr()));
-      return;
-    }
-    
-    if (!_definitions.store(valueId, definition)) {
-      response.code(iot_core::api::ResponseCode::InsufficientStorage);
-      return;
-    }
-
-    transaction.commit();
-
-    getDefinition(request, response);
-  }
-
-  void deleteDefinition(iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-    ValueId valueId = iot_core::convert<ValueId>::fromString(request.pathArg(0).cstr(), nullptr, 10); // TODO validation
-    _definitions.remove(valueId);
-    _definitions.commit();
-    response.code(iot_core::api::ResponseCode::OkNoContent);
-  }
-
-  void getDevices(iot_core::api::IRequest&, iot_core::api::IResponse& response) {
-    auto& body = response
-      .code(iot_core::api::ResponseCode::Ok)
-      .contentType(iot_core::api::ContentType::ApplicationJson)
-      .sendChunkedBody();
-
-    if (!body.valid()) {
-      return;
-    }
-
-    auto writer = jsons::makeWriter(body);
-    
-    writer.openObject();
-    writer.property(F("this"));
-    writer.openObject();
-    for (auto& [name, device] : _protocol.getDevices()) {
-      writer.property(device->deviceId().toString()).string(device->description());
-    }
-    writer.close();
-    writer.property(F("others"));
-    writer.openList();
-    for (auto& deviceId : _protocol.getOtherDeviceIds()) {
-      writer.string(deviceId.toString());
-    }
-    writer.close();
     writer.close();
 
     writer.end();

@@ -16,13 +16,16 @@
 #include "AppVersion.h"
 #include "SerialCan.h"
 #include "StiebelEltronProtocol.h"
+#include "StiebelEltronProtocolApi.h"
 #include "ValueDefinitions.h"
+#include "ValueDefinitionsApi.h"
 #include "DateTimeSource.h"
 #include "DataAccess.h"
-#include "RestApi.h"
+#include "DataAccessApi.h"
 #ifdef MQTT_SUPPORT
 #include "MqttClient.h"
 #endif
+#include "UiProvider.h"
 
 namespace io {
 // Switches
@@ -52,15 +55,18 @@ iot_core::api::SystemApi systemApi { sys, sys };
 
 SerialCan can { sys, io::canResetPin, io::txEnablePin };
 StiebelEltronProtocol protocol { sys, can };
+StiebelEltronProtocolApi protocolApi { sys, protocol };
 ConversionRepository conversions { sys };
 DefinitionRepository definitions { sys, conversions };
+DefinitionsApi definitionsApi { sys, conversions, definitions };
 ConversionService conversionService { conversions, definitions };
 DateTimeSource timeSource { sys.logger("dts"), protocol, conversionService };
 DataAccess access { sys, protocol, definitions, io::writeEnablePin };
-RestApi appApi { sys, access, protocol, conversionService, conversions, definitions };
+DataAccessApi accessApi { sys, access, conversionService, definitions };
 #ifdef MQTT_SUPPORT
 MqttClient mqtt { sys, access, conversionService, definitions };
 #endif
+UiProvider ui {};
 
 void setup() {
   sys.setDateTimeSource(&timeSource);
@@ -84,7 +90,10 @@ void setup() {
 #endif
 
   api.addProvider(&systemApi);
-  api.addProvider(&appApi);
+  api.addProvider(&protocolApi);
+  api.addProvider(&definitionsApi);
+  api.addProvider(&accessApi);
+  api.addProvider(&ui);
 
   sys.setup();
 }
