@@ -766,10 +766,10 @@ static const Enum IVUOperatingModeEnum {
 };
 
 void defineExampleCustomConverters(ICustomConverterRepository& repository) {
-  repository.store(customConverterId(0), new EnumConverter { "Weekday", WeekdayEnum });
-  repository.store(customConverterId(1), new BitfieldConverter { "OperatingStatus", IVUOperatingStatus });
-  repository.store(customConverterId(2), new EnumConverter { "OperatingMode", IVUOperatingModeEnum });
-  repository.store(customConverterId(3), new EnumConverter { "ValvePosition", ValvePositionEnum });
+  repository.store(customConverterId(0), new EnumConverter { F("Weekday"), WeekdayEnum });
+  repository.store(customConverterId(1), new BitfieldConverter { F("OperatingStatus"), IVUOperatingStatus });
+  repository.store(customConverterId(2), new EnumConverter { F("OperatingMode"), IVUOperatingModeEnum });
+  repository.store(customConverterId(3), new EnumConverter { F("ValvePosition"), ValvePositionEnum });
 }
 
 static const ICodec* CODECS[5] {
@@ -846,7 +846,7 @@ private:
     size_t loaded = 0;
     for (size_t i = 0; i < std::size(_customConverters); ++i) {
       uint8_t converterId = customConverterId(i);
-      auto file = LittleFS.open(toolbox::format("/def/converters/%u", converterId), "r");
+      auto file = LittleFS.open(toolbox::format(F("/def/converters/%u"), converterId), "r");
       if (file) {
         ++stored;
         toolbox::StreamInput input{file};
@@ -856,17 +856,17 @@ private:
         reader.end();
         if (reader.failed()) {
           replaceCustomConverter(converterId, nullptr);
-          _logger.log(iot_core::LogLevel::Warning, toolbox::format("Failed to load converter %u: %s", converterId, reader.diagnostics().errorMessage.toString().c_str()));
+          _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to load converter %u: %s"), converterId, reader.diagnostics().errorMessage.toString().c_str()));
         } else {
           ++loaded;
-          _logger.log(iot_core::LogLevel::Info, toolbox::format("Loaded converter %u.", converterId));
+          _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Loaded converter %u."), converterId));
         }
         file.close();
       } else {
         replaceCustomConverter(converterId, nullptr);
       }
     }
-    _logger.log(iot_core::LogLevel::Info, toolbox::format("Loaded converters (%u of %u)", loaded, stored));
+    _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Loaded converters (%u of %u)"), loaded, stored));
     _dirty = false;
   }
 
@@ -875,7 +875,7 @@ private:
     size_t loaded = 0;
     for (size_t i = 0; i < std::size(_customConverters); ++i) {
       uint8_t converterId = i | CONVERTER_ID_CUSTOM_FLAG;
-      auto filename = toolbox::format("/def/converters/%u", converterId);
+      auto filename = toolbox::format(F("/def/converters/%u"), converterId);
       ICustomConverter* existing = getCustomConverter(converterId);
       if (existing) {
         ++loaded;
@@ -887,19 +887,19 @@ private:
           writer.end();
           file.close();
           if (writer.failed()) {
-            _logger.log(iot_core::LogLevel::Warning, toolbox::format("Failed to store converter %u.", converterId));
+            _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to store converter %u."), converterId));
             LittleFS.remove(filename);
           } else {
             ++stored;
           }
         } else {
-          _logger.log(iot_core::LogLevel::Warning, toolbox::format("Failed to store converter %u.", converterId));
+          _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to store converter %u."), converterId));
         }
       } else {
         LittleFS.remove(filename);
       }
     }
-    _logger.log(iot_core::LogLevel::Info, toolbox::format("Stored converters (%u of %u)", loaded, stored));
+    _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Stored converters (%u of %u)"), loaded, stored));
     _dirty = loaded != stored;
   }
 

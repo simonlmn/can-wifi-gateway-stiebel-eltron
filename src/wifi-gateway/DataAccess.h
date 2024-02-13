@@ -42,24 +42,19 @@ enum struct DataCaptureMode : uint8_t {
 
 const char* dataCaptureModeToString(DataCaptureMode mode) {
   switch (mode) {
-    case DataCaptureMode::None:
-      return "None";
-    case DataCaptureMode::Configured:
-      return "Configured";
-    case DataCaptureMode::Defined:
-      return "Defined";
-    case DataCaptureMode::Any:
-      return "Any";
-    default:
-      return "?";
+    case DataCaptureMode::None: return "None";
+    case DataCaptureMode::Configured: return "Configured";
+    case DataCaptureMode::Defined: return "Defined";
+    case DataCaptureMode::Any: return "Any";
+    default: return "?";
   }
 }
 
-DataCaptureMode dataCaptureModeFromString(const char* mode, size_t length = SIZE_MAX) {
-  if (strncmp(mode, "None", length) == 0) return DataCaptureMode::None;
-  if (strncmp(mode, "Configured", length) == 0) return DataCaptureMode::Configured;
-  if (strncmp(mode, "Defined", length) == 0) return DataCaptureMode::Defined;
-  if (strncmp(mode, "Any", length) == 0) return DataCaptureMode::Any;
+DataCaptureMode dataCaptureModeFromString(const toolbox::strref& mode) {
+  if (mode == F("None")) return DataCaptureMode::None;
+  if (mode == F("Configured")) return DataCaptureMode::Configured;
+  if (mode == F("Defined")) return DataCaptureMode::Defined;
+  if (mode == F("Any")) return DataCaptureMode::Any;
   return DataCaptureMode::None;
 }
 
@@ -140,7 +135,7 @@ public:
 
   bool setReadOnly(bool readOnly) {
     _readOnly = readOnly;
-    _logger.log(toolbox::format(F("%s write access (%seffective)."), _readOnly ? "Disabled" : "Enabled", effectiveReadOnly() == _readOnly ? "" : "NOT "));
+    _logger.log(toolbox::format(F("%s write access (%seffective)."), _readOnly ? F("Disabled") : F("Enabled"), effectiveReadOnly() == _readOnly ? "" : "NOT "));
     return true;
   }
 
@@ -150,7 +145,7 @@ public:
 
   bool setIgnoreDateTime(bool ignoreDateTime) {
     _ignoreDateTime = ignoreDateTime;
-    _logger.log(toolbox::format(F("%s date/time availability."), _ignoreDateTime ? "Ignoring" : "Waiting for"));
+    _logger.log(toolbox::format(F("%s date/time availability."), _ignoreDateTime ? F("Ignoring") : F("Waiting for")));
     return true;
   }
 

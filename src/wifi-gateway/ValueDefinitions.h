@@ -334,12 +334,12 @@ private:
           if (ok && !reader.failed()) {
             _definitions.insert(id, definition);
           } else {
-            _logger.log(iot_core::LogLevel::Warning, toolbox::format("Failed to load definition %u: %s", id, reader.diagnostics().errorMessage.toString().c_str()));
+            _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to load definition %u: %s"), id, reader.diagnostics().errorMessage.toString().c_str()));
           }
         }
       }
     }
-    _logger.log(iot_core::LogLevel::Info, toolbox::format("Restored definitions (%u of %u)", stored, _definitions.size()));
+    _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Restored definitions (%u of %u)"), stored, _definitions.size()));
     _dirty = false;
   }
 
@@ -356,16 +356,16 @@ private:
         writer.end();
         file.close();
         if (writer.failed()) {
-          _logger.log(iot_core::LogLevel::Warning, toolbox::format("Failed to store definition %u.", entry.key));
+          _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to store definition %u."), entry.key));
           LittleFS.remove(filename);
         } else {
           ++stored;
         }
       } else {
-        _logger.log(iot_core::LogLevel::Warning, toolbox::format("Failed to store definition %u.", entry.key));
+        _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to store definition %u."), entry.key));
       }
     }
-    _logger.log(iot_core::LogLevel::Info, toolbox::format("Stored definitions (%u of %u)", stored, _definitions.size()));
+    _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Stored definitions (%u of %u)"), stored, _definitions.size()));
     _dirty = stored != _definitions.size();
   }
 

@@ -32,17 +32,17 @@ enum struct CanMode : uint8_t {
 
 toolbox::strref canModeToString(CanMode mode) {
   switch (mode) {
-    case CanMode::Normal: return "Normal";
-    case CanMode::ListenOnly: return "ListenOnly";
-    case CanMode::LoopBack: return "LoopBack";
-    default: return "?";
+    case CanMode::Normal: return F("Normal");
+    case CanMode::ListenOnly: return F("ListenOnly");
+    case CanMode::LoopBack: return F("LoopBack");
+    default: return F("?");
   }
 }
 
 CanMode canModeFromString(toolbox::strref mode) {
-  if (mode == "Normal") return CanMode::Normal;
-  if (mode == "ListenOnly") return CanMode::ListenOnly;
-  if (mode == "LoopBack") return CanMode::LoopBack;
+  if (mode == F("Normal")) return CanMode::Normal;
+  if (mode == F("ListenOnly")) return CanMode::ListenOnly;
+  if (mode == F("LoopBack")) return CanMode::LoopBack;
   return CanMode::ListenOnly;
 }
 
