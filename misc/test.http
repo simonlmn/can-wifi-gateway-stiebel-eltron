@@ -1,4 +1,35 @@
-@deviceAddress = 192.168.3.225
+@deviceAddress = 192.168.1.238
+
+### 
+GET http://{{deviceAddress}}/api/definitions
+
+###
+PUT http://{{deviceAddress}}/api/definitions
+Content-Type: application/json
+
+{
+    "0003": {
+        "name": "DHW set temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0004": {
+        "name": "HC set temperature",
+        "unit": "Celsius",
+        "codec": "S16",
+        "converter": "10^-1",
+        "access": "Readable"
+    },
+    "0374": {
+        "name": "operating status",
+        "unit": "None",
+        "codec": "U16",
+        "converter": "OperatingStatus",
+        "access": "Readable"
+    }
+}
 
 ###
 POST http://{{deviceAddress}}/api/system/reset
@@ -33,65 +64,59 @@ Content-Type: text/plain
 display=1;
 
 ###
+GET http://{{deviceAddress}}/api/converters
+
+###
+PUT http://{{deviceAddress}}/api/converters/custom/OperatingStatus
+
+{
+  "id": 129,
+  "key": "OperatingStatus",
+  "description": "bitfield",
+  "builtIn": false,
+  "config": {
+    "bitfield": {
+      "key": "OperatingStatus",
+      "fields": [
+        "AUTO",
+        "COMPR",
+        "HEAT",
+        "COOL",
+        "DHW",
+        "ELHEAT",
+        "SERV",
+        "PWROFF",
+        "FILTER",
+        "VENT",
+        "HCPUMP",
+        "DEFROS",
+        "FILTXA",
+        "FILTVA",
+        "HEATUP",
+        ""
+      ]
+    }
+  }
+}
+
+###
 GET http://{{deviceAddress}}/api/definitions
 
 ###
 GET http://{{deviceAddress}}/api/data
 
 ###
-POST http://{{deviceAddress}}/api/subscriptions
-Content-Type: text/plain
+GET http://{{deviceAddress}}/api/subscriptions
 
-3,
-4@HEA/1,
-12,
-13,
-14,
-15@HEA/1,
-18@HEA/1,
-22,
-274,
-374,
-474,
-613,
-833,
-942,
-943,
-944,
-945,
-1431,
-1433,
-1435,
-1436,
-1467,
-1611,
-1684,
-1690,
-1691,
-1696,
-2330,
-2331,
-2332,
-2333,
-2334,
-2335,
-2336,
-2337,
-2340,
-2341,
-2344,
-2345,
-2346,
-2347,
-2348,
-2349,
-2350,
-2351,
-2352,
-2353,
-49391,
-49396,
-49397,
+###
+POST http://{{deviceAddress}}/api/subscriptions
+Content-Type: application/json
+
+[
+  {"valueId": 3, "source": "SYS/0"},
+  {"valueId": 4, "source": "HEA/2"},
+  {"valueId": 374, "source": "SYS/0"}
+]
 
 ###
 POST http://{{deviceAddress}}/api/writable

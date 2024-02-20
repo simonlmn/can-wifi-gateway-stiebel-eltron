@@ -170,12 +170,20 @@ private:
     
     const auto& collectionData = _access.getData();
 
+    auto writer = jsons::makeWriter(body);
+
+    writer.openList();
     for (auto& data : collectionData) {
       if (!predicate || predicate(data.second)) {
-        body.write(toolbox::format("%u@%s,\n", data.second.id, data.second.source.toString()));
-        _system.lyield();
+        writer.openObject();
+        writer.property(F("valueId")).number(data.second.id);
+        writer.property(F("source")).string(data.second.source.toString());
+        writer.close();
       }
     }
+    writer.close();
+
+    writer.end();    
   }
 
   /**

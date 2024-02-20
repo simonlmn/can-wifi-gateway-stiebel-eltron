@@ -561,7 +561,7 @@ public:
     output.property("key").string(_key);
     output.property("enum");
     output.openObject();
-    for (auto value : _enum) {
+    for (auto& value : _enum) {
       output.property(value.name()).number(value.value());
     }
     output.close();
@@ -804,7 +804,7 @@ class ConversionRepository final : public IConversionRepository, public ICustomC
 private:
   iot_core::Logger _logger;
   iot_core::ISystem& _system;
-  ICustomConverter* _customConverters[16] {};
+  ICustomConverter* _customConverters[8] {};
   size_t _converterCount = 0;
   bool _dirty = false;
   bool _defineExamplesIfEmpty = true;
@@ -823,7 +823,7 @@ private:
   }
 
   bool replaceCustomConverter(ConverterId id, ICustomConverter* converter) {
-    if (isCustomConverterId(id) || converterIndex(id) >= std::size(_customConverters)) {
+    if (!isCustomConverterId(id) || converterIndex(id) >= std::size(_customConverters)) {
       return false;
     }
 
@@ -1008,8 +1008,8 @@ public:
   }
 
   ICustomConverter* getCustomConverter(ConverterId id) const override {
-    if ((id & CONVERTER_ID_CUSTOM_FLAG) == CONVERTER_ID_CUSTOM_FLAG) {
-      uint8_t i = id & CONVERTER_ID_INDEX_MASK;
+    if (isCustomConverterId(id)) {
+      uint8_t i = converterIndex(id);
       if (i < std::size(_customConverters)) {
         return _customConverters[i];
       } else {

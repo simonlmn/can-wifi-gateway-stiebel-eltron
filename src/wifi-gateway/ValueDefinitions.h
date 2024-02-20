@@ -312,7 +312,7 @@ private:
   iot_core::Logger _logger;
   iot_core::ISystem& _system;
   IConversionRepository& _conversionRepo;
-  toolbox::FixedCapacityMap<ValueId, ValueDefinition, 250u> _definitions {};
+  toolbox::FixedCapacityMap<ValueId, ValueDefinition, 200u> _definitions {};
   bool _dirty = false;
 
   void restoreDefinitions() {

@@ -17,6 +17,8 @@
 #include "SerialCan.h"
 #include "StiebelEltronProtocol.h"
 #include "StiebelEltronProtocolApi.h"
+#include "ValueConversion.h"
+#include "ValueConversionApi.h"
 #include "ValueDefinitions.h"
 #include "ValueDefinitionsApi.h"
 #include "DateTimeSource.h"
@@ -57,6 +59,7 @@ SerialCan can { sys, io::canResetPin, io::txEnablePin };
 StiebelEltronProtocol protocol { sys, can };
 StiebelEltronProtocolApi protocolApi { sys, protocol };
 ConversionRepository conversions { sys };
+ConversionApi conversionsApi { sys, conversions, conversions };
 DefinitionRepository definitions { sys, conversions };
 DefinitionsApi definitionsApi { sys, conversions, definitions };
 ConversionService conversionService { conversions, definitions };
@@ -91,6 +94,7 @@ void setup() {
 
   api.addProvider(&systemApi);
   api.addProvider(&protocolApi);
+  api.addProvider(&conversionsApi);
   api.addProvider(&definitionsApi);
   api.addProvider(&accessApi);
   api.addProvider(&ui);
