@@ -196,7 +196,7 @@ private:
           response
             .code(iot_core::api::ResponseCode::BadRequest)
             .contentType(iot_core::api::ContentType::TextPlain)
-            .sendSingleBody().write(toolbox::format(F("Converter ID %u must match ID %u from path."), property.asInteger(), converterId));
+            .sendSingleBody().write(toolbox::format(F("Converter ID %u must match ID %u from path."), property.asInteger().get(), converterId));
           return;
         }
       } else if (property.name() == "config" && property.type() == jsons::ValueType::Object) {

@@ -20,7 +20,7 @@ Content-Type: application/json
         "unit": "Celsius",
         "codec": "S16",
         "converter": "10^-1",
-        "access": "Readable"
+        "access": "Writable"
     },
     "0374": {
         "name": "operating status",
@@ -106,41 +106,23 @@ GET http://{{deviceAddress}}/api/definitions
 GET http://{{deviceAddress}}/api/data
 
 ###
-GET http://{{deviceAddress}}/api/subscriptions
+GET http://{{deviceAddress}}/api/data/config
 
 ###
-POST http://{{deviceAddress}}/api/subscriptions
+POST http://{{deviceAddress}}/api/data/config
 Content-Type: application/json
 
 [
-  {"valueId": 3, "source": "SYS/0"},
-  {"valueId": 4, "source": "HEA/2"},
-  {"valueId": 374, "source": "SYS/0"}
+  {"valueId": 3, "source": "SYS/0", "subscribed": true},
+  {"valueId": 4, "source": "HEA/2", "subscribed": true, "writable": true},
+  {"valueId": 374, "source": "SYS/0", "subscribed": true}
 ]
 
 ###
-POST http://{{deviceAddress}}/api/writable
-Content-Type: text/plain
+PUT http://{{deviceAddress}}/api/data/config/SYS/0/3
+Content-Type: application/json
 
-5@HEA/1,
-8@HEA/1,
-17@HEA/1,
-19,
-117@HEA/1,
-270@HEA/1,
-271@HEA/1,
-1388,
-1389,
-1391,
-1392,
-1393,
-1394,
-1395,
-1396,
-1398,
-1399,
-1400,
-1401,
-1402,
-1403,
-1501,
+{"valueId": 3, "source": "SYS/0", "subscribed": true},
+
+###
+DELETE http://{{deviceAddress}}/api/data/config/SYS/0/3

@@ -17,6 +17,64 @@ static const char ARG_NUMBERS_AS_DECIMALS[] = "numbersAsDecimals";
 static const char ARG_ACCESS_MODE[] = "accessMode";
 static const char ARG_VALIDATE_ONLY[] = "validateOnly";
 
+class DataConfig final {
+  ValueId _valueId {};
+  DeviceId _source {};
+  bool _subscribed {false};
+  bool _writable {false};
+
+public:
+  DataConfig() {}
+  DataConfig(const DataEntry& entry) : DataConfig(entry.id, entry.source, entry.subscribed, entry.writable) {}
+  DataConfig(ValueId valueId, DeviceId source, bool subscribed, bool writable) :
+    _valueId(valueId),
+    _source(source),
+    _subscribed(subscribed),
+    _writable(writable)
+  {}
+
+  const ValueId& valueId() const { return _valueId; }
+  const DeviceId& source() const { return _source; }
+  bool subscribed() const { return _subscribed; }
+  bool writable() const { return _writable; }
+
+  void serialize(jsons::IWriter& output) const {
+    output.openObject();
+    output.property(F("valueId")).number(_valueId);
+    output.property(F("source")).string(_source.toString());
+    output.property(F("subscribed")).boolean(_subscribed);
+    output.property(F("writable")).boolean(_writable);
+    output.close();
+  }
+
+  bool deserialize(jsons::Value& input) {
+    auto object = input.asObject();
+    if (object.valid()) {
+      for (auto& property : object) {
+        if (property.name() == "valueId" && property.type() == jsons::ValueType::Integer) {
+          _valueId = property.asInteger().get();
+        } else if (property.name() == "source" && property.type() == jsons::ValueType::String) {
+          auto deviceId = DeviceId::fromString(property.asString().get());
+          if (deviceId) {
+            _source = deviceId.get();
+          } else {
+            return false;
+          }
+        } else if (property.name() == "subscribed" && property.type() == jsons::ValueType::Boolean) {
+          _subscribed = property.asBoolean().get();
+        } else if (property.name() == "writable" && property.type() == jsons::ValueType::Boolean) {
+          _writable = property.asBoolean().get();
+        } else {
+          return false;
+        }
+      }
+      return true;
+    } else {
+      return false;
+    }
+  }
+};
+
 class DataAccessApi final : public iot_core::api::IProvider {
 private:
   iot_core::Logger _logger;
@@ -67,79 +125,55 @@ public:
       });
     });
 
-    server.on(F("/api/subscriptions"), iot_core::api::HttpMethod::GET, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      getDataConfigs(request, response, [] (DataEntry const& entry) { return entry.subscribed; });
+    server.on(F("/api/data/config"), iot_core::api::HttpMethod::GET, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      getDataConfigs(request, response);
     });
 
-    server.on(F("/api/subscriptions"), iot_core::api::HttpMethod::POST, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      postDataConfig(request, response, [&] (DataAccess::DataKey const& key) { return _access.addSubscription(key); });
+    server.on(F("/api/data/config"), iot_core::api::HttpMethod::POST, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      postDataConfigs(request, response);
     });
 
-    server.on(UriBraces(F("/api/subscriptions/{}/{}/{}")), iot_core::api::HttpMethod::DELETE, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      doItem(request, response, [&] (DataAccess::DataKey const& key, DataEntry const& entry) { _access.removeSubscription(key); return true; });
+    server.on(UriBraces(F("/api/data/config/{}/{}/{}")), iot_core::api::HttpMethod::PUT, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      putDataConfig(request, response);
     });
 
-    server.on(F("/api/writable"), iot_core::api::HttpMethod::GET, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      getDataConfigs(request, response, [](DataEntry const& entry) { return entry.writable; });
-    });
-
-    server.on(F("/api/writable"), iot_core::api::HttpMethod::POST, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      postDataConfig(request, response, [&] (DataAccess::DataKey const& key) { return _access.addWritable(key); });
-    });
-
-    server.on(UriBraces(F("/api/writable/{}/{}/{}")), iot_core::api::HttpMethod::DELETE, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      doItem(request, response, [&] (DataAccess::DataKey const& key, DataEntry const& entry) { _access.removeWritable(key); return true; });
+    server.on(UriBraces(F("/api/data/config/{}/{}/{}")), iot_core::api::HttpMethod::DELETE, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      deleteDataConfig(request, response);
     });
   }
 
 private:
+  
   /**
    * Do a POST operation for one or more data configurations. The operation is executed for each item
    * independently, and only if all operations are successful is the whole operation answered with
    * successful status code.
    * 
-   * Expects a list of DataKeys.
+   * Expects a list of DataConfig objects.
    * 
    * For example:
-   * [ {"valueId": 123, "source": "SYS/0"}, {"valueId": 42, "source": "HEA/2"} ]
+   * [ {"valueId": 123, "source": "SYS/0", "subscribed": true}, {"valueId": 42, "source": "HEA/2", "writable": true } ]
    */
-  void postDataConfig(iot_core::api::IRequest& request, iot_core::api::IResponse& response, std::function<bool(DataAccess::DataKey const&)> itemOperation = {}) {
+  void postDataConfigs(iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
     auto reader = jsons::makeReader(request.body());
     auto json = reader.begin();
     for (auto& value : json.asList()) {
-      auto config = value.asObject();
-      if (config.valid()) {
-        ValueId valueId;
-        DeviceId source;
-        for (auto& property : config) {
-          if (property.name() == "valueId" && property.type() == jsons::ValueType::Integer) {
-            valueId = property.asInteger().get();
-          } else if (property.name() == "source" && property.type() == jsons::ValueType::String) {
-            auto deviceId = DeviceId::fromString(property.asString().get());
-            if (deviceId) {
-              source = deviceId.get();
-            } else {
-              response.code(iot_core::api::ResponseCode::BadRequest)
-                .contentType(iot_core::api::ContentType::TextPlain)
-                .sendSingleBody().write(toolbox::format(F("Value error: invalid source '%s'"), property.asString().get().cstr()));
-              return;
-            }
-          } else {
-            response.code(iot_core::api::ResponseCode::BadRequest)
-              .contentType(iot_core::api::ContentType::TextPlain)
-              .sendSingleBody().write(toolbox::format(F("JSON error: unexpected property %s"), property.name().cstr()));
-            return;
-          }
+      DataConfig config;
+      if (config.deserialize(value)) {
+        if (config.subscribed()) {
+          _access.addSubscription({config.source(), config.valueId()});
+        } else {
+          _access.removeSubscription({config.source(), config.valueId()});
         }
-        if (!itemOperation({source, valueId})) {
-          response
-            .code(iot_core::api::ResponseCode::BadRequest)
-            .contentType(iot_core::api::ContentType::TextPlain)
-            .sendSingleBody().write(toolbox::format(F("Operation failed for %u@%s"), valueId, source.toString()));
-          return;
+        if (config.writable()) {
+          _access.addWritable({config.source(), config.valueId()});
+        } else {
+          _access.removeWritable({config.source(), config.valueId()});
         }
       } else {
-        response.code(iot_core::api::ResponseCode::BadRequest); // TODO error message
+        response.code(iot_core::api::ResponseCode::BadRequest)
+          .contentType(iot_core::api::ContentType::TextPlain)
+          .sendSingleBody().write(F("Failed to parse data config.")); // TODO improve error reporting
         return;
       }
     }
@@ -158,7 +192,7 @@ private:
   /**
    * Produce a list of data configurations based on the optional predicate.
    */
-  void getDataConfigs(iot_core::api::IRequest&, iot_core::api::IResponse& response, std::function<bool(DataEntry const&)> predicate = {}) {
+  void getDataConfigs(iot_core::api::IRequest&, iot_core::api::IResponse& response) {
     auto& body = response
       .code(iot_core::api::ResponseCode::Ok)
       .contentType(iot_core::api::ContentType::ApplicationJson)
@@ -174,16 +208,139 @@ private:
 
     writer.openList();
     for (auto& data : collectionData) {
-      if (!predicate || predicate(data.second)) {
-        writer.openObject();
-        writer.property(F("valueId")).number(data.second.id);
-        writer.property(F("source")).string(data.second.source.toString());
-        writer.close();
-      }
+      DataConfig{data.second}.serialize(writer);
     }
     writer.close();
 
     writer.end();    
+  }
+
+  void putDataConfig(iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+    bool validateOnly = request.hasArg(ARG_VALIDATE_ONLY);
+    
+    DeviceType type = deviceTypeFromString(request.pathArg(0));
+    if (type == DeviceType::Any) {
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(F("device type invalid"));
+      return;
+    }
+
+    char* end;
+    toolbox::strref addressArg = request.pathArg(1);
+    long addressNumber = iot_core::convert<long>::fromString(addressArg.cstr(), &end, 10);
+    if (end == addressArg.cstr() || addressNumber < 0 || addressNumber > 0x7F) {
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(F("device address invalid"));
+      return;
+    }
+
+    toolbox::strref valueIdArg = request.pathArg(2);
+    long valueIdNumber = iot_core::convert<long>::fromString(valueIdArg.cstr(), &end, 0);
+    if (end == valueIdArg.cstr() || valueIdNumber < 0 || valueIdNumber > 0xFFFF) {
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(F("value ID invalid"));
+      return;
+    }
+
+    const DataAccess::DataKey key {DeviceId{type, DeviceAddress(addressNumber)}, ValueId(valueIdNumber)};
+
+    DataConfig config;
+    auto reader = jsons::makeReader(request.body());
+    auto json = reader.begin();
+    if (!config.deserialize(json)) {
+      response.code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(F("Failed to parse data config.")); // TODO improve error reporting
+      return;
+    }
+    reader.end();
+
+    if (reader.failed()) {
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(toolbox::format(F("JSON error: %s"), reader.diagnostics().errorMessage.cstr()));
+    }
+
+    if (config.source() != key.first) {
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(toolbox::format(F("Source device ID %s must match source %s from path."), config.source().toString(0), key.first.toString(1)));
+      return;
+    }
+
+    if (config.valueId() != key.second) {
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(toolbox::format(F("Value ID %u must match ID %u from path."), config.valueId(), key.second));
+      return;
+    }
+
+    if (validateOnly) {
+      response
+        .code(iot_core::api::ResponseCode::Ok)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(request.body().content());
+    } else {
+      if (config.subscribed()) {
+        _access.addSubscription(key);
+      } else {
+        _access.removeSubscription(key);
+      }
+      if (config.writable()) {
+        _access.addWritable(key);
+      } else {
+        _access.removeWritable(key);
+      }
+      response.code(iot_core::api::ResponseCode::OkAccepted);
+    }
+  }
+
+  void deleteDataConfig(iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+    DeviceType type = deviceTypeFromString(request.pathArg(0));
+    if (type == DeviceType::Any) {
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(F("device type invalid"));
+      return;
+    }
+
+    char* end;
+    toolbox::strref addressArg = request.pathArg(1);
+    long addressNumber = iot_core::convert<long>::fromString(addressArg.cstr(), &end, 10);
+    if (end == addressArg.cstr() || addressNumber < 0 || addressNumber > 0x7F) {
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(F("device address invalid"));
+      return;
+    }
+
+    toolbox::strref valueIdArg = request.pathArg(2);
+    long valueIdNumber = iot_core::convert<long>::fromString(valueIdArg.cstr(), &end, 0);
+    if (end == valueIdArg.cstr() || valueIdNumber < 0 || valueIdNumber > 0xFFFF) {
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(F("value ID invalid"));
+      return;
+    }
+
+    const DataAccess::DataKey key {DeviceId{type, DeviceAddress(addressNumber)}, ValueId(valueIdNumber)};
+    
+    _access.removeSubscription(key);
+    _access.removeWritable(key);
+
+    response.code(iot_core::api::ResponseCode::OkNoContent);
   }
 
   /**

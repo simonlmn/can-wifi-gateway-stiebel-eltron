@@ -842,7 +842,7 @@ private:
     size_t loaded = 0;
     for (size_t i = 0; i < std::size(_customConverters); ++i) {
       uint8_t converterId = customConverterId(i);
-      auto file = LittleFS.open(toolbox::format(F("/def/converters/%u"), converterId), "r");
+      auto file = LittleFS.open(toolbox::format(F("/cvt/custom/%u"), converterId), "r");
       if (file) {
         ++stored;
         toolbox::StreamInput input{file};
@@ -871,7 +871,7 @@ private:
     size_t loaded = 0;
     for (size_t i = 0; i < std::size(_customConverters); ++i) {
       uint8_t converterId = i | CONVERTER_ID_CUSTOM_FLAG;
-      auto filename = toolbox::format(F("/def/converters/%u"), converterId);
+      auto filename = toolbox::format(F("/cvt/custom/%u"), converterId);
       ICustomConverter* existing = getCustomConverter(converterId);
       if (existing) {
         ++loaded;

@@ -318,7 +318,7 @@ private:
   void restoreDefinitions() {
     size_t stored = 0;
     _definitions.clear();
-    auto dir = LittleFS.openDir("/def/definitions/");
+    auto dir = LittleFS.openDir("/def/");
     while (dir.next()) {
       if (dir.isFile()) {
         ++stored;
@@ -345,9 +345,9 @@ private:
 
   void persistDefinitions() {
     size_t stored = 0;
-    LittleFS.rmdir("/def/definitions/");
+    LittleFS.rmdir("/def/");
     for (auto& entry : _definitions) {
-      auto filename = toolbox::format("/def/converters/%u", entry.key);
+      auto filename = toolbox::format("/def/%u", entry.key);
       auto file = LittleFS.open(filename, "w");
       if (file) {
         toolbox::PrintOutput output{file};
