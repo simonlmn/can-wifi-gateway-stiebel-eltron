@@ -412,28 +412,21 @@ static const size_t MAX_ENUM_VALUE_LENGTH = 20u;
 
 class EnumValue final {
   uint8_t _value = 0u;
-  char _name[MAX_ENUM_VALUE_LENGTH] = {};
+  toolbox::str<MAX_ENUM_VALUE_LENGTH> _name = {};
 
 public:
   EnumValue() {}
-
-  EnumValue(uint8_t value, const toolbox::strref& name) {
-    _value = value;
-    name.copy(_name, MAX_ENUM_VALUE_LENGTH, true);
-  }
-
+  EnumValue(uint8_t value, const toolbox::strref& name) : _value(value), _name(name) {}
   EnumValue(const EnumValue& other) : EnumValue(other._value, other._name) {}
-
   EnumValue& operator=(const EnumValue& other) {
     if (&other != this) {
       _value = other._value;
-      strncpy(_name, other._name, MAX_ENUM_VALUE_LENGTH);  
+      _name = other._name; 
     }
     return *this;
   }
 
   uint8_t value() const { return _value; }
-
   toolbox::strref name() const { return _name; }
 };
 
@@ -443,15 +436,18 @@ class Enum final {
 
 public:
   Enum() {}
-
   Enum(std::initializer_list<EnumValue> values) {
-    size_t _length = 0u;
+    _length = 0u;
     for (auto& value : values) {
       if (_length >= MAX_ENUM_VALUES) break;
       _values[_length] = value;
       ++_length;
     }
   }
+
+  size_t size() const {
+    return _length;
+  }  
 
   void define(const EnumValue& value) {
     EnumValue* existing = byValue(value.value());
