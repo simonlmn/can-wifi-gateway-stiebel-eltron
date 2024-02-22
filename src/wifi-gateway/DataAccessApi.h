@@ -300,7 +300,7 @@ private:
       } else {
         _access.removeWritable(key);
       }
-      response.code(iot_core::api::ResponseCode::OkAccepted);
+      response.code(iot_core::api::ResponseCode::Ok);
     }
   }
 
@@ -455,24 +455,20 @@ private:
         if (i == 0) {
           type = data.first.first.type;
           address = data.first.first.address;
-          writer.property(deviceTypeToString(type));
-          writer.openObject();
-          writer.property(iot_core::convert<DeviceAddress>::toString(address, 10));
-          writer.openObject();
+          writer.property(deviceTypeToString(type)).openObject();
+          writer.property(iot_core::convert<DeviceAddress>::toString(address, 10)).openObject();
         } else {
           if (type != data.first.first.type) {
             writer.close();
             writer.close();
             type = data.first.first.type;
             address = data.first.first.address;
-            writer.property(deviceTypeToString(type));
-            writer.openObject();
-            writer.property(iot_core::convert<DeviceAddress>::toString(address, 10));
-            writer.openObject();            
+            writer.property(deviceTypeToString(type)).openObject();
+            writer.property(iot_core::convert<DeviceAddress>::toString(address, 10)).openObject();
           } else if (address != data.first.first.address) {
             writer.close();
             address = data.first.first.address;
-            writer.property(iot_core::convert<DeviceAddress>::toString(address, 10));
+            writer.property(iot_core::convert<DeviceAddress>::toString(address, 10)).openObject();
           }
         }
 

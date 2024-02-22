@@ -252,7 +252,9 @@ export class CheckboxView extends View {
     constructor(label, attributes, callback) {
         super(createElement('input', attributes));
         this._element.type = 'checkbox';
-        this._element.onchange = (e) => callback(e.target.checked, this);
+        if (callback) {
+            this._element.onchange = (e) => callback(e.target.value, this);
+        }
 
         if (label) {
             label.forView = this;
@@ -284,7 +286,9 @@ export class NumberView extends View {
     constructor(label, attributes, callback) {
         super(createElement('input', attributes));
         this._element.type = 'number';
-        this._element.onchange = (e) => callback(e.target.value, this);
+        if (callback) {
+            this._element.onchange = (e) => callback(e.target.value, this);
+        }
 
         if (label) {
             label.forView = this;
@@ -316,7 +320,9 @@ export class TextView extends View {
     constructor(label, attributes, callback) {
         super(createElement('input', attributes));
         this._element.type = 'text';
-        this._element.onchange = (e) => callback(e.target.value, this);
+        if (callback) {
+            this._element.onchange = (e) => callback(e.target.value, this);
+        }
 
         if (label) {
             label.forView = this;
@@ -348,7 +354,9 @@ export class FileView extends View {
     constructor(label, attributes, callback) {
         super(createElement('input', attributes));
         this._element.type = 'file';
-        this._element.onchange = (e) => callback(e.target.value, this);
+        if (callback) {
+            this._element.onchange = (e) => callback(e.target.value, this);
+        }
 
         if (label) {
             label.forView = this;
@@ -377,7 +385,9 @@ export class SelectView extends View {
 
     constructor(label, options, attributes, callback) {
         super(createElement('select', attributes));
-        this._element.onchange = (e) => callback(e.target.value, this);
+        if (callback) {
+            this._element.onchange = (e) => callback(e.target.value, this);
+        }
         this.options = options;
         if (label) {
             label.forView = this;
@@ -436,12 +446,14 @@ export class ButtonView extends View {
     constructor(text, attributes, callback) {
         super(createElement('button', attributes, text));
         this._element.type = 'button';
-        this._element.onclick = () => {
-            try {
-                this.disable();
-                callback(this);
-            } finally {
-                this.enable();
+        if (callback) {
+            this._element.onclick = () => {
+                try {
+                    this.disable();
+                    callback(this);
+                } finally {
+                    this.enable();
+                }
             }
         }
     }

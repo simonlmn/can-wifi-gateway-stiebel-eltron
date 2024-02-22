@@ -74,7 +74,7 @@ class DataConfigurationView extends ContainerView {
                 return;
             }
 
-            if (configFile.size > 2048) {
+            if (configFile.size > 4096) {
                 alert('Config file too large.');
                 return;
             }
@@ -82,26 +82,7 @@ class DataConfigurationView extends ContainerView {
             try {
                 this.modalLoader.show();
                 const config = await configFile.text();
-                const matches = config.matchAll(/^#+ *(\w*)\s*$/gm);
-                let iterator = matches.next();
-                while (!iterator.done) {
-                    const sectionName = iterator.value[1];
-                    const sectionStartIndex = iterator.value.index + iterator.value[0].length + 1;
-                    iterator = matches.next();
-                    const sectionEndIndex = iterator.done ? config.length : iterator.value.index;
-                    const sectionContent = config.substring(sectionStartIndex, sectionEndIndex).trim();
-
-                    switch (sectionName) {
-                        case 'Subscriptions':
-                            await this.#client.post('/subscriptions', sectionContent);
-                            break;
-                        case 'Writable':
-                            await this.#client.post('/writable', sectionContent);
-                            break;
-                        default:
-                            break;
-                    }
-                }
+                await this.#client.post('/data/config', config);
             } catch (err) {
                 alert(err);
             } finally {
@@ -122,13 +103,8 @@ class DataConfigurationView extends ContainerView {
             if (confirm('Delete all data configurations?')) {
                 try {
                     this.modalLoader.show();
-                    for (const dataConfig of this.#dataConfigs.items.values()) {
-                        if (dataConfig.subscribed) {
-                            await this.#disableSubscription(dataConfig);
-                        }
-                        if (dataConfig.writable) {
-                            await this.#disableWritable(dataConfig);
-                        }
+                    for (const dataConfig of this.#dataConfigs) {
+                        await this.#deleteDataConfig(dataConfig);
                     }
                     await this.#loadDataConfigs();
                     this.#refreshTable();
@@ -156,11 +132,7 @@ class DataConfigurationView extends ContainerView {
     async #loadDefinitions() {
         try {
             const response = await this.#client.get('/definitions');
-            const data = await response.json();
-            this.#definitions = new Map();
-            for (const definition of data) {
-                this.#definitions.set(definition.id, definition);// definition.id, definition.name, definition.unit, definition.accessMode, definition.source
-            }
+            this.#definitions = await response.json();
         } catch (err) {
             alert(err);
         }
@@ -168,25 +140,17 @@ class DataConfigurationView extends ContainerView {
 
     async #loadDataConfigs() {
         try {
-            const response = await this.#client.get('/data?onlyConfigured');
-            const data = await response.json();
-            const items = [];
-            for (const deviceType in data.items) {
-                for (const deviceAddress in data.items[deviceType]) {
-                    for (const id in data.items[deviceType][deviceAddress]) {
-                        items.push(data.items[deviceType][deviceAddress][id]);
-                    }
-                }
-            }
-            data.items = items;
-            this.#dataConfigs = data;
+            const response = await this.#client.get('/data/config');
+            this.#dataConfigs = await response.json();
         } catch (err) {
             alert(err);
         }
     }
 
     #refreshAddIds() {
-        const options = Array.from(this.#definitions.values()).map(definition => ({ value: definition.id, label: `[${definition.id}] ${definition.name}`}));
+        const options = Object.entries(this.#definitions)
+            .filter(([id, definition]) => definition.access != 'None')
+            .map(([id, definition]) => ({ value: id, label: `[${id}] ${definition.name}`}));
         this.dataId.options = options;
         this.dataId.selected = options[0].value;
         this.#updateSourceAndMode();
@@ -194,22 +158,12 @@ class DataConfigurationView extends ContainerView {
     }
   
     #updateSourceAndMode() {
-        const definition = this.#definitions.get(parseInt(this.dataId.selected));
-        const [sourceType, sourceAddress] = definition.source.split('/');
+        const definition = this.#definitions[this.dataId.selected];
 
         this.sourceType.enable();
-        if (sourceType != 'ANY') {
-            this.sourceType.selected = sourceType;   
-        }
-        
         this.sourceAddress.enable();
-        if (sourceAddress == '*') {
-            this.sourceAddress.value = 1;
-        } else {
-            this.sourceAddress.value = parseInt(sourceAddress);
-        }
 
-        if (definition.accessMode == 'Readable') {
+        if (definition.access == 'Readable') {
             this.mode.options = ['Subscribe'];
             this.mode.selected = 'Subscribe';
             this.mode.disable();
@@ -222,70 +176,45 @@ class DataConfigurationView extends ContainerView {
 
     async #addDataConfig() {
         this.addFieldset.disable();
-        const id = this.dataId.selected;
-        const sourceType = this.sourceType.selected;
-        const sourceAddress = this.sourceAddress.value;
-        const mode = this.mode.selected;
-
-        try {
-            if (mode == 'Subscribe' || mode == 'Both') {
-                await this.#client.post('/subscriptions', `${id}@${sourceType}/${sourceAddress}`);
-            }
-    
-            if (mode == 'Writable' || mode == 'Both') {
-                await this.#client.post('/writable', `${id}@${sourceType}/${sourceAddress}`);
-            }
-
-            await this.#loadDataConfigs();
-            this.#refreshTable();
-            this.#refreshAddIds();
-        } catch (err) {
-            alert(err);
-        } finally {
-            this.addFieldset.enable();
-        }
+        await this.#updateDataConfig({
+          valueId: Number.parseInt(this.dataId.selected),
+          source: `${this.sourceType.selected}/${this.sourceAddress.value}`,
+          subscribed: this.mode.selected == 'Subscribe' || this.mode.selected == 'Both',
+          writable: this.mode.selected == 'Writable' || this.mode.selected == 'Both'
+        });
+        this.addFieldset.enable();
     }
 
-    async #enableSubscription(dataConfig) {
-        try {
-            await this.#client.post('/subscriptions', `${dataConfig.id}@${dataConfig.source}`);
-            dataConfig.subscribed = true;
-        } catch (err) {
-            alert(err);
-        }
+    async #updateDataConfig(dataConfig) {
+      try {
+          const [sourceType, sourceAddress] = dataConfig.source.split('/');
+          await this.#client.put(`/data/config/${sourceType}/${sourceAddress}/${dataConfig.valueId}`, JSON.stringify(dataConfig));
+          await this.#loadDataConfigs();
+          this.#refreshTable();
+          this.#refreshAddIds();
+      } catch (err) {
+          alert(err);
+      }
     }
 
-    async #disableSubscription(dataConfig) {
-        try {
-            await this.#client.delete(`/subscriptions/${dataConfig.source}/${dataConfig.id}`);
-            dataConfig.subscribed = false;
-        } catch (err) {
-            alert(err);
-        }
-    }
-
-    async #enableWritable(dataConfig) {
-        try {
-            await this.#client.post('/writable', `${dataConfig.id}@${dataConfig.source}`);
-            dataConfig.writable = true;
-        } catch (err) {
-            alert(err);
-        }
-    }
-
-    async #disableWritable(dataConfig) {
-        try {
-            await this.#client.delete(`/writable/${dataConfig.source}/${dataConfig.id}`);
-            dataConfig.writable = false;
-        } catch (err) {
-            alert(err);
-        }
+    async #deleteDataConfig(dataConfig) {
+      try {
+          const [sourceType, sourceAddress] = dataConfig.source.split('/');
+          await this.#client.delete(`/data/config/${sourceType}/${sourceAddress}/${dataConfig.valueId}`);
+          await this.#loadDataConfigs();
+          this.#refreshTable();
+          this.#refreshAddIds();
+      } catch (err) {
+          alert(err);
+      } finally {
+          this.addFieldset.enable();
+      }
     }
 
     #refreshTable() {
         this.table.clear();
 
-        if (this.#dataConfigs.actualItems > 0) {
+        if (this.#dataConfigs.length > 0) {
             this.table.addRow().addHeaders([
                 'Source',
                 'ID',
@@ -294,32 +223,27 @@ class DataConfigurationView extends ContainerView {
                 'Subscribed',
                 'Writable'
             ]);
-            for (const dataConfig of this.#dataConfigs.items.values()) {
+            for (const dataConfig of this.#dataConfigs) {
+                const definition = this.#definitions[dataConfig.valueId.toString()]
                 this.table.addRow().addColumns([
                     dataConfig.source,
-                    dataConfig.id,
-                    dataConfig.name,
-                    dataConfig.unit,
+                    dataConfig.valueId,
+                    definition?.name,
+                    definition?.unit,
                     new CheckboxView(null, { checked: dataConfig.subscribed }, async (checked, checkbox) => {
                         checkbox.disable();
-                        if (checked) {
-                            await this.#enableSubscription(dataConfig);
-                        } else {
-                            await this.#disableSubscription(dataConfig);
-                        }
+                        dataConfig.subscribed = checked;
+                        await this.#updateDataConfig(dataConfig);
                         checkbox.enable();
                         if (!dataConfig.subscribed && !dataConfig.writable) {
                             await this.#loadDataConfigs();
                             this.#refreshTable();
                         }
                     }),
-                    new CheckboxView(null, { checked: dataConfig.writable, disabled: dataConfig.accessMode == 'Readable' }, async (checked, checkbox) => {
+                    new CheckboxView(null, { checked: dataConfig.writable, disabled: definition?.access == 'Readable' }, async (checked, checkbox) => {
                         checkbox.disable();
-                        if (checked) {
-                            await this.#enableWritable(dataConfig);
-                        } else {
-                            await this.#disableWritable(dataConfig);
-                        }
+                        dataConfig.writable = checked;
+                        await this.#updateDataConfig(dataConfig);
                         checkbox.enable();
                         if (!dataConfig.subscribed && !dataConfig.writable) {
                             await this.#loadDataConfigs();
