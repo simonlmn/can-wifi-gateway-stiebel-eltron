@@ -357,7 +357,7 @@ public:
     }
   }
   const char* describe() const override {
-    return "bitfield";
+    return toolbox::format("%s bitfield", key());
   }
   const char* key() const override {
     return _key;
@@ -542,7 +542,7 @@ public:
     }
   }
   const char* describe() const override {
-    return "enum";
+    return toolbox::format("%s enum", key());
   }
   const char* key() const override {
     return _key;
