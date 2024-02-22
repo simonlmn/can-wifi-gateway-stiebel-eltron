@@ -43,18 +43,18 @@ function serializeConfig(config) {
 
 const SourceTypes = [
     { value: 'SYS', label: 'System' },
-    { value: 'X04', label: '? X04 ?' },
-    { value: 'X05', label: '? X05 ?' },
+    { value: 'X04', label: 'X04' },
+    { value: 'X05', label: 'X05' },
     { value: 'HEA', label: 'Heating Circuit' },
-    { value: 'X07', label: '? X07 ?' },
+    { value: 'X07', label: 'X07' },
     { value: 'SEN', label: 'Sensor' },
-    { value: 'X09', label: '? X09 ?' },
-    { value: 'X0A', label: '? X0A ?' },
-    { value: 'X0B', label: '? X0B ?' },
-    { value: 'X0C', label: '? X0C ?' },
+    { value: 'X09', label: 'X09' },
+    { value: 'X0A', label: 'X0A' },
+    { value: 'X0B', label: 'X0B' },
+    { value: 'X0C', label: 'X0C' },
     { value: 'DIS', label: 'Display' },
-    { value: 'X0E', label: '? X0E ?' },
-    { value: 'X0F', label: '? X0F ?' }
+    { value: 'X0E', label: 'X0E' },
+    { value: 'X0F', label: 'X0F' }
 ];
 
 class DataConfigurationView extends ContainerView {

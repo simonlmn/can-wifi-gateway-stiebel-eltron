@@ -131,6 +131,10 @@ export class ContainerView extends View {
         return this.addView(new TextView(label, attributes, callback));
     }
 
+    textarea(label, attributes, callback) {
+        return this.addView(new TextAreaView(label, attributes, callback));
+    }
+
     file(label, attributes, callback) {
         return this.addView(new FileView(label, attributes, callback));
     }
@@ -148,9 +152,13 @@ export class ContainerView extends View {
     }
 
     section(title, attributes) {
-        const view = this.addView(new ContainerView(attributes));
+        const view = this.addView(new ContainerView(createElement('section', attributes)));
         view.h2(title);
         return view;
+    }
+
+    block(attributes) {
+        return this.addView(new ContainerView(createElement('div', attributes)));
     }
 
     progress(attributes) {
@@ -348,6 +356,39 @@ export class TextView extends View {
     validate() {
         return this._element.checkValidity();
     }
+}
+
+export class TextAreaView extends View {
+  constructor(label, attributes, callback) {
+      super(createElement('textarea', attributes));
+      if (callback) {
+          this._element.onchange = (e) => callback(e.target.value, this);
+      }
+
+      if (label) {
+          label.forView = this;
+      }
+  }
+
+  disable() {
+      this._element.disabled = true;
+  }
+
+  enable() {
+      this._element.disabled = false;
+  }
+
+  set value(value) {
+      this._element.value = value;
+  }
+
+  get value() {
+      return this._element.value
+  }
+
+  validate() {
+      return this._element.checkValidity();
+  }
 }
 
 export class FileView extends View {
