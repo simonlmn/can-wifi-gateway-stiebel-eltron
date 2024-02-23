@@ -318,55 +318,49 @@ private:
   void restoreDefinitions() {
     size_t stored = 0;
     _definitions.clear();
-    auto dir = LittleFS.openDir("/def/");
-    while (dir.next()) {
-      if (dir.isFile()) {
+    auto file = LittleFS.open("/def/definitions.json", "r");
+    if (file) {
+      toolbox::StreamInput input{file};
+      auto reader = jsons::makeReader(input);
+      auto json = reader.begin();
+      for (auto& property : json.asObject()) {
         ++stored;
-        ValueId id = dir.fileName().toInt();
-        auto file = dir.openFile("r");
-        if (file) {
-          toolbox::StreamInput input{file};
-          auto reader = jsons::makeReader(input);
-          auto json = reader.begin();
-          ValueDefinition definition {};
-          bool ok = definition.deserialize(json, _conversionRepo);
-          reader.end();
-          if (ok && !reader.failed()) {
-            _definitions.insert(id, definition);
-          } else {
-            _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to load definition %u: %s"), id, reader.diagnostics().errorMessage.toString().c_str()));
-          }
+        ValueId valueId = iot_core::convert<ValueId>::fromString(property.name().cstr(), nullptr, 10); // TODO validation
+        ValueDefinition definition {};
+        if (definition.deserialize(property, _conversionRepo) && !reader.failed()) {
+          _definitions.insert(valueId, definition);
+        } else {
+          _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to load definition %u: %s"), valueId, reader.diagnostics().errorMessage.toString().c_str()));
         }
       }
     }
-    _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Restored definitions (%u of %u)"), stored, _definitions.size()));
+    _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Restored definitions (%u of %u)"), _definitions.size(), stored));
     _dirty = false;
   }
 
   void persistDefinitions() {
     size_t stored = 0;
-    LittleFS.rmdir("/def/");
-    for (auto& entry : _definitions) {
-      auto filename = toolbox::format("/def/%u", entry.key);
-      auto file = LittleFS.open(filename, "w");
-      if (file) {
-        toolbox::PrintOutput output{file};
-        auto writer = jsons::makeWriter(output);
+    auto file = LittleFS.open("/def/definitions.json", "w");
+    if (file) {
+      toolbox::PrintOutput output{file};
+      auto writer = jsons::makeWriter(output);
+      writer.openObject();
+      for (auto& entry : _definitions) {
+        writer.property(iot_core::convert<long>::toString(entry.key, 10));
         entry.value.serialize(writer, NullConversionRepository{});
-        writer.end();
-        file.close();
-        if (writer.failed()) {
-          _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to store definition %u."), entry.key));
-          LittleFS.remove(filename);
-        } else {
-          ++stored;
-        }
-      } else {
-        _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to store definition %u."), entry.key));
       }
+      writer.end();
+      file.close();
+      if (writer.failed()) {
+        _logger.log(iot_core::LogLevel::Warning, F("Failed to store definitions."));
+        LittleFS.remove("/def/definitions.json");
+      } else {
+        _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Stored %u definitions."), _definitions.size()));
+        _dirty = false;
+      }
+    } else {
+      _logger.log(iot_core::LogLevel::Error, F("Failed to open file to store definitions."));
     }
-    _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Stored definitions (%u of %u)"), stored, _definitions.size()));
-    _dirty = stored != _definitions.size();
   }
 
 public:
@@ -406,13 +400,22 @@ public:
   }
 
   void remove(ValueId id) override {
-    bool changed = _definitions.remove(id);
-    _dirty = _dirty || changed;
+    auto definition = _definitions.find(id);
+    if (definition) {
+      // TODO remove const_cast when FixedCapacityMap in toolbox has been updated
+      *const_cast<ValueDefinition*>(definition) = ValueDefinition::UNDEFINED;
+      _dirty = true;
+    }
   }
 
   void removeAll() override {
-    _definitions.clear();
-    _dirty = true;
+    for (auto& entry : _definitions) {
+      if (!entry.value.isUndefined()) {
+        // TODO remove const_cast when FixedCapacityMap in toolbox has been updated
+        const_cast<toolbox::Mapping<ValueId, ValueDefinition>&>(entry).value = ValueDefinition::UNDEFINED;
+        _dirty = true;
+      }
+    }
   }
 
   void commit() override {

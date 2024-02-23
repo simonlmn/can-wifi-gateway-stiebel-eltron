@@ -31,7 +31,7 @@
         "name": "device ID",
         "unit": "None",
         "codec": "S16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "12": {
@@ -143,28 +143,28 @@
         "name": "humidity hysteresis",
         "unit": "Percent",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "268": {
         "name": "outside temperature damping",
         "unit": "Hours",
         "codec": "U8",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "270": {
         "name": "HC curve gradient slope",
         "unit": "Percent",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "271": {
         "name": "HC room influence",
         "unit": "Percent",
         "codec": "U8",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "274": {
@@ -185,35 +185,35 @@
         "name": "current day",
         "unit": "Day",
         "codec": "U8",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "291": {
         "name": "current month",
         "unit": "Month",
         "codec": "U8",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "292": {
         "name": "current year",
         "unit": "Year",
         "codec": "U8",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "293": {
         "name": "current hour",
         "unit": "Hour",
         "codec": "U8",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "294": {
         "name": "current minute",
         "unit": "Minute",
         "codec": "U8",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "374": {
@@ -248,175 +248,175 @@
         "name": "ventilation filter runtime",
         "unit": "Days",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "942": {
         "name": "HRV heat quant. per day (% 1000)",
         "unit": "WattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "943": {
         "name": "HRV heat quant. per day (/ 1000)",
         "unit": "KiloWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "944": {
         "name": "HRV heat quant. total (% 1000)",
         "unit": "KiloWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "945": {
         "name": "HRV heat quant. total (/ 1000)",
         "unit": "MegaWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1388": {
         "name": "ventilation level day",
         "unit": "None",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1389": {
         "name": "ventilation level night",
         "unit": "None",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1391": {
         "name": "ventilation level standby",
         "unit": "None",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1392": {
         "name": "ventilation level party",
         "unit": "None",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1393": {
         "name": "unscheduled vent. level 0 duration",
         "unit": "Minutes",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1394": {
         "name": "unscheduled vent. level 1 duration",
         "unit": "Minutes",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1395": {
         "name": "unscheduled vent. level 2 duration",
         "unit": "Minutes",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1396": {
         "name": "unscheduled vent. level 3 duration",
         "unit": "Minutes",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1398": {
         "name": "air ventilation level 1",
         "unit": "CubicmeterPerHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1399": {
         "name": "air ventilation level 2",
         "unit": "CubicmeterPerHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1400": {
         "name": "air ventilation level 3",
         "unit": "CubicmeterPerHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1401": {
         "name": "air extraction level 1",
         "unit": "CubicmeterPerHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1402": {
         "name": "air extraction level 2",
         "unit": "CubicmeterPerHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1403": {
         "name": "air extraction level 3",
         "unit": "CubicmeterPerHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1430": {
         "name": "air ventilation current setpoint",
         "unit": "CubicmeterPerHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1431": {
         "name": "air ventilation actual",
         "unit": "Hertz",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1432": {
         "name": "air extraction current setpoint",
         "unit": "CubicmeterPerHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1433": {
         "name": "air extraction actual",
         "unit": "Hertz",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1434": {
         "name": "exhaust air current setpoint",
         "unit": "Percent",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1435": {
         "name": "exhaust air actual",
         "unit": "Hertz",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1436": {
@@ -444,14 +444,14 @@
         "name": "heating level",
         "unit": "None",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1501": {
         "name": "unscheduled ventilation level",
         "unit": "None",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Writable"
     },
     "1610": {
@@ -500,56 +500,56 @@
         "name": "PWM solar pump",
         "unit": "Percent",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1689": {
         "name": "PWM mixing circuit pump",
         "unit": "Percent",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1690": {
         "name": "relative heating power",
         "unit": "Percent",
         "codec": "S16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1691": {
         "name": "compressor current setpoint",
         "unit": "Percent",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1692": {
         "name": "compressor freq. setpoint (unlimited)",
         "unit": "Hertz",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1693": {
         "name": "compressor freq. setpoint (limited)",
         "unit": "Hertz",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1694": {
         "name": "compressor freq.",
         "unit": "Hertz",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1695": {
         "name": "compressor current",
         "unit": "Ampere",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1696": {
@@ -563,7 +563,7 @@
         "name": "compressor voltage",
         "unit": "Volt",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1698": {
@@ -577,7 +577,7 @@
         "name": "compressor fault",
         "unit": "None",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "1961": {
@@ -598,161 +598,161 @@
         "name": "DHW el. cons. per day (% 1000)",
         "unit": "WattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2331": {
         "name": "DHW el. cons. per day (/ 1000)",
         "unit": "KiloWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2332": {
         "name": "DHW el. cons. total (% 1000)",
         "unit": "KiloWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2333": {
         "name": "DHW el. cons. total (/ 1000)",
         "unit": "MegaWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2334": {
         "name": "heating el. cons. per day (% 1000)",
         "unit": "WattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2335": {
         "name": "heating el. cons. per day (/ 1000)",
         "unit": "KiloWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2336": {
         "name": "heating el. cons. total (% 1000)",
         "unit": "KiloWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2337": {
         "name": "heating el. cons. total (/ 1000)",
         "unit": "MegaWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2340": {
         "name": "DHW EH heat quant. total (% 1000)",
         "unit": "KiloWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2341": {
         "name": "DHW EH heat quant. total (/ 1000)",
         "unit": "MegaWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2344": {
         "name": "heating EH heat quant. total (% 1000)",
         "unit": "KiloWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2345": {
         "name": "heating EH heat quant. total (/ 1000)",
         "unit": "MegaWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2346": {
         "name": "DHW heat quant. per day (% 1000)",
         "unit": "WattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2347": {
         "name": "DHW heat quant. per day (/ 1000)",
         "unit": "KiloWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2348": {
         "name": "DHW heat quant. total (% 1000)",
         "unit": "KiloWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2349": {
         "name": "DHW heat quant. total (/ 1000)",
         "unit": "MegaWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2350": {
         "name": "heating heat quant. per day (% 1000)",
         "unit": "WattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2351": {
         "name": "heating heat quant. per day (/ 1000)",
         "unit": "KiloWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2352": {
         "name": "heating heat quant. total (% 1000)",
         "unit": "KiloWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "2353": {
         "name": "heating heat quant. total (/ 1000)",
         "unit": "MegaWattHour",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "49391": {
         "name": "air extraction humidity",
         "unit": "RelativeHumidity",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "49396": {
         "name": "compressor starts (% 1000)",
         "unit": "Hours",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "49397": {
         "name": "compressor starts (/ 1000)",
         "unit": "ThousandHours",
         "codec": "U16",
-        "converter": "10^0",
+        "converter": "int",
         "access": "Readable"
     },
     "49398": {

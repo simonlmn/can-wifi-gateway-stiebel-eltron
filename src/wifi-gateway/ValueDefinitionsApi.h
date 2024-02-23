@@ -61,8 +61,10 @@ private:
 
     writer.openObject();
     for (auto& mapping : _definitions.all()) {
-      writer.property(iot_core::convert<long>::toString(mapping.key, 10));
-      mapping.value.serialize(writer, _conversions);
+      if (!mapping.value.isUndefined()) {
+        writer.property(iot_core::convert<long>::toString(mapping.key, 10));
+        mapping.value.serialize(writer, _conversions);
+      }
     }
     writer.close();
 

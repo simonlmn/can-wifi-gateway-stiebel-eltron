@@ -246,7 +246,7 @@ public:
   static const NumericValueConverter INSTANCE;
   void toJson(const toolbox::Maybe<int32_t>& value, jsons::IWriter& output) const override {
     if (value) {
-      output.number(toolbox::Decimal::fromFixedPoint(value, _decimalPlaces));
+      output.number(toolbox::Decimal::fromFixedPoint(value.get(), _decimalPlaces));
     } else {
       output.null();
     }
@@ -326,7 +326,7 @@ public:
         auto fieldName = _fields.at(i);
         if (fieldName.length() > 0) {
           int32_t fieldMask = 1 << i;
-          output.property(fieldName).boolean((value & fieldMask) != 0);
+          output.property(fieldName).boolean((value.get() & fieldMask) != 0);
         }
       }
       output.close();
@@ -518,7 +518,7 @@ public:
 
   void toJson(const toolbox::Maybe<int32_t>& value, jsons::IWriter& output) const override {
     if (value && value.get() >= 0 && value.get() < 0xFF) {
-      const EnumValue* v = _enum.byValue((uint8_t)value);
+      const EnumValue* v = _enum.byValue((uint8_t)value.get());
       if (v) {
         output.string(v->name());
       } else {

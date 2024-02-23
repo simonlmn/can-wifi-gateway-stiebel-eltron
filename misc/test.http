@@ -1,4 +1,4 @@
-@deviceAddress = 192.168.1.238
+@deviceAddress = 192.168.3.145
 
 ### 
 GET http://{{deviceAddress}}/api/definitions
@@ -8,27 +8,30 @@ PUT http://{{deviceAddress}}/api/definitions
 Content-Type: application/json
 
 {
-    "0003": {
-        "name": "DHW set temperature",
-        "unit": "Celsius",
-        "codec": "S16",
-        "converter": "10^-1",
-        "access": "Readable"
-    },
-    "0004": {
-        "name": "HC set temperature",
-        "unit": "Celsius",
-        "codec": "S16",
-        "converter": "10^-1",
-        "access": "Writable"
-    },
-    "0374": {
-        "name": "operating status",
-        "unit": "None",
-        "codec": "U16",
-        "converter": "OperatingStatus",
-        "access": "Readable"
-    }
+  "3": {
+    "name": "DHW set temperature",
+    "unit": "Celsius",
+    "access": "Readable",
+    "interval": 30000,
+    "codec": "S16",
+    "converter": "10^-1"
+  },
+  "4": {
+    "name": "HC set temperature",
+    "unit": "Celsius",
+    "access": "Readable",
+    "interval": 30000,
+    "codec": "S16",
+    "converter": "10^-1"
+  },
+  "5": {
+    "name": "set room temperature day",
+    "unit": "Celsius",
+    "access": "Writable",
+    "interval": 30000,
+    "codec": "S16",
+    "converter": "10^-1"
+  }
 }
 
 ###
