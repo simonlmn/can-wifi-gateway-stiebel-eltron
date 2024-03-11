@@ -1,9 +1,3 @@
-@deviceAddress = 192.168.1.162
-
-###
-PUT http://{{deviceAddress}}/api/data/config
-Content-Type: application/json
-
 [
 {"valueId":3,"source":"SYS/0","subscribed":true},
 {"valueId":4,"source":"HEA/1","subscribed":true},

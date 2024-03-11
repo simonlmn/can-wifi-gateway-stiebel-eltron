@@ -1,13 +1,14 @@
 #ifndef VALUECONVERSION_H_
 #define VALUECONVERSION_H_
 
-#ifdef TEST_ENV
-#include <cstdint>
-#include <cstdio>
-#include <cstring>
-#endif
-
 #include <iot_core/Utils.h>
+#include <iot_core/Interfaces.h>
+#include <toolbox/FixedCapacityMap.h>
+#include <toolbox/Repository.h>
+#include <jsons.h>
+#include <LittleFS.h>
+#include <algorithm>
+#include "StiebelEltronTypes.h"
 
 /*
    From https://www.stiebel-eltron.de/content/dam/ste/cdbassets/historic/bedienungs-_u_installationsanleitungen/ISG_Modbus__b89c1c53-6d34-4243-a630-b42cf0633361.pdf
@@ -31,417 +32,707 @@ const char* getRawValueAsHexString(uint16_t rawValue) {
   return buffer;
 }
 
-enum struct Unit : uint8_t {
-  Unknown = 0,
-  None,
-  Percent,
-  RelativeHumidity,
-  Hertz,
-  Celsius,
-  Kelvin,
-  Bar,
-  KelvinPerMinute,
-  LiterPerMinute,
-  CubicmeterPerHour,
-  Years,
-  Year,
-  Months,
-  Month,
-  Days,
-  Day,
-  Weekday,
-  Hours,
-  ThousandHours,
-  Hour,
-  Minutes,
-  Minute,
-  Seconds,
-  Second,
-  Watt,
-  KiloWatt,
-  WattHour,
-  KiloWattHour,
-  MegaWattHour,
-  Ampere,
-  Volt
+class ICodec {
+public:
+  virtual toolbox::Maybe<int32_t> decode(uint16_t value) const = 0;
+  virtual toolbox::Maybe<uint16_t> encode(const toolbox::Maybe<int32_t>& value) const = 0;
+  virtual const char* describe() const = 0;
+  virtual const char* key() const = 0;
 };
 
-const char* unitSymbol(Unit unit) {
-  switch (unit) {
-    case Unit::Unknown: return "?";
-    case Unit::None: return "";
-    case Unit::Percent: return "%";
-    case Unit::RelativeHumidity: return "% RH";
-    case Unit::Hertz: return "Hz";
-    case Unit::Celsius: return "°C";
-    case Unit::Kelvin: return "K";
-    case Unit::Bar: return "bar";
-    case Unit::KelvinPerMinute: return "K/min";
-    case Unit::LiterPerMinute: return "l/min";
-    case Unit::CubicmeterPerHour: return "m^3/h";
-    case Unit::Years: return "years";
-    case Unit::Year: return "";
-    case Unit::Months: return "months";
-    case Unit::Month: return "";
-    case Unit::Days: return "days";
-    case Unit::Day: return "";
-    case Unit::Weekday: return "";
-    case Unit::Hours: return "h";
-    case Unit::ThousandHours: return "1000h";
-    case Unit::Hour: return "";
-    case Unit::Minutes: return "min";
-    case Unit::Minute: return "";
-    case Unit::Seconds: return "s";
-    case Unit::Second: return "";
-    case Unit::Watt: return "W";
-    case Unit::KiloWatt: return "kW";
-    case Unit::WattHour: return "Wh";
-    case Unit::KiloWattHour: return "kWh";
-    case Unit::MegaWattHour: return "MWh";
-    case Unit::Ampere: return "A";
-    case Unit::Volt: return "V";
-    default: return "?";
+class IConverter {
+public:
+  virtual void toJson(const toolbox::Maybe<int32_t>& value, jsons::IWriter& output) const = 0;
+  virtual toolbox::Maybe<int32_t> fromJson(jsons::Value& input) const = 0;
+  virtual const char* describe() const = 0;
+  virtual const char* key() const = 0;
+};
+
+class ICustomConverter : public IConverter {
+public:
+  virtual const toolbox::strref& type() const = 0;
+  virtual void serialize(jsons::IWriter& output) const = 0;
+  virtual bool deserialize(jsons::Value& input) = 0;
+};
+
+struct NoneCodec final : public ICodec {
+  static const NoneCodec INSTANCE;
+  toolbox::Maybe<int32_t> decode(uint16_t value) const override {
+    return {};
+  }
+  toolbox::Maybe<uint16_t> encode(const toolbox::Maybe<int32_t>& value) const override {
+    return {};
+  }
+  const char* describe() const override {
+    return "none";
+  }
+  const char* key() const override {
+    return "";
+  }
+};
+const NoneCodec NoneCodec::INSTANCE {};
+
+struct Unsigned8BitCodec final : public ICodec {
+  static const Unsigned8BitCodec INSTANCE;
+  toolbox::Maybe<int32_t> decode(uint16_t value) const override {
+    if ((value & 0xFFu) == 0u) {
+      return value >> 8;
+    } else {
+      return {};
+    }
+  }
+  toolbox::Maybe<uint16_t> encode(const toolbox::Maybe<int32_t>& value) const override {
+    if (value && value.get() <= 0xFFu) {
+      return uint16_t(value.get() << 8);
+    } else {
+      return {};
+    }
+  }
+  const char* describe() const override {
+    return "8 bit, unsigned";
+  }
+  const char* key() const override {
+    return "U8";
+  }
+};
+const Unsigned8BitCodec Unsigned8BitCodec::INSTANCE {};
+
+struct Signed8BitCodec final : public ICodec {
+  static const Signed8BitCodec INSTANCE;
+  toolbox::Maybe<int32_t> decode(uint16_t value) const override {
+    if ((value & 0xFFu) == 0u) {
+      value = value >> 8;
+      return value > 0x80u ? (int32_t)value - 0x100 : (int32_t)value;
+    } else {
+      return {};
+    }
+  }
+  toolbox::Maybe<uint16_t> encode(const toolbox::Maybe<int32_t>& value) const override {
+    if (value && value.get() > -0x80 && value.get() <= 0x80) {
+      return uint16_t(value.get() < 0 ? value.get() + 0x100 : value.get()) << 8;
+    } else {
+      return {};
+    }
+  }
+  const char* describe() const override {
+    return "8 bit, signed";
+  }
+  const char* key() const override {
+    return "S8";
+  }
+};
+const Signed8BitCodec Signed8BitCodec::INSTANCE {};
+
+struct Unsigned16BitCodec final : public ICodec {
+  static const Unsigned16BitCodec INSTANCE;
+  toolbox::Maybe<int32_t> decode(uint16_t value) const override {
+    return value;
+  }
+  toolbox::Maybe<uint16_t> encode(const toolbox::Maybe<int32_t>& value) const override {
+    if (value && value.get() >= 0 && value.get() <= 0xFFFF) {
+      return uint16_t(value.get());
+    } else {
+      return {};
+    }
+  }
+  const char* describe() const override {
+    return "16 bit, unsigned";
+  }
+  const char* key() const override {
+    return "U16";
+  }
+};
+const Unsigned16BitCodec Unsigned16BitCodec::INSTANCE {};
+
+struct Signed16BitCodec final : public ICodec {
+  static const Signed16BitCodec INSTANCE;
+  toolbox::Maybe<int32_t> decode(uint16_t value) const override {
+    return value > 0x8000u ? (int32_t)value - 0x10000 : (int32_t)value;
+  }
+  toolbox::Maybe<uint16_t> encode(const toolbox::Maybe<int32_t>& value) const override {
+    if (value && value.get() > -0x8000 && value.get() <= 0x8000) {
+      return uint16_t(value.get() < 0 ? value.get() + 0x10000 : value.get());
+    } else {
+      return {};
+    }
+  }
+  const char* describe() const override {
+    return "16 bit, signed";
+  }
+  const char* key() const override {
+    return "S16";
+  }
+};
+const Signed16BitCodec Signed16BitCodec::INSTANCE {};
+
+class NoneConverter final : public IConverter {
+public:
+  static const NoneConverter INSTANCE;
+  void toJson(const toolbox::Maybe<int32_t>& value, jsons::IWriter& output) const override {
+    output.null();
+  }
+  toolbox::Maybe<int32_t> fromJson(jsons::Value& input) const override {
+    return {};
+  }
+  const char* describe() const override {
+    return "none";
+  }
+  const char* key() const override {
+    return "";
+  }
+};
+const NoneConverter NoneConverter::INSTANCE {};
+
+class HexStringConverter final : public IConverter {
+public:
+  static HexStringConverter INSTANCE;
+  void toJson(const toolbox::Maybe<int32_t>& value, jsons::IWriter& output) const override {
+    if (value) {
+      output.string(toolbox::format("%04x", value.get()));
+    } else {
+      output.null();
+    }
+  }
+  toolbox::Maybe<int32_t> fromJson(jsons::Value& input) const override {
+    auto string = input.asString();
+    if (string) {
+      return strtol(string.get().ref(), nullptr, 16); // TODO replace with strref based conversion
+    } else {
+      return {};
+    }
+  }
+  const char* describe() const override {
+    return "raw value as hex string";
+  }
+  const char* key() const override {
+    return "raw";
+  }
+};
+HexStringConverter HexStringConverter::INSTANCE {};
+
+class BooleanConverter final : public IConverter {
+public:
+  static BooleanConverter INSTANCE;
+  void toJson(const toolbox::Maybe<int32_t>& value, jsons::IWriter& output) const override {
+    if (value == 0) {
+      output.boolean(false);
+    } else if (value == 1) {
+      output.boolean(true);
+    } else {
+      output.null();
+    }
+  }
+  toolbox::Maybe<int32_t> fromJson(jsons::Value& input) const override {
+    auto boolean = input.asBoolean();
+    if (boolean) {
+      return boolean.get() ? 1 : 0;
+    } else {
+      return {};
+    }
+  }
+  const char* describe() const override {
+    return "boolean (0 = false, 1 = true)";
+  }
+  const char* key() const override {
+    return "bool";
+  }
+};
+BooleanConverter BooleanConverter::INSTANCE {};
+
+template<uint8_t _decimalPlaces>
+class NumericValueConverter final : public IConverter {
+  static const toolbox::str<5> KEY;
+public:
+  static const NumericValueConverter INSTANCE;
+  void toJson(const toolbox::Maybe<int32_t>& value, jsons::IWriter& output) const override {
+    if (value) {
+      output.number(toolbox::Decimal::fromFixedPoint(value.get(), _decimalPlaces));
+    } else {
+      output.null();
+    }
+  }
+  toolbox::Maybe<int32_t> fromJson(jsons::Value& input) const override {
+    auto decimal = input.asDecimal();
+    if (decimal) {
+      return decimal.get().toFixedPoint(_decimalPlaces); // TODO implement/use toFixedPoint for int32 or check if result fits
+    } else {
+      return {};
+    }
+  }
+  const char* describe() const override {
+    return _decimalPlaces == 0 ? "integer number" : toolbox::format("decimal number (scale 10^%i)", -_decimalPlaces);
+  }
+  const char* key() const override {
+    return KEY;
+  }
+};
+template<uint8_t _decimalPlaces>
+const toolbox::str<5> NumericValueConverter<_decimalPlaces>::KEY { _decimalPlaces == 0 ? "int" : toolbox::format("10^%i", -_decimalPlaces)};
+template<uint8_t _decimalPlaces>
+const NumericValueConverter<_decimalPlaces> NumericValueConverter<_decimalPlaces>::INSTANCE {};
+
+static const size_t MAX_BITFIELD_FIELDS = 16u;
+static const size_t MAX_BITFIELD_NAME_LENGTH = 8u;
+
+class Bitfield final {
+  char _fields[MAX_BITFIELD_FIELDS][MAX_BITFIELD_NAME_LENGTH] = {};
+
+public:
+  Bitfield() {}
+
+  Bitfield(std::initializer_list<toolbox::strref> fields) {
+    size_t i = 0u;
+    for (auto name : fields) {
+      if (i >= MAX_BITFIELD_FIELDS) break;
+      name.copy(_fields[i], MAX_BITFIELD_NAME_LENGTH, true);
+      ++i;
+    }
+
+    for (; i < MAX_BITFIELD_FIELDS; ++i) {
+      toolbox::strref(toolbox::format("#BIT%i", i)).copy(_fields[i], MAX_BITFIELD_NAME_LENGTH, true);
+    }
+  }
+
+  void set(size_t i, const toolbox::strref& name) {
+    name.copy(_fields[i], MAX_BITFIELD_NAME_LENGTH, true);
+  }
+
+  toolbox::strref at(size_t i) const {
+    return {_fields[i]};
+  }
+
+  size_t find(const toolbox::strref& name) const {
+    for (size_t i = 0; i < MAX_BITFIELD_FIELDS; ++i) {
+      if (name == _fields[i]) {
+        return i;
+      }
+    }
+    return MAX_BITFIELD_FIELDS;
+  }
+};
+
+class BitfieldConverter final : public ICustomConverter {
+  toolbox::str<20> _key;
+  Bitfield _fields;
+
+public:
+  BitfieldConverter() {}
+  BitfieldConverter(const toolbox::strref& key, const Bitfield& fields) : _key(key), _fields(fields) {}
+
+  void toJson(const toolbox::Maybe<int32_t>& value, jsons::IWriter& output) const override {
+    if (value) {
+      output.openObject();
+      for (uint8_t i = 0; i < MAX_BITFIELD_FIELDS; ++i) {
+        auto fieldName = _fields.at(i);
+        if (fieldName.length() > 0) {
+          int32_t fieldMask = 1 << i;
+          output.property(fieldName).boolean((value.get() & fieldMask) != 0);
+        }
+      }
+      output.close();
+    } else {
+      output.null();
+    }
+  }
+  toolbox::Maybe<int32_t> fromJson(jsons::Value& input) const override {
+    auto object = input.asObject();
+    if (object.valid()) {
+      uint16_t result = 0;
+      for (auto& property : object) {
+        size_t bit = _fields.find(property.name());
+        auto boolean = property.asBoolean();
+        if (bit < MAX_BITFIELD_FIELDS && boolean) {
+          if (boolean.get()) {
+            result |= (1u << bit);
+          } else {
+            result &= ~(1u << bit);
+          }
+        } else {
+          return {};
+        }
+      }
+      return result;
+    } else {
+      return {};
+    }
+  }
+  const char* describe() const override {
+    return toolbox::format("%s bitfield", key());
+  }
+  const char* key() const override {
+    return _key;
+  }
+
+  static const toolbox::strref TYPE;
+  const toolbox::strref& type() const override {
+    return TYPE;
+  }
+  void serialize(jsons::IWriter& output) const override {
+    output.openObject();
+    output.property("key").string(_key);
+    output.property("fields");
+    output.openList();
+    for (size_t i = 0; i < MAX_BITFIELD_FIELDS; ++i) {
+      output.string(_fields.at(i));
+    }
+    output.close();
+    output.close();
+  }
+  bool deserialize(jsons::Value& input) override {
+    auto object = input.asObject();
+    if (object.valid()) {
+      for (auto& property : object) {
+        if (property.name() == "key" && property.type() == jsons::ValueType::String) {
+          _key = property.asString();
+        } else if (property.name() == "fields" && property.type() == jsons::ValueType::List) {
+          size_t i = 0;
+          for (auto& field : property.asList()) {
+            auto fieldName = field.asString();
+            if (fieldName) {
+              _fields.set(i, fieldName.get());
+            } else {
+              return false;
+            }
+            ++i;
+          }
+        } else {
+          return false;
+        }
+      }
+      return true;
+    } else {
+      return false;
+    }
+  }
+};
+const toolbox::strref BitfieldConverter::TYPE {"bitfield"};
+
+static const size_t MAX_ENUM_VALUES = 16u;
+static const size_t MAX_ENUM_VALUE_LENGTH = 20u;
+
+class EnumValue final {
+  uint8_t _value = 0u;
+  toolbox::str<MAX_ENUM_VALUE_LENGTH> _name = {};
+
+public:
+  EnumValue() {}
+  EnumValue(uint8_t value, const toolbox::strref& name) : _value(value), _name(name) {}
+  EnumValue(const EnumValue& other) : EnumValue(other._value, other._name) {}
+  EnumValue& operator=(const EnumValue& other) {
+    if (&other != this) {
+      _value = other._value;
+      _name = other._name; 
+    }
+    return *this;
+  }
+
+  uint8_t value() const { return _value; }
+  toolbox::strref name() const { return _name; }
+};
+
+class Enum final {
+  EnumValue _values[MAX_ENUM_VALUES] = {};
+  size_t _length = 0u;
+
+public:
+  Enum() {}
+  Enum(std::initializer_list<EnumValue> values) {
+    _length = 0u;
+    for (auto& value : values) {
+      if (_length >= MAX_ENUM_VALUES) break;
+      _values[_length] = value;
+      ++_length;
+    }
+  }
+
+  size_t size() const {
+    return _length;
+  }  
+
+  void define(const EnumValue& value) {
+    EnumValue* existing = byValue(value.value());
+    if (!existing) {
+      existing = byName(value.name());
+    }
+
+    if (existing) {
+      *existing = value;
+    } else if (_length < MAX_ENUM_VALUES) {
+      _values[_length] = value;
+      ++_length;
+    }
+  }
+
+  const EnumValue* begin() const {
+    return &_values[0];
+  }
+
+  const EnumValue* end() const {
+    return &_values[_length];
+  }
+
+  const EnumValue* byValue(uint8_t value) const {
+    for (size_t i = 0u; i < _length; ++i) {
+      if (_values[i].value() == value) {
+        return &_values[i];
+      }
+    }
+    return nullptr;
+  }
+
+  EnumValue* byValue(uint8_t value) {
+    for (size_t i = 0u; i < _length; ++i) {
+      if (_values[i].value() == value) {
+        return &_values[i];
+      }
+    }
+    return nullptr;
+  }
+
+  const EnumValue* byName(const toolbox::strref& name) const {
+    for (size_t i = 0u; i < _length; ++i) {
+      if (name == _values[i].name()) {
+        return &_values[i];
+      }
+    }
+    return nullptr;
+  }
+
+  EnumValue* byName(const toolbox::strref& name) {
+    for (size_t i = 0u; i < _length; ++i) {
+      if (name == _values[i].name()) {
+        return &_values[i];
+      }
+    }
+    return nullptr;
+  }
+};
+
+class EnumConverter final : public ICustomConverter {
+  toolbox::str<20> _key;
+  Enum _enum;
+
+public:
+  EnumConverter() {}
+  EnumConverter(const toolbox::strref& key, const Enum& e) : _key(key), _enum(e) {}
+
+  void toJson(const toolbox::Maybe<int32_t>& value, jsons::IWriter& output) const override {
+    if (value && value.get() >= 0 && value.get() < 0xFF) {
+      const EnumValue* v = _enum.byValue((uint8_t)value.get());
+      if (v) {
+        output.string(v->name());
+      } else {
+        output.null();
+      }
+    } else {
+      output.null();
+    }
+  }
+  toolbox::Maybe<int32_t> fromJson(jsons::Value& input) const override {
+    auto string = input.asString();
+    if (string) {
+      const EnumValue* v = _enum.byName(string.get());
+      if (v) {
+        return v->value();
+      } else {
+        return {};
+      }
+    } else {
+      return {};
+    }
+  }
+  const char* describe() const override {
+    return toolbox::format("%s enum", key());
+  }
+  const char* key() const override {
+    return _key;
+  }
+
+  static const toolbox::strref TYPE;
+  const toolbox::strref& type() const override {
+    return TYPE;
+  }
+  void serialize(jsons::IWriter& output) const override {
+    output.openObject();
+    output.property("key").string(_key);
+    output.property("enum");
+    output.openObject();
+    for (auto& value : _enum) {
+      output.property(value.name()).number(value.value());
+    }
+    output.close();
+    output.close();
+  }
+  bool deserialize(jsons::Value& input) override {
+    auto object = input.asObject();
+    if (object.valid()) {
+      for (auto& property : object) {
+        if (property.name() == "key" && property.type() == jsons::ValueType::String) {
+          _key = property.asString();
+        } else if (property.name() == "enum" && property.type() == jsons::ValueType::Object) {
+          for (auto& property : property.asObject()) {
+            auto integer = property.asInteger();
+            if (integer) {
+              _enum.define({integer.get(), property.name()});
+            } else {
+              return false;
+            }
+          }
+        } else {
+          return false;
+        }
+      }
+      return true;
+    } else {
+      return false;
+    }
+  }
+};
+const toolbox::strref EnumConverter::TYPE {"enum"};
+
+ICustomConverter* createConverter(const toolbox::strref& type) {
+  if (type == EnumConverter::TYPE) {
+    return new EnumConverter();
+  } else if (type == BitfieldConverter::TYPE) {
+    return new BitfieldConverter();
+  } else {
+    return nullptr;
   }
 }
 
-struct Codec { // Contract
-  static int32_t decode(uint16_t value) {
-    return value;
+void serialize(jsons::IWriter& output, ICustomConverter* converter) {
+  if (converter) {
+    output.openObject();
+    output.property(converter->type());
+    converter->serialize(output);
+    output.close();
+  } else {
+    output.null();    
   }
+}
 
-  // should only return 0 - UINT16_MAX or UINT16_MAX + n for errors
-  static uint32_t encode(int32_t value) {
-    return value;
-  }
-
-  static bool isError(uint32_t rawValue) {
-    return rawValue > UINT16_MAX;
-  }
-};
-
-struct Unsigned8BitCodec {
-  static int32_t decode(uint16_t value) {
-    return value >> 8;
-  }
-  static uint32_t encode(int32_t value) {
-    return value << 8;
-  }
-};
-
-struct Unsigned16BitCodec {
-  static int32_t decode(uint16_t value) {
-    return value;
-  }
-  static uint32_t encode(int32_t value) {
-    return value;
-  }
-};
-
-struct Signed16BitCodec {
-  static int32_t decode(uint16_t value) {
-    return value > 0x8000u ? (int32_t)value - 0x10000 : (int32_t)value;
-  }
-  static uint32_t encode(int32_t value) {
-    return (value < 0 ? value + 0x10000 : value);
-  }
-};
-
-/*
-   Note: the returned string is only guaranteed to be valid until the next
-   invocation of the converter, as it may reuse the same buffer over again.
-*/
-struct ValueConverter { // Contract
-  static const int32_t ERROR_RAW_VALUE = UINT16_MAX + 1;
-  static const char* ERROR_STRING_VALUE;
-  
-  // one shared buffer to reduce memory usage, size must accommodate largest use-case
-  static const size_t maxLength = 256u;
-  static char buffer[maxLength + 1];
-  
-  static char* getBuffer() {
-    buffer[0] = '\0';
-    return buffer;
-  }
-
-  // should return a string representation which can be directly used as a JSON value
-  static const char* fromRaw(int32_t /*value*/) {
-    return ERROR_STRING_VALUE;
-  }
-  
-  static int32_t toRaw(const char* /*value*/, const char* /*end*/ = nullptr) {
-    return ERROR_RAW_VALUE;
-  }
-
-  static const char* description() {
-    return "null";
-  }
-};
-
-const char* ValueConverter::ERROR_STRING_VALUE = "null";
-char ValueConverter::buffer[ValueConverter::maxLength + 1];
-
-template<typename Codec, typename Converter>
-struct ValueConversion {
-  static const char* fromRaw(uint16_t value) {
-    return Converter::fromRaw(Codec::decode(value));
-  }
-  
-  static uint32_t toRaw(const char* value, const char* end = nullptr) {
-    return Codec::encode(Converter::toRaw(value, end));
-  }
-};
-
-// decimalPoint should be in the range -+6
-template<int8_t decimalPoint = 0>
-struct NumericValueConverter {
-  static const char* fromRaw(int32_t value) {
-    const size_t maxLength = ValueConverter::maxLength;
-    char* buffer = ValueConverter::getBuffer();
-    
-    if (value == 0) {
-      return "0";
-    }
-    
-    snprintf(buffer, maxLength, "%i", value);
-    
-    if (decimalPoint < 0) {
-      // insert point, e.g. for -1:
-      // "1" -> "0.1"
-      // "-1" -> "-0.1"
-      // "65568" -> "6556.8"
-      // "-32768" -> "-3276.8"
-
-      // insert point, e.g. for -6:
-      // "1" -> "0.000001"
-      // "-1" -> "-0.000001"
-      // "65568" -> "0.065568"
-      // "-32768" -> "-0.032768"
-      
-      auto numberOfDecimals = -decimalPoint; // e.g. -6 -> 6
-      ssize_t lengthOfNumber = strlen(buffer); // e.g. "-12" -> 3
-      ssize_t remainingLength = maxLength - lengthOfNumber;
-      
-      if (remainingLength < (numberOfDecimals + 1)) {
-        return "NaN";
-      } else {
-        auto signLength = value < 0 ? 1 : 0;
-        ssize_t numberOfDigits = lengthOfNumber - signLength;
-        ssize_t numberOfIntegerDigits = numberOfDigits - numberOfDecimals;
-        
-        if (numberOfIntegerDigits <= 0) {
-          // Add zero padding and point
-          auto numberOfZeroesAndPoint = -numberOfIntegerDigits + 1 + 1;
-          for (int i = lengthOfNumber - 1; i >= signLength; --i) {
-            buffer[numberOfZeroesAndPoint + i] = buffer[i];
-          }
-          for (int i = 0; i < numberOfZeroesAndPoint; ++i) {
-            buffer[signLength + i] = '0';
-          }
-          buffer[signLength + 1] = '.';
-          buffer[signLength + numberOfZeroesAndPoint + numberOfDigits] = '\0';
+ICustomConverter* deserialize(jsons::Value& input, ICustomConverter* existing = nullptr) {
+  auto object = input.asObject();
+  if (object.valid()) {
+    for (auto& property : object) {
+      auto type = property.name();
+      if (existing && existing->type() == type) {
+        if (existing->deserialize(property)) {
+          return existing;
         } else {
-          // Insert point
-          for (int i = 0; i < numberOfDecimals; ++i) {
-            buffer[signLength + numberOfDigits - i] = buffer[signLength + numberOfDigits - i - 1];
-          }
-          buffer[signLength + numberOfDigits - numberOfDecimals] = '.';
-          buffer[signLength + numberOfDigits + 1] = '\0';
+          return nullptr;
         }
-      }
-    } else if (decimalPoint > 0) {
-      // append zeroes, e.g. for +6:
-      // "1" -> "1000000"
-      // "-1" -> "-1000000"
-      // "65568" -> "65568000000"
-      // "-32768" -> "-32768000000"
-      
-      auto numberOfZeroesToAppend = decimalPoint;
-      ssize_t lengthOfNumber = strlen(buffer);
-      ssize_t remainingLength = maxLength - lengthOfNumber;
-      
-      if (remainingLength < numberOfZeroesToAppend) {
-        return value < 0 ? "-Infinity" : "Infinity";
       } else {
-        while (numberOfZeroesToAppend) {
-          buffer[lengthOfNumber] = '0';
-          lengthOfNumber += 1;
-          numberOfZeroesToAppend -= 1;
-        }
-        buffer[lengthOfNumber] = '\0';
-      }
-    }
-
-    return buffer;
-  }
-  
-  static int32_t toRaw(const char* value, const char* end = nullptr) {
-    const size_t maxLength = ValueConverter::maxLength;
-    char* buffer = ValueConverter::getBuffer();
-
-    ssize_t length = end == nullptr ? strlen(value) : (end - value);
-
-    if (length > maxLength) {
-      return ValueConverter::ERROR_RAW_VALUE;
-    }
-
-    strncpy(buffer, value, length + 1);
-
-    if (decimalPoint < 0) {
-      ssize_t decimalPointPos = length + decimalPoint - 1;
-      if (memchr(value, '.', length) == nullptr) { // the value does not have a decimal point (=integer)
-        length += -decimalPoint + 1; // extend it by the decimal point and as many zeroes as necesary
-        decimalPointPos = length + decimalPoint - 1;
-        buffer[decimalPointPos] = '.';
-        for (int i = 0; i < -decimalPoint; ++i) {
-          buffer[decimalPointPos + i + 1] = '0';
-        }
-        buffer[decimalPointPos + -decimalPoint + 1] = '\0';
-      }
-      
-      if (decimalPointPos <= 0 || buffer[decimalPointPos] != '.') { // value not correct
-          return ValueConverter::ERROR_RAW_VALUE;
-      }
-
-      for (int i = decimalPointPos; i < length; ++i) {
-          buffer[i] = buffer[i + 1];
-      }
-    } else {
-      ssize_t truncatePos = length - decimalPoint;
-      if (truncatePos <= 0) { // value not correct
-          return ValueConverter::ERROR_RAW_VALUE;
-      }
-
-      buffer[truncatePos] = '\0';
-    }
-
-    buffer[length] = '\0';
-    return strtol(buffer, nullptr, 10);
-  }
-  static const char* description() {
-    return "{}";
-  }
-};
-
-template<typename Bitfield>
-struct BitfieldConverter {
-  static const char* fromRaw(int32_t value) {
-    const size_t maxLength = ValueConverter::maxLength - 2; // - "{}"
-    char* buffer = ValueConverter::getBuffer();
-
-    size_t currentPosition = 0;
-
-    buffer[currentPosition++] = '{';
-
-    bool hasAtLeastOne = false;
-    for (uint8_t i = 0; i < 16u; ++i) {
-      size_t valueNameLength = strlen(Bitfield::VALUES[i]);
-      if (valueNameLength > 0) {
-        size_t fieldLength = valueNameLength + 2 /* length of quotes */ + 6 /* length of ":false" or ":true" */ + (hasAtLeastOne ? 1 : 0) /* length of "," separator, if needed */;
-  
-        if (currentPosition + fieldLength > maxLength) {
-          // we cannot add more, so we just return what we have so far even if it means we lose data...
-          return buffer;
-        }
-        
-        if (hasAtLeastOne) {
-          buffer[currentPosition++] = ',';
-        }
-
-        buffer[currentPosition++] = '"';
-        strcpy(buffer + currentPosition, Bitfield::VALUES[i]);
-        currentPosition += valueNameLength;
-        buffer[currentPosition++] = '"';
-        
-        buffer[currentPosition++] = ':';
-        
-        int32_t fieldMask = 1 << i;
-        if ((value & fieldMask) != 0) {
-          strcpy(buffer + currentPosition, "true");
-          currentPosition += 4;
+        ICustomConverter* newInstance = createConverter(type);
+        if (newInstance && newInstance->deserialize(property)) {
+          return newInstance;
         } else {
-          strcpy(buffer + currentPosition, "false");
-          currentPosition += 5;
-        }
-  
-        hasAtLeastOne = true;
-      }
-    }
-
-    buffer[currentPosition++] = '}';
-    buffer[currentPosition++] = '\0';
-    
-    return buffer;
-  }
-
-  static int32_t toRaw(const char* value, const char* end = nullptr) {
-    const size_t maxLength = ValueConverter::maxLength;
-    char* buffer = ValueConverter::getBuffer();
-    
-    auto length = end == nullptr ? strlen(value) : (end - value);
-    if (length > maxLength || length < 2) {
-      return ValueConverter::ERROR_RAW_VALUE;
-    }
-
-    uint16_t result = 0;
-
-    strncpy(buffer, value + 1, length - 2);
-    buffer[length - 2] = '\0';
-    
-    char* fieldValue = strtok(buffer, ",");
-    while (fieldValue != NULL) {
-      result |= bitmaskOf(fieldValue);
-      fieldValue = strtok(NULL, ",");
-    }
-
-    return result;
-  }
-
-  static uint16_t bitmaskOf(const char* fieldValue) {
-    size_t length = strlen(fieldValue);
-    if (length < 8) { // must be at least ".":(true|false)
-      return 0;
-    }
-
-    if (strcmp(fieldValue + (length - 4), "true") == 0) {
-      for (uint8_t i = 0; i < 16u; ++i) {
-        size_t valueLength = strlen(Bitfield::VALUES[i]);
-        if (strncmp(fieldValue + 1, Bitfield::VALUES[i], valueLength) == 0 && fieldValue[1 + valueLength] == '"') {
-          return 1 << i;
+          delete newInstance;
+          return nullptr;
         }
       }
     }
-
-    return 0;
+    return nullptr;
+  } else {
+    return nullptr;
   }
-  static const char* description() {
-    return fromRaw(0);
-  }
-};
+}
 
-struct BooleanConverter {
-  static const char* fromRaw(int32_t value) {
-    if (value == 0) {
-      return "false";
-    } else if (value == 1) {
-      return "true";
+class Conversion final {
+  const ICodec* _codec;
+  const IConverter* _converter;
+
+public:
+  Conversion() {}
+  Conversion(const ICodec* codec, const IConverter* converter) : _codec(codec), _converter(converter) {}
+
+  bool isNull() const {
+    return _codec == nullptr || _converter == nullptr;
+  }
+
+  const ICodec& codec() const {
+    return _codec != nullptr ? *_codec : NoneCodec::INSTANCE;
+  }
+
+  const IConverter& converter() const {
+    return _converter != nullptr ? *_converter : NoneConverter::INSTANCE;
+  }
+
+  void toJson(uint16_t value, jsons::IWriter& output) const {
+    if (isNull()) {
+      output.null();
     } else {
-      return ValueConverter::ERROR_STRING_VALUE;
+      _converter->toJson(_codec->decode(value), output);
     }
   }
-  static int32_t toRaw(const char* value, const char* end = nullptr) {
-    if (strncmp(value, "true", end == nullptr ? 6 : (end - value)) == 0) return 1;
-    if (strncmp(value, "false", end == nullptr ? 7 : (end - value)) == 0) return 0;
-    return ValueConverter::ERROR_RAW_VALUE;
-  }
-  static const char* description() {
-    return "[false,true]";
+  
+  toolbox::Maybe<uint16_t> fromJson(jsons::Value& input) const {
+    if (isNull()) {
+      return {};
+    } else {
+      return _codec->encode(_converter->fromJson(input));
+    }
   }
 };
 
-struct IVUOperatingStatusBitfield {
-  static const char* VALUES[16];
+using CodecId = uint8_t;
+using ConverterId = uint8_t;
+
+class IConversionRepository {
+public:
+  virtual toolbox::Iterable<const ICodec*> codecs() const = 0;
+  virtual toolbox::Iterable<const IConverter*> builtinConverters() const = 0;
+  virtual toolbox::Iterable<ICustomConverter* const> customConverters() const = 0;
+
+  virtual const ICodec* getCodec(CodecId id) const = 0;
+  virtual CodecId getCodecIdByKey(const toolbox::strref& key) const = 0;
+  virtual const IConverter* getConverter(ConverterId id) const = 0;
+  virtual ConverterId getConverterIdByKey(const toolbox::strref& key) const = 0;
 };
-const char* IVUOperatingStatusBitfield::VALUES[] = {
+
+class ICustomConverterRepository : public toolbox::IRepository {
+public:
+  virtual ICustomConverter* getCustomConverter(ConverterId id) const = 0;
+  virtual bool store(ConverterId id, ICustomConverter* definition) = 0;
+  virtual void remove(ConverterId id) = 0;
+  virtual void removeAll() = 0;
+};
+
+static const CodecId NONE_CODEC_ID = 0u;
+static const ConverterId NONE_CONVERTER_ID = 0u;
+
+static const uint8_t CONVERTER_ID_INDEX_MASK = 0x7Fu;
+static const uint8_t CONVERTER_ID_CUSTOM_FLAG = 0x80u;
+
+constexpr bool isCustomConverterId(ConverterId id) {
+  return (id & CONVERTER_ID_CUSTOM_FLAG) == CONVERTER_ID_CUSTOM_FLAG;
+}
+
+constexpr uint8_t converterIndex(ConverterId id) {
+  return id & CONVERTER_ID_INDEX_MASK;
+}
+
+constexpr ConverterId customConverterId(uint8_t index) {
+  return index | CONVERTER_ID_CUSTOM_FLAG;
+}
+
+
+static const Enum WeekdayEnum {
+  { 0, "Monday" },
+  { 1, "Tuesday" },
+  { 2, "Wednesday" },
+  { 3, "Thursday" },
+  { 4, "Friday" },
+  { 5, "Saturday" },
+  { 6, "Sunday" }  
+};
+
+static const Enum ValvePositionEnum {
+  { 0, "DHW" },
+  { 2, "HC" }
+};
+
+static const Bitfield IVUOperatingStatus {
   "AUTO", // SWITCHING PROGRAM ENABLED
   "COMPR", // COMPRESSOR
   "HEAT", // HEATING
@@ -460,80 +751,298 @@ const char* IVUOperatingStatusBitfield::VALUES[] = {
   ""
 };
 
-struct IVUOperatingModeEnumConverter {
-  static const char* fromRaw(int32_t value) {
-    switch (value) {
-      case 11: return "\"AUTOMATIC\"";
-      case 1: return "\"STANDBY\"";
-      case 3: return "\"DAY MODE\"";
-      case 4: return "\"SETBACK MODE\"";
-      case 5: return "\"DHW\"";
-      case 14: return "\"MANUAL MODE\"";
-      case 0: return "\"EMERGENCY OPERATION\"";
-      default: return "null";
-    }
-  }
-  static int32_t toRaw(const char* value, const char* end = nullptr) {
-    size_t n = end == nullptr ? strlen(value) : (end - value);
-    if (strncmp(value, "\"AUTOMATIC\"", n) == 0) return 11;
-    if (strncmp(value, "\"STANDBY\"", n) == 0) return 1;
-    if (strncmp(value, "\"DAY MODE\"", n) == 0) return 3;
-    if (strncmp(value, "\"SETBACK MODE\"", n) == 0) return 4;
-    if (strncmp(value, "\"DHW\"", n) == 0) return 5;
-    if (strncmp(value, "\"MANUAL MODE\"", n) == 0) return 14;
-    if (strncmp(value, "\"EMERGENCY OPERATION\"", n) == 0) return 0;
-    return ValueConverter::ERROR_RAW_VALUE;
-  }
-  static const char* description() {
-    return "[\"AUTOMATIC\",\"STANDBY\",\"DAY MODE\",\"SETBACK MODE\",\"DHW\",\"MANUAL MODE\",\"EMERGENCY OPERATION\"]";
-  }
+static const Enum IVUOperatingModeEnum {
+  { 11, "AUTOMATIC" },
+  { 1, "STANDBY" },
+  { 3, "DAY MODE" },
+  { 4, "SETBACK MODE" },
+  { 5, "DHW" },
+  { 14, "MANUAL MODE" },
+  { 0, "EMERGENCY OPERATION" }
 };
 
-struct WeekdayEnumConverter {
-  static const char* fromRaw(int32_t value) {
-    switch (value) {
-      case 0: return "\"Monday\"";
-      case 1: return "\"Tuesday\"";
-      case 2: return "\"Wednesday\"";
-      case 3: return "\"Thursday\"";
-      case 4: return "\"Friday\"";
-      case 5: return "\"Saturday\"";
-      case 6: return "\"Sunday\"";
-      default: return "null";
-    }
-  }
-  static int32_t toRaw(const char* value, const char* end = nullptr) {
-    size_t n = end == nullptr ? strlen(value) : (end - value);
-    if (strncmp(value, "\"Monday\"", n) == 0) return 0;
-    if (strncmp(value, "\"Tuesday\"", n) == 0) return 1;
-    if (strncmp(value, "\"Wednesday\"", n) == 0) return 2;
-    if (strncmp(value, "\"Thursday\"", n) == 0) return 3;
-    if (strncmp(value, "\"Friday\"", n) == 0) return 4;
-    if (strncmp(value, "\"Saturday\"", n) == 0) return 5;
-    if (strncmp(value, "\"Sunday\"", n) == 0) return 6;
-    return ValueConverter::ERROR_RAW_VALUE;
-  }
-  static const char* description() {
-    return "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\",\"Saturday\",\"Sunday\"]";
-  }
+void defineExampleCustomConverters(ICustomConverterRepository& repository) {
+  repository.store(customConverterId(0), new EnumConverter { F("Weekday"), WeekdayEnum });
+  repository.store(customConverterId(1), new BitfieldConverter { F("OperatingStatus"), IVUOperatingStatus });
+  repository.store(customConverterId(2), new EnumConverter { F("OperatingMode"), IVUOperatingModeEnum });
+  repository.store(customConverterId(3), new EnumConverter { F("ValvePosition"), ValvePositionEnum });
+}
+
+static const ICodec* CODECS[5] {
+  &NoneCodec::INSTANCE,
+  &Unsigned8BitCodec::INSTANCE,
+  &Signed8BitCodec::INSTANCE,
+  &Unsigned16BitCodec::INSTANCE,
+  &Signed16BitCodec::INSTANCE
 };
 
-struct ValvePositionEnumConverter {
-  static const char* fromRaw(int32_t value) {
-    switch (value) {
-      case 0: return "\"DHW\"";
-      case 2: return "\"HC\"";
-      default: return "null";
+static const IConverter* BUILT_IN_CONVERTERS[7] {
+  &NoneConverter::INSTANCE,
+  &HexStringConverter::INSTANCE,
+  &BooleanConverter::INSTANCE,
+  &NumericValueConverter<0>::INSTANCE,
+  &NumericValueConverter<1>::INSTANCE,
+  &NumericValueConverter<2>::INSTANCE,
+  &NumericValueConverter<3>::INSTANCE
+};
+
+struct NullConversionRepository final : public IConversionRepository {
+  toolbox::Iterable<const ICodec*> codecs() const override { return { nullptr, nullptr }; }
+  toolbox::Iterable<const IConverter*> builtinConverters() const override { return { nullptr, nullptr }; }
+  toolbox::Iterable<ICustomConverter* const> customConverters() const override { return { nullptr, nullptr }; }
+  const ICodec* getCodec(CodecId id) const override { return nullptr; }
+  CodecId getCodecIdByKey(const toolbox::strref& key) const override { return NONE_CODEC_ID; }
+  const IConverter* getConverter(ConverterId id) const override { return nullptr; }
+  ConverterId getConverterIdByKey(const toolbox::strref& key) const override { return NONE_CONVERTER_ID; }
+};
+
+class ConversionRepository final : public IConversionRepository, public ICustomConverterRepository, public iot_core::IApplicationComponent {
+private:
+  iot_core::Logger _logger;
+  iot_core::ISystem& _system;
+  ICustomConverter* _customConverters[8] {};
+  size_t _converterCount = 0;
+  bool _dirty = false;
+  bool _defineExamplesIfEmpty = true;
+
+  const IConverter* getBuiltInConverter(ConverterId id) {
+    if (!isCustomConverterId(id)) {
+      uint8_t i = converterIndex(id);
+      if (i < std::size(BUILT_IN_CONVERTERS)) {
+        return BUILT_IN_CONVERTERS[i];
+      } else {
+        return nullptr;
+      }
+    } else {
+      return nullptr;
     }
   }
-  static int32_t toRaw(const char* value, const char* end = nullptr) {
-    size_t n = end == nullptr ? strlen(value) : (end - value);
-    if (strncmp(value, "\"DHW\"", n) == 0) return 0;
-    if (strncmp(value, "\"HC\"", n) == 0) return 2;
-    return ValueConverter::ERROR_RAW_VALUE;
+
+  bool replaceCustomConverter(ConverterId id, ICustomConverter* converter) {
+    if (!isCustomConverterId(id) || converterIndex(id) >= std::size(_customConverters)) {
+      return false;
+    }
+
+    ICustomConverter* existing = _customConverters[converterIndex(id)];
+
+    if (existing != converter) {
+      if (existing) --_converterCount;
+
+      delete existing;
+      _customConverters[converterIndex(id)] = converter;
+
+      if (converter) ++_converterCount;
+    }
+
+    return true;
   }
-  static const char* description() {
-    return "[\"DHW\",\"HC\"]";
+
+  void restoreConverters() {
+    size_t stored = 0;
+    size_t loaded = 0;
+    for (size_t i = 0; i < std::size(_customConverters); ++i) {
+      uint8_t converterId = customConverterId(i);
+      auto file = LittleFS.open(toolbox::format(F("/cvt/custom/%u"), converterId), "r");
+      if (file) {
+        ++stored;
+        toolbox::StreamInput input{file};
+        auto reader = jsons::makeReader(input);
+        auto json = reader.begin();
+        replaceCustomConverter(converterId, deserialize(json, getCustomConverter(converterId)));
+        reader.end();
+        if (reader.failed()) {
+          replaceCustomConverter(converterId, nullptr);
+          _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to load converter %u: %s"), converterId, reader.diagnostics().errorMessage.toString().c_str()));
+        } else {
+          ++loaded;
+          _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Loaded converter %u."), converterId));
+        }
+        file.close();
+      } else {
+        replaceCustomConverter(converterId, nullptr);
+      }
+    }
+    _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Loaded converters (%u of %u)"), loaded, stored));
+    _dirty = false;
+  }
+
+  void persistConverters() {
+    size_t stored = 0;
+    size_t loaded = 0;
+    for (size_t i = 0; i < std::size(_customConverters); ++i) {
+      uint8_t converterId = i | CONVERTER_ID_CUSTOM_FLAG;
+      auto filename = toolbox::format(F("/cvt/custom/%u"), converterId);
+      ICustomConverter* existing = getCustomConverter(converterId);
+      if (existing) {
+        ++loaded;
+        auto file = LittleFS.open(filename, "w");
+        if (file) {
+          toolbox::PrintOutput output{file};
+          auto writer = jsons::makeWriter(output);
+          serialize(writer, existing);
+          writer.end();
+          file.close();
+          if (writer.failed()) {
+            _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to store converter %u."), converterId));
+            LittleFS.remove(filename);
+          } else {
+            ++stored;
+          }
+        } else {
+          _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to store converter %u."), converterId));
+        }
+      } else {
+        LittleFS.remove(filename);
+      }
+    }
+    _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Stored converters (%u of %u)"), loaded, stored));
+    _dirty = loaded != stored;
+  }
+
+public:
+  ConversionRepository(iot_core::ISystem& system) :
+    _logger(system.logger("cvt")),
+    _system(system)
+  {}
+
+  const char* name() const override {
+    return "cvt";
+  }
+
+  bool configure(const char* name, const char* value) override {
+    if (strcmp(name, "examples") == 0) return setDefineExamples(iot_core::convert<bool>::fromString(value, false));
+    return false;
+  }
+
+  void getConfig(std::function<void(const char*, const char*)> writer) const override {
+    writer("examples", iot_core::convert<bool>::toString(_defineExamplesIfEmpty));
+  }
+
+  bool setDefineExamples(bool enabled) {
+    _defineExamplesIfEmpty = enabled;
+    _logger.log(toolbox::format(F("Define example converters %s."), enabled ? "enabled" : "disabled"));
+    if (_defineExamplesIfEmpty && _converterCount == 0) {
+      defineExampleCustomConverters(*this);
+    }
+    return true;
+  }
+
+  void setup(bool /*connected*/) override {
+    restoreConverters();
+    if (_defineExamplesIfEmpty && _converterCount == 0) {
+      defineExampleCustomConverters(*this);
+    }
+  }
+
+  void loop(iot_core::ConnectionStatus /*status*/) override {
+  }
+  
+  void getDiagnostics(iot_core::IDiagnosticsCollector&) const override {
+  }
+
+  toolbox::Iterable<const ICodec*> codecs() const override {
+    return { std::begin(CODECS), std::end(CODECS) };
+  }
+
+  toolbox::Iterable<const IConverter*> builtinConverters() const override {
+    return { std::begin(BUILT_IN_CONVERTERS), std::end(BUILT_IN_CONVERTERS) };
+  }
+
+  toolbox::Iterable<ICustomConverter* const> customConverters() const override {
+    return { std::begin(_customConverters), std::end(_customConverters) };
+  }
+
+  const ICodec* getCodec(CodecId id) const override {
+    if (id < std::size(CODECS)) {
+      return CODECS[id];
+    } else {
+      return &NoneCodec::INSTANCE;
+    }
+  }
+
+  CodecId getCodecIdByKey(const toolbox::strref& key) const override {
+    CodecId id = 0;
+    for (auto& codec : CODECS) {
+      if (key == codec->key()) {
+        return id;
+      }
+      ++id;
+    }
+    return NONE_CODEC_ID;
+  }
+
+  const IConverter* getConverter(ConverterId id) const override {
+    size_t index = converterIndex(id);
+    if (isCustomConverterId(id)) {
+      if (index < std::size(_customConverters) && _customConverters[index]) {
+        return _customConverters[index];
+      }
+    } else {
+      if (index < std::size(BUILT_IN_CONVERTERS)) {
+        return BUILT_IN_CONVERTERS[index];
+      }
+    }
+    return &NoneConverter::INSTANCE;
+  }
+
+  ConverterId getConverterIdByKey(const toolbox::strref& key) const override {
+    ConverterId id = 0;
+    for (auto& converter : BUILT_IN_CONVERTERS) {
+      if (key == converter->key()) {
+        return id;
+      }
+      ++id;
+    }
+    id = customConverterId(0);
+    for (auto& converter : _customConverters) {
+      if (converter && key == converter->key()) {
+        return id;
+      }
+      ++id;
+    }
+    return NONE_CONVERTER_ID;
+  }
+
+  ICustomConverter* getCustomConverter(ConverterId id) const override {
+    if (isCustomConverterId(id)) {
+      uint8_t i = converterIndex(id);
+      if (i < std::size(_customConverters)) {
+        return _customConverters[i];
+      } else {
+        return nullptr;
+      }
+    } else {
+      return nullptr;
+    }
+  }
+
+  bool store(ConverterId id, ICustomConverter* converter) override {
+    _dirty = true;
+    return replaceCustomConverter(id, converter);
+  }
+  
+  void remove(ConverterId id) override {
+    replaceCustomConverter(id, nullptr);
+    _dirty = true;
+  }
+  
+  void removeAll() override {
+    for (uint8_t i = 0; i < std::size(_customConverters); ++i) {
+      replaceCustomConverter(customConverterId(i), nullptr);
+    }
+    _dirty = true;
+  }
+  
+  void commit() override {
+    if (_dirty) {
+      persistConverters();
+    }
+  }
+  
+  void rollback() override {
+    if (_dirty) {
+      restoreConverters();
+    }
   }
 };
 

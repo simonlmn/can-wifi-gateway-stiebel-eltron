@@ -2,53 +2,43 @@
 #define SERIALIZER_H_
 
 #include <iot_core/Utils.h>
-#include <iot_core/JsonWriter.h>
+#include <jsons/Writer.h>
 #include "DataAccess.h"
 
 namespace serializer {
 
-template<typename JsonWriter>
-void serialize(JsonWriter& writer, const DataEntry& entry, bool compact = false, bool numbersAsDecimals = false) {
+void serialize(jsons::IWriter& writer, const IConversionService& conversion, const IDefinitionRepository& definitions, const DataEntry& entry, bool compact = false, bool numbersAsDecimals = false) {
+  auto& definition = definitions.get(entry.id);
+
   writer.openObject();
   
-  writer.propertyPlain(F("id"), iot_core::convert<ValueId>::toString(entry.id, 10));
-  if (entry.hasDefinition()) {
+  writer.property(F("id")).number(entry.id);
+  if (!definition.isUndefined()) {
     if (!compact) {
-      writer.propertyString(F("name"), entry.definition->name);
-      writer.propertyString(F("accessMode"), valueAccessModeToString(entry.definition->accessMode));
+      writer.property(F("name")).string(definition.name);
+      writer.property(F("accessMode")).string(valueAccessModeToString(definition.accessMode));
     }
-    if (entry.definition->unit != Unit::Unknown) {
-      writer.propertyString(F("unit"), unitSymbol(entry.definition->unit));
+    if (definition.unit != Unit::Unknown) {
+      writer.property(F("unit")).string(unitSymbol(definition.unit));
     }
   }
   if (entry.lastUpdate.isSet()) {
     if (numbersAsDecimals) {
-      writer.propertyString(F("rawValue"), getRawValueAsDecString(entry.rawValue));
+      writer.property(F("rawValue")).string(getRawValueAsDecString(entry.rawValue));
     } else {
-      writer.propertyString(F("rawValue"), getRawValueAsHexString(entry.rawValue));
+      writer.property(F("rawValue")).string(getRawValueAsHexString(entry.rawValue));
     }
-    if (entry.hasDefinition()) {
-      writer.propertyPlain(F("value"), entry.definition->fromRaw(entry.rawValue));
+    if (!definition.isUndefined()) {
+      writer.property(F("value"));
+      conversion.toJson(writer, entry.id, entry.rawValue);
     }
   }
-  writer.propertyString(F("lastUpdate"), entry.lastUpdate.toString());
-  writer.propertyString(F("source"), entry.source.toString());
+  writer.property(F("lastUpdate")).string(entry.lastUpdate.toString());
+  writer.property(F("source")).string(entry.source.toString());
   if (!compact) {
-    writer.propertyPlain(F("subscribed"), iot_core::convert<bool>::toString(entry.subscribed));
-    writer.propertyPlain(F("writable"), iot_core::convert<bool>::toString(entry.writable));
+    writer.property(F("subscribed")).boolean(entry.subscribed);
+    writer.property(F("writable")).boolean(entry.writable);
   }
-  writer.close();
-}
-
-template<typename JsonWriter>
-void serialize(JsonWriter& writer, const ValueDefinition& definition) {
-  writer.openObject();
-
-  writer.propertyPlain(F("id"), iot_core::convert<ValueId>::toString(definition.id, 10));
-  writer.propertyString(F("name"), definition.name);
-  writer.propertyString(F("unit"), unitSymbol(definition.unit));
-  writer.propertyString(F("accessMode"), valueAccessModeToString(definition.accessMode));
-  writer.propertyString(F("source"), definition.source.toString());
   
   writer.close();
 }

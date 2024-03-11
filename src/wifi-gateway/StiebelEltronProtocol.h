@@ -1,11 +1,6 @@
 #ifndef STIEBELELTRONPROTOCOL_H_
 #define STIEBELELTRONPROTOCOL_H_
 
-#ifdef TEST_ENV
-#include <cstdint>
-#include <cstdio>
-#endif
-
 #include <iot_core/Interfaces.h>
 #include "StiebelEltronTypes.h"
 #include "CanInterface.h"
@@ -141,7 +136,7 @@ public:
 
 class StiebelEltronProtocol final : public iot_core::IApplicationComponent {
 private:
-  iot_core::Logger& _logger;
+  iot_core::Logger _logger;
   iot_core::ISystem& _system;
   ICanInterface& _can;
   bool _ready = false;
@@ -156,7 +151,7 @@ private:
   
 public:
   StiebelEltronProtocol(iot_core::ISystem& system, ICanInterface& can)
-    : _logger(system.logger()),
+    : _logger(system.logger("sep")),
     _system(system),
     _can(can)
   { }
@@ -174,14 +169,14 @@ public:
 
   void setup(bool /*connected*/) override {
     _can.onReady([this] () {
-            for (auto& [name, device] : _devices) {
-                registerDevice(*device);
+      for (auto& [name, device] : _devices) {
+        registerDevice(*device);
       }
-            _ready = true;
+      _ready = true;
     });
 
     _can.onMessage([this] (CanMessage const& message) {
-            processProtocol(message);
+      processProtocol(message);
     });
   }
 
@@ -217,7 +212,7 @@ public:
     }
 
     if (!data.targetId.isExact() || !data.sourceId.isExact()) {
-      _logger.log(iot_core::LogLevel::Error, name(), iot_core::format(F("Request source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
+      _logger.log(iot_core::LogLevel::Error, toolbox::format(F("Request source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
       return;
     }
 
@@ -244,7 +239,7 @@ public:
     }
 
     if (!data.targetId.isExact() || !data.sourceId.isExact()) {
-      _logger.log(iot_core::LogLevel::Error, name(), iot_core::format(F("Write source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
+      _logger.log(iot_core::LogLevel::Error, toolbox::format(F("Write source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
       return;
     }
 
@@ -270,7 +265,7 @@ public:
     }
 
     if (!data.targetId.isExact() || !data.sourceId.isExact()) {
-      _logger.log(iot_core::LogLevel::Error, name(), iot_core::format(F("Response source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
+      _logger.log(iot_core::LogLevel::Error, toolbox::format(F("Response source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
       return;
     }
 
@@ -411,19 +406,19 @@ private:
     switch (type)
     {
     case MessageType::Register:
-      _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
+      _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
       break;
     case MessageType::Write:
-      _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%s t:%s s:%s id:%04X%c v:%04X"), messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
+      _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("%s t:%s s:%s id:%04X%c v:%04X"), messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
       break;
     case MessageType::Response:
-      _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%s t:%s s:%s id:%04X%c v:%04X"), messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
+      _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("%s t:%s s:%s id:%04X%c v:%04X"), messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
       break;
     case MessageType::Request:
-      _logger.log(iot_core::LogLevel::Debug, name(), [&] () { return iot_core::format(F("%s t:%s s:%s id:%04X%c"), messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l'); });
+      _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("%s t:%s s:%s id:%04X%c"), messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l'); });
       break;
     default:
-      _logger.log(iot_core::LogLevel::Info, name(), [&] () { return iot_core::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
+      _logger.log(iot_core::LogLevel::Info, [&] () { return toolbox::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
       break;
     }
   }
