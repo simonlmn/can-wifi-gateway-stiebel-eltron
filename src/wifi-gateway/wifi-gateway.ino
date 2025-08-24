@@ -8,6 +8,7 @@
 //#define DEVELOPMENT_MODE
 #define MQTT_SUPPORT
 
+#include <toolbox.h>
 #include <gpiobj.h>
 #include <iot_core.h>
 #include <iot_core/api/Server.h>
@@ -15,12 +16,18 @@
 #include "AppVersion.h"
 #include "SerialCan.h"
 #include "StiebelEltronProtocol.h"
+#include "StiebelEltronProtocolApi.h"
+#include "ValueConversion.h"
+#include "ValueConversionApi.h"
+#include "ValueDefinitions.h"
+#include "ValueDefinitionsApi.h"
 #include "DateTimeSource.h"
 #include "DataAccess.h"
-#include "RestApi.h"
+#include "DataAccessApi.h"
 #ifdef MQTT_SUPPORT
 #include "MqttClient.h"
 #endif
+#include "UiProvider.h"
 
 namespace io {
 // Switches
@@ -50,17 +57,24 @@ iot_core::api::SystemApi systemApi { sys, sys };
 
 SerialCan can { sys, io::canResetPin, io::txEnablePin };
 StiebelEltronProtocol protocol { sys, can };
-DateTimeSource timeSource { sys.logger(), protocol };
-DataAccess access { sys, protocol, io::writeEnablePin };
-RestApi appApi { sys, access, protocol };
+StiebelEltronProtocolApi protocolApi { sys, protocol };
+ConversionRepository conversions { sys };
+ConversionApi conversionsApi { sys, conversions, conversions };
+DefinitionRepository definitions { sys, conversions };
+DefinitionsApi definitionsApi { sys, conversions, definitions };
+ConversionService conversionService { conversions, definitions };
+DateTimeSource timeSource { sys.logger("dts"), protocol, conversionService };
+DataAccess access { sys, protocol, definitions, io::writeEnablePin };
+DataAccessApi accessApi { sys, access, conversionService, definitions };
 #ifdef MQTT_SUPPORT
-MqttClient mqtt { sys, access };
+MqttClient mqtt { sys, access, conversionService, definitions };
 #endif
+UiProvider ui {};
 
 void setup() {
   sys.setDateTimeSource(&timeSource);
 
-  sys.logger().log("ios", iot_core::format(F("ota=%u write=%u tx=%u debug=%u"),
+  sys.logs().log("ios", toolbox::format(F("ota=%u write=%u tx=%u debug=%u"),
     io::otaEnablePin.read(),
     io::writeEnablePin.read(),
     io::txEnablePin.read(),
@@ -70,6 +84,8 @@ void setup() {
   sys.addComponent(&api);
   sys.addComponent(&can);
   sys.addComponent(&protocol);
+  sys.addComponent(&conversions);
+  sys.addComponent(&definitions);
   sys.addComponent(&timeSource);
   sys.addComponent(&access);
 #ifdef MQTT_SUPPORT
@@ -77,7 +93,11 @@ void setup() {
 #endif
 
   api.addProvider(&systemApi);
-  api.addProvider(&appApi);
+  api.addProvider(&protocolApi);
+  api.addProvider(&conversionsApi);
+  api.addProvider(&definitionsApi);
+  api.addProvider(&accessApi);
+  api.addProvider(&ui);
 
   sys.setup();
 }

@@ -1,13 +1,15 @@
 profiles:
   default:
     notes: Standard build for ESP8266 NodeMCU board (currently the only tested option)
-    fqbn: esp8266:esp8266:nodemcu:xtal=160,vt=flash,exception=disabled,stacksmash=disabled,ssl=all,mmu=3232,non32xfer=fast,eesz=4M2M,ip=lm2f,dbg=Disabled,lvl=None____,wipe=none,baud=115200
+    fqbn: esp8266:esp8266:nodemcu:xtal=160,vt=flash,exception=disabled,stacksmash=disabled,ssl=all,mmu=3232,non32xfer=fast,eesz=4M2M,ip=lm2f,dbg=Disabled,lvl=None____,wipe=none,baud=921600
     platforms:
       - platform: esp8266:esp8266 (3.1.2)
         platform_index_url: https://arduino.esp8266.com/stable/package_esp8266com_index.json
     libraries:
       - WiFiManager (2.0.16-rc.2)
       - PubSubClient (2.8)
-      - GPIObj (0.4.0)
-      - ESP IoT Core (0.3.0)
+      - gpiobj (0.5.0)
+      - esp-iot-core (0.7.0)
+      - jsons (0.4.0)
       - serial-transport (0.2.0)
+      - toolbox (0.6.0)
