@@ -12,4 +12,4 @@ profiles:
       - esp-iot-core (0.7.0)
       - jsons (0.4.0)
       - serial-transport (0.2.0)
-      - toolbox (0.6.0)
+      - toolbox (0.6.1)
