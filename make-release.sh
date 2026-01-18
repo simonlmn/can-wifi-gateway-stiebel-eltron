@@ -52,7 +52,7 @@ if [[ "$pre_release_label" =~ ^[a-z].*$ ]]; then
     fi
 fi
 
-if [ -z "$new_tag" ]; then
+if [ -z "$new_target_version" ]; then
     bump_patch=_
     while [ "$bump_patch" != "y" -a "$bump_patch" != "n" -a -n "$bump_patch" ]
     do
