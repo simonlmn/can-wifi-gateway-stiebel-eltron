@@ -98,16 +98,44 @@ export class DefinitionsPage {
         this.#tableView.clear();
         const textarea = this.#tableView.textarea(null, { rows: 25 });
         textarea.value = JSON.stringify(this.#definitions, null, 2);
-        this.#tableView.button('Save', {}, async (button) => {
+        const progressContainer = this.#tableView.block();
+        const progress = progressContainer.progress();
+        const statusMessage = progressContainer.p();
+        statusMessage.textContent = '';
+        progress.indeterminate = true;
+        progressContainer.hide();
+        
+        let abortRequested = false;
+        
+        const saveButton = this.#tableView.button('Save', {}, async (button) => {
             button.disable();
-            if (await this.#updateDefinitions(textarea.value)) {
+            discardButton.textContent = 'Abort';
+            discardButton.enable();
+            progressContainer.show();
+            statusMessage.textContent = 'Saving...';
+            abortRequested = false;
+            
+            const result = await this.#updateDefinitions(textarea.value, progress, statusMessage, () => abortRequested);
+            
+            if (result) {
                 this.#viewDefinitions();
                 return;
             }
+            
             button.enable();
+            discardButton.textContent = 'Discard';
+            progressContainer.hide();
+            statusMessage.textContent = '';
         });
-        this.#tableView.button('Discard', {}, () => {
-            this.#viewDefinitions();
+        
+        const discardButton = this.#tableView.button('Discard', {}, () => {
+            if (discardButton.textContent === 'Abort') {
+                abortRequested = true;
+                discardButton.disable();
+                statusMessage.textContent = 'Aborting...';
+            } else {
+                this.#viewDefinitions();
+            }
         });
     }
 
@@ -301,16 +329,48 @@ export class DefinitionsPage {
         }
     }
 
-    async #updateDefinitions(definitionsJson) {
+    async #updateDefinitions(definitionsJson, progress, statusMessage, shouldAbort) {
         try {
             const newDefinitions = JSON.parse(definitionsJson);
+            const totalOperations = Object.keys(this.#definitions).length + Object.keys(newDefinitions).length;
+            let completedOperations = 0;
+
+            progress.indeterminate = false;
+
             for (const id of Object.keys(this.#definitions)) {
+                if (shouldAbort && shouldAbort()) {
+                    if (statusMessage) {
+                        statusMessage.textContent = `Aborted after ${completedOperations}/${totalOperations} operations.`;
+                    }
+                    await this.#loadDefinitions();
+                    return false;
+                }
+                
                 if (newDefinitions[id] === undefined) {
                     await this.#client.delete(`/definitions/${id}`);
+                    completedOperations++;
+                    progress.value = completedOperations / totalOperations;
+                    if (statusMessage) {
+                        statusMessage.textContent = `Saving... (${completedOperations}/${totalOperations})`;
+                    }
                 }
             }
+            
             for (const [id,definition] of Object.entries(newDefinitions)) {
+                if (shouldAbort && shouldAbort()) {
+                    if (statusMessage) {
+                        statusMessage.textContent = `Aborted after ${completedOperations}/${totalOperations} operations.`;
+                    }
+                    await this.#loadDefinitions();
+                    return false;
+                }
+                
                 await this.#client.put(`/definitions/${id}`, JSON.stringify(definition));
+                completedOperations++;
+                progress.value = completedOperations / totalOperations;
+                if (statusMessage) {
+                    statusMessage.textContent = `Saving... (${completedOperations}/${totalOperations})`;
+                }
             }
             await this.#loadDefinitions();
             return true;
