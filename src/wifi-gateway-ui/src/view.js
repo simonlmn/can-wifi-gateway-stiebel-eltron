@@ -329,7 +329,8 @@ export class TextView extends View {
         super(createElement('input', attributes));
         this._element.type = 'text';
         if (callback) {
-            this._element.onchange = (e) => callback(e.target.value, this);
+            const eventType = attributes?.liveUpdate ? 'oninput' : 'onchange';
+            this._element[eventType] = (e) => callback(e.target.value, this);
         }
 
         if (label) {

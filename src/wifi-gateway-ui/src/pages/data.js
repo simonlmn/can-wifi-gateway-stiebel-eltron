@@ -13,9 +13,13 @@ function formatValue(value) {
 
 export class DataPage {
     #client
+    #data
+    #searchTimeout
 
     constructor(client) {
         this.#client = client;
+        this.#data = null;
+        this.#searchTimeout = null;
     }
 
     get label() {
@@ -24,21 +28,30 @@ export class DataPage {
 
     async enter(view) {
         view.h1('Current data');
-        this.filter = view.select(view.label('Filter:'), ['All', 'Undefined', 'Configured', 'Not Configured'], {}, async (selected) => {
+        
+        const filterFieldset = view.fieldset('Search and Filter Options');
+        this.filter = filterFieldset.select(filterFieldset.label('Filter:'), ['All', 'Undefined', 'Configured', 'Not Configured'], {}, async (selected) => {
             this.filter.disable();
             await this.#reload();
             this.filter.enable();
         });
-        this.updatedSince = view.text(view.label('Updated since (ISO date/time, optional):'), { placeholder: '2024-01-01T00:00:00' }, async () => {
+        this.updatedSince = filterFieldset.text(filterFieldset.label('Updated since (ISO date/time):'), { placeholder: '2024-01-01T00:00:00' }, async () => {
             this.updatedSince.disable();
             await this.#reload();
             this.updatedSince.enable();
         });
-        this.numbersAsDecimals = view.checkbox(view.label('Show raw values as decimal'), { indeterminate: false }, async () => {
+        this.numbersAsDecimals = filterFieldset.checkbox(filterFieldset.label('Show raw values as decimal'), { indeterminate: false }, async () => {
             this.numbersAsDecimals.disable();
             await this.#reload();
             this.numbersAsDecimals.enable();
         });
+        this.searchFilter = filterFieldset.text(filterFieldset.label('Search by ID or name:'), { placeholder: 'e.g., 42 or temperature', liveUpdate: true }, async () => {
+            clearTimeout(this.#searchTimeout);
+            this.#searchTimeout = setTimeout(() => {
+                this.#refreshTable();
+            }, 300);
+        });
+        
         this.table = view.table();
         this.state = view.p();
         this.filter.selected = 'All';
@@ -46,6 +59,7 @@ export class DataPage {
     }
 
     async leave() {
+        clearTimeout(this.#searchTimeout);
         this.autoRefresh(false);
     }
 
@@ -94,44 +108,75 @@ export class DataPage {
         this.state.content = `<small>Loading...</small>`;
         try {
             const response = await this.#client.get(`/data${this.#getDataQueryParam()}`);
-            const data = await response.json();
-            this.table.clear();
-
-            if (data.actualItems > 0) {
-                this.table.addRow().addHeaders([
-                    'Source',
-                    'ID',
-                    'Name',
-                    'Raw Value',
-                    'Value',
-                    'Unit',
-                    'Last Update'
-                ]);
-                for (const deviceType in data.items) {
-                    for (const deviceAddress in data.items[deviceType]) {
-                        for (const id in data.items[deviceType][deviceAddress]) {
-                            const datapoint = data.items[deviceType][deviceAddress][id];
-                            this.table.addRow().addColumns([
-                                datapoint.source,
-                                datapoint.id,
-                                datapoint.name,
-                                datapoint.rawValue,
-                                formatValue(datapoint.value),
-                                datapoint.unit,
-                                datapoint.lastUpdate
-                            ]);
-                        }
-                    }
-                }
-                this.state.attribute('class', null);
-                this.state.content = `<small>Updated on ${new Date().toISOString()}.</small>`;
-            } else {
-                this.state.attribute('class', 'notice');
-                this.state.content = 'No data has been captured yet. You need to configure which datapoints shall be requested and/or captured.';
-            }
+            this.#data = await response.json();
+            this.#refreshTable();
         } catch (err) {
             this.state.attribute('class', 'notice');
             this.state.content = `${err}`;
+        }
+    }
+
+    #refreshTable() {
+        this.table.clear();
+
+        if (!this.#data || this.#data.actualItems === 0) {
+            this.state.attribute('class', 'notice');
+            this.state.content = 'No data has been captured yet. You need to configure which datapoints shall be requested and/or captured.';
+            return;
+        }
+
+        const searchTerm = this.searchFilter?.value?.trim().toLowerCase() || '';
+        const datapoints = [];
+
+        // Collect all datapoints for filtering
+        for (const deviceType in this.#data.items) {
+            for (const deviceAddress in this.#data.items[deviceType]) {
+                for (const id in this.#data.items[deviceType][deviceAddress]) {
+                    const datapoint = this.#data.items[deviceType][deviceAddress][id];
+                    datapoints.push(datapoint);
+                }
+            }
+        }
+
+        // Filter datapoints based on search term
+        let filteredDatapoints = datapoints;
+        if (searchTerm) {
+            filteredDatapoints = datapoints.filter(dp => {
+                const idStr = dp.id?.toString().toLowerCase() || '';
+                const nameStr = dp.name?.toLowerCase() || '';
+                return idStr.includes(searchTerm) || nameStr.includes(searchTerm);
+            });
+        }
+
+        if (filteredDatapoints.length > 0) {
+            this.table.addRow().addHeaders([
+                'Source',
+                'ID',
+                'Name',
+                'Raw Value',
+                'Value',
+                'Unit',
+                'Last Update'
+            ]);
+            for (const datapoint of filteredDatapoints) {
+                this.table.addRow().addColumns([
+                    datapoint.source,
+                    datapoint.id,
+                    datapoint.name,
+                    datapoint.rawValue,
+                    formatValue(datapoint.value),
+                    datapoint.unit,
+                    datapoint.lastUpdate
+                ]);
+            }
+            this.state.attribute('class', null);
+            this.state.content = `<small>Showing ${filteredDatapoints.length} of ${datapoints.length} items. Updated on ${new Date().toISOString()}.</small>`;
+        } else if (searchTerm) {
+            this.state.attribute('class', 'notice');
+            this.state.content = `No data matches the search filter "${searchTerm}".`;
+        } else {
+            this.state.attribute('class', 'notice');
+            this.state.content = 'No data has been captured yet. You need to configure which datapoints shall be requested and/or captured.';
         }
     }
 }
