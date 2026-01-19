@@ -122,17 +122,17 @@ public:
     _messageHandler = messageHandler;
   }
 
-  SendResult sendCanMessage(const CanMessage& message) override {
+  OperationResult sendCanMessage(const CanMessage& message) override {
     if (effectiveMode() == CanMode::ListenOnly) {
-      return SendResult::NotReady;
+      return OperationResult::NotReady;
     }
 
     if (!_canAvailable) {
-      return SendResult::NotReady;
+      return OperationResult::NotReady;
     }
 
     if (_availableTokens < 1.0f) {
-      return SendResult::RateLimited;
+      return OperationResult::RateLimited;
     }
 
     logCanMessage("TX", message);
@@ -142,7 +142,7 @@ public:
 
     _availableTokens -= 1.0f;
     _counters.tx += 1;
-    return SendResult::Accepted;
+    return OperationResult::Accepted;
   }
 
   float getAvailableTokens() const override {

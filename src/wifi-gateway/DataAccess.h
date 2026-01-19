@@ -5,6 +5,7 @@
 #include <iot_core/DateTime.h>
 #include <iot_core/Utils.h>
 #include "DateTimeSource.h"
+#include "OperationResult.h"
 #include "StiebelEltronProtocol.h"
 #include "ValueDefinitions.h"
 #include <utility>
@@ -434,7 +435,7 @@ private:
       
       DataEntry& entry = _dataIterator->second;
 
-      SendResult sendResult = SendResult::Accepted;
+      OperationResult sendResult = OperationResult::Accepted;
       if (entry.writable) {
         if (entry.lastUpdateMs != 0) { // we already have received a value from the source
           if (entry.lastWriteMs != 0 && (currentMs > entry.lastWriteMs + WRITE_INTERVAL_MS)) {
@@ -445,7 +446,7 @@ private:
               entry.writeRetries = 0;
             } else {
               sendResult = _protocol.write({ _deviceId, entry.source, entry.id, entry.toWrite });
-              if (sendResult == SendResult::Accepted) {
+              if (sendResult == OperationResult::Accepted) {
                 entry.lastWriteMs = currentMs;
                 entry.writeRetries++;
                 // Wait a bit before requesting verification to give the target time to process
@@ -458,7 +459,7 @@ private:
         } else { // request the value from the source first before allowing to write it
           if (currentMs > entry.lastRequestMs + MIN_UPDATE_INTERVAL_MS) {
             sendResult = _protocol.request({ _deviceId, entry.source, entry.id });
-            if (sendResult == SendResult::Accepted) {
+            if (sendResult == OperationResult::Accepted) {
               entry.lastRequestMs = currentMs;
             }
           }
@@ -467,7 +468,7 @@ private:
         if (currentMs > entry.lastUpdateMs + std::max(MIN_UPDATE_INTERVAL_MS, getDefinition(entry.id).updateIntervalMs)
           && currentMs > entry.lastRequestMs + MIN_UPDATE_INTERVAL_MS) {
           sendResult = _protocol.request({ _deviceId, entry.source, entry.id });
-          if (sendResult == SendResult::Accepted) {
+          if (sendResult == OperationResult::Accepted) {
             entry.lastRequestMs = currentMs;
           }
         }
@@ -475,14 +476,14 @@ private:
 
       switch (sendResult)
       {
-        case SendResult::Accepted:
+        case OperationResult::Accepted:
           // All good, proceed with next entry
           break;
-        case SendResult::Invalid:
+        case OperationResult::Invalid:
           // Should normally not happen, but if it does, skip this entry this time and proceed with next entry
           break;
-        case SendResult::NotReady:
-        case SendResult::RateLimited:
+        case OperationResult::NotReady:
+        case OperationResult::RateLimited:
           // stop processing for now, try again later
           return;
       }

@@ -206,14 +206,14 @@ public:
     return _otherDeviceIds;
   }
 
-  SendResult request(RequestData const& data) {
+  OperationResult request(RequestData const& data) {
     if (!_ready) {
-      return SendResult::NotReady;
+      return OperationResult::NotReady;
     }
 
     if (!data.targetId.isExact() || !data.sourceId.isExact()) {
       _logger.log(iot_core::LogLevel::Error, toolbox::format(F("Request source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
-      return SendResult::Invalid;
+      return OperationResult::Invalid;
     }
 
     _system.lyield();
@@ -233,14 +233,14 @@ public:
     return _can.sendCanMessage(message);
   }
 
-  SendResult write(WriteData const& data) {
+  OperationResult write(WriteData const& data) {
     if (!_ready) {
-      return SendResult::NotReady;
+      return OperationResult::NotReady;
     }
 
     if (!data.targetId.isExact() || !data.sourceId.isExact()) {
       _logger.log(iot_core::LogLevel::Error, toolbox::format(F("Write source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
-      return SendResult::Invalid;
+      return OperationResult::Invalid;
     }
 
     _system.lyield();
@@ -259,14 +259,14 @@ public:
     return _can.sendCanMessage(message);
   }
 
-  SendResult respond(ResponseData const& data) {
+  OperationResult respond(ResponseData const& data) {
     if (!_ready) {
-      return SendResult::NotReady;
+      return OperationResult::NotReady;
     }
 
     if (!data.targetId.isExact() || !data.sourceId.isExact()) {
       _logger.log(iot_core::LogLevel::Error, toolbox::format(F("Response source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
-      return SendResult::Invalid;
+      return OperationResult::Invalid;
     }
 
     _system.lyield();

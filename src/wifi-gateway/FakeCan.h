@@ -110,8 +110,8 @@ public:
     _messageHandler = messageHandler;
   }
 
-  SendResult sendCanMessage(const CanMessage& message) override {
-    return SendResult::Accepted; // FakeCan always accepts messages
+  OperationResult sendCanMessage(const CanMessage& message) override {
+    return OperationResult::Accepted; // FakeCan always accepts messages
   }
 
   float getAvailableTokens() const override {
