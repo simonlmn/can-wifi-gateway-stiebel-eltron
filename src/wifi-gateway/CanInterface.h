@@ -52,6 +52,13 @@ struct CanCounters {
   uint32_t err = 0;
 };
 
+enum struct SendResult {
+  Accepted,
+  RateLimited,
+  NotReady,
+  Invalid,
+};
+
 class ICanInterface {
 public:
   virtual bool setMode(CanMode mode) = 0;
@@ -59,7 +66,7 @@ public:
   virtual bool ready() const = 0;
   virtual void onReady(std::function<void()> readyHandler) = 0;
   virtual void onMessage(std::function<void(const CanMessage& message)> messageHandler) = 0;
-  virtual bool sendCanMessage(const CanMessage& message) = 0; // Returns true if message was accepted, false if rate limited
+  virtual SendResult sendCanMessage(const CanMessage& message) = 0; // Returns true if message was accepted, false if rate limited
   virtual float getAvailableTokens() const = 0; // Query available send budget (1 token = 1 frame)
   virtual CanCounters const& counters() const = 0;
 };

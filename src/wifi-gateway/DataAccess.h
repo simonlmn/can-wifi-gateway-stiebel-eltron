@@ -407,7 +407,7 @@ private:
     }
   }
 
-  // CAN bus protection is now handled by SerialCan with token bucket rate limiting
+  // Note: CAN bus protection is handled by SerialCan with token bucket rate limiting
   // These constants control retry behavior and timing, not rate limiting
   static constexpr uint32_t MIN_UPDATE_INTERVAL_MS = 30000; // Min 30s between subscription requests
   static constexpr unsigned long WRITE_INTERVAL_MS = 3000; // 3s between write retries
@@ -420,71 +420,77 @@ private:
   void maintainData() {
     if (_maintenanceInterval.elapsed()) {
       unsigned long currentMs = millis();
+      doDataMaintenance(currentMs);
+      _maintenanceInterval.restart();
+    }
+  }
+
+  void doDataMaintenance(unsigned long currentMs) {
+    size_t remainingDataEntries = _data.size();
+    while (remainingDataEntries > 0) {
+      if (_dataIterator == _data.end()) {
+        _dataIterator = _data.begin();
+      }
       
-      size_t remainingDataEntries = _data.size();
-      while (remainingDataEntries > 0) {
-        if (_dataIterator == _data.end()) {
-          _dataIterator = _data.begin();
-        }
-        
-        DataEntry& entry = _dataIterator->second;
-        bool messageSent = false;
+      DataEntry& entry = _dataIterator->second;
 
-        if (entry.writable) {
-          if (entry.lastUpdateMs != 0) { // we already have received a value from the source
-            if (entry.lastWriteMs != 0 && (currentMs > entry.lastWriteMs + WRITE_INTERVAL_MS)) {
-              if (entry.writeRetries >= MAX_WRITE_RETRIES) {
-                _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Write failed after %u retries for %u (wanted: %u, current: %u)"), 
-                  entry.writeRetries, entry.id, entry.toWrite, entry.rawValue));
-                entry.lastWriteMs = 0; // Give up on this write
-                entry.writeRetries = 0;
-              } else {
-                // Attempt write; check if rate limited
-                if (_protocol.write({ _deviceId, entry.source, entry.id, entry.toWrite })) {
-                  entry.lastWriteMs = currentMs;
-                  entry.writeRetries++;
-                  // Wait a bit before requesting verification to give the target time to process
-                  entry.lastRequestMs = currentMs + WRITE_VERIFY_DELAY_MS - MIN_UPDATE_INTERVAL_MS;
-                  entry.lastUpdateMs = 0; // triggers request for new value from source after delay
-                  _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Write attempt %u for %u: %u"), entry.writeRetries, entry.id, entry.toWrite));
-                  messageSent = true;
-                } else {
-                  // Rate limited - stop processing and try again next cycle
-                  break;
-                }
-              }
-            }
-          } else { // request the value from the source first before allowing to write it
-            if (currentMs > entry.lastRequestMs + MIN_UPDATE_INTERVAL_MS) {
-              if (_protocol.request({ _deviceId, entry.source, entry.id })) {
-                entry.lastRequestMs = currentMs;
-                messageSent = true;
-              } else {
-                // Rate limited - stop processing
-                break;
-              }
-            }
-          }
-        } else if (entry.subscribed) {
-          if (currentMs > entry.lastUpdateMs + std::max(MIN_UPDATE_INTERVAL_MS, getDefinition(entry.id).updateIntervalMs)
-           && currentMs > entry.lastRequestMs + MIN_UPDATE_INTERVAL_MS) {
-            if (_protocol.request({ _deviceId, entry.source, entry.id })) {
-              entry.lastRequestMs = currentMs;
-              messageSent = true;
+      SendResult sendResult = SendResult::Accepted;
+      if (entry.writable) {
+        if (entry.lastUpdateMs != 0) { // we already have received a value from the source
+          if (entry.lastWriteMs != 0 && (currentMs > entry.lastWriteMs + WRITE_INTERVAL_MS)) {
+            if (entry.writeRetries >= MAX_WRITE_RETRIES) {
+              _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Write failed after %u retries for %u (wanted: %u, current: %u)"), 
+                entry.writeRetries, entry.id, entry.toWrite, entry.rawValue));
+              entry.lastWriteMs = 0; // Give up on this write
+              entry.writeRetries = 0;
             } else {
-              // Rate limited - stop processing
-              break;
+              sendResult = _protocol.write({ _deviceId, entry.source, entry.id, entry.toWrite });
+              if (sendResult == SendResult::Accepted) {
+                entry.lastWriteMs = currentMs;
+                entry.writeRetries++;
+                // Wait a bit before requesting verification to give the target time to process
+                entry.lastRequestMs = currentMs + WRITE_VERIFY_DELAY_MS - MIN_UPDATE_INTERVAL_MS;
+                entry.lastUpdateMs = 0; // triggers request for new value from source after delay
+                _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Write attempt %u for %u: %u"), entry.writeRetries, entry.id, entry.toWrite));
+              }
+            }
+          }
+        } else { // request the value from the source first before allowing to write it
+          if (currentMs > entry.lastRequestMs + MIN_UPDATE_INTERVAL_MS) {
+            sendResult = _protocol.request({ _deviceId, entry.source, entry.id });
+            if (sendResult == SendResult::Accepted) {
+              entry.lastRequestMs = currentMs;
             }
           }
         }
-
-        ++_dataIterator;
-        --remainingDataEntries;
-
-        _system.lyield();
+      } else if (entry.subscribed) {
+        if (currentMs > entry.lastUpdateMs + std::max(MIN_UPDATE_INTERVAL_MS, getDefinition(entry.id).updateIntervalMs)
+          && currentMs > entry.lastRequestMs + MIN_UPDATE_INTERVAL_MS) {
+          sendResult = _protocol.request({ _deviceId, entry.source, entry.id });
+          if (sendResult == SendResult::Accepted) {
+            entry.lastRequestMs = currentMs;
+          }
+        }
       }
 
-      _maintenanceInterval.restart();
+      switch (sendResult)
+      {
+        case SendResult::Accepted:
+          // All good, proceed with next entry
+          break;
+        case SendResult::Invalid:
+          // Should normally not happen, but if it does, skip this entry this time and proceed with next entry
+          break;
+        case SendResult::NotReady:
+        case SendResult::RateLimited:
+          // stop processing for now, try again later
+          return;
+      }
+
+      ++_dataIterator;
+      --remainingDataEntries;
+
+      _system.lyield();
     }
   }
 

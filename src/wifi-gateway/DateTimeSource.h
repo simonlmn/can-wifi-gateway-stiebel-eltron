@@ -109,7 +109,7 @@ public:
   }
   
 private:
-  unsigned long _requestDateTimeFieldIntervalMs = 30000;
+  unsigned long _requestDateTimeFieldIntervalMs = 10000;
   unsigned long _dateTimeFieldAgeThresholdMs = 30000;
   unsigned long _lastRequestDateTimeFields = 0;
   

@@ -22,9 +22,9 @@ private:
   
   // Token bucket rate limiter for 20 kbit/s bus protection
   // Analysis: ~4.4ms per CAN frame (worst case with bit stuffing)
-  // Theoretical max: ~220 frames/sec, we use ~10 frames/sec = ~4.4% bus utilization
-  static constexpr float MAX_FRAMES_PER_SECOND = 10.0f; // Direct, intuitive bus load limit
-  static constexpr float MAX_BURST_TOKENS = 5.0f; // Allow small bursts for responsiveness
+  // Theoretical max: ~220 frames/sec, we use ~12 frames/sec = ~5.4% bus utilization
+  static constexpr float MAX_FRAMES_PER_SECOND = 12.0f; // Direct, intuitive bus load limit
+  static constexpr float MAX_BURST_TOKENS = 6.0f; // Allow small bursts for responsiveness
   unsigned long _lastTokenRefillMs;
   float _availableTokens;
   
@@ -43,7 +43,7 @@ public:
     _resetInterval(30000),
     _counters(),
     _lastTokenRefillMs(0),
-    _availableTokens(0),
+    _availableTokens(MAX_BURST_TOKENS),
     _serial([this] (const char* message, serial_transport::Endpoint& serial) { processReceived(message, serial); }, [this] (serial_transport::ErrorCode errorCode, serial_transport::Endpoint& serial) { handleError(errorCode, serial); })
   {
   }
@@ -122,21 +122,17 @@ public:
     _messageHandler = messageHandler;
   }
 
-  bool sendCanMessage(const CanMessage& message) override {
+  SendResult sendCanMessage(const CanMessage& message) override {
     if (effectiveMode() == CanMode::ListenOnly) {
-      return false;
+      return SendResult::NotReady;
     }
 
     if (!_canAvailable) {
-      return false;
+      return SendResult::NotReady;
     }
 
-    // Refill token bucket based on time elapsed
-    refillTokenBucket();
-
-    // Check if we have budget to send
     if (_availableTokens < 1.0f) {
-      return false; // Rate limited
+      return SendResult::RateLimited;
     }
 
     logCanMessage("TX", message);
@@ -144,13 +140,12 @@ public:
     // TODO check _serial.canQueue() and/or result from queueCanTxMessage() ?
     queueCanTxMessage(_serial, message.id, message.ext, message.rtr, message.len, message.data);
 
-    _availableTokens -= 1.0f; // Consume one token
+    _availableTokens -= 1.0f;
     _counters.tx += 1;
-    return true; // Message accepted
+    return SendResult::Accepted;
   }
 
   float getAvailableTokens() const override {
-    // Return cached value; will be refreshed on next send attempt or in loop()
     return _availableTokens;
   }
 
@@ -164,8 +159,6 @@ private:
     if (_lastTokenRefillMs > 0) {
       float elapsedSeconds = (currentMs - _lastTokenRefillMs) / 1000.0f;
       _availableTokens = std::min(_availableTokens + (MAX_FRAMES_PER_SECOND * elapsedSeconds), MAX_BURST_TOKENS);
-    } else {
-      _availableTokens = MAX_BURST_TOKENS; // Initial fill
     }
     _lastTokenRefillMs = currentMs;
   }
