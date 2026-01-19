@@ -13,6 +13,7 @@ static const char ARG_UPDATED_SINCE[] = "updatedSince";
 static const char ARG_ITEM_FILTER[] = "filter";
 static const char ARG_ITEM_FILTER_CONFIGURED[] = "configured";
 static const char ARG_ITEM_FILTER_NOT_CONFIGURED[] = "notConfigured";
+static const char ARG_ITEM_FILTER_UNDEFINED[] = "undefined";
 static const char ARG_NUMBERS_AS_DECIMALS[] = "numbersAsDecimals";
 static const char ARG_ACCESS_MODE[] = "accessMode";
 static const char ARG_VALIDATE_ONLY[] = "validateOnly";
@@ -95,6 +96,8 @@ public:
           getItems(request, response, [] (DataEntry const& entry) { return entry.isConfigured(); });
         } else if (request.arg(ARG_ITEM_FILTER) == ARG_ITEM_FILTER_NOT_CONFIGURED) {
           getItems(request, response, [] (DataEntry const& entry) { return !entry.isConfigured(); });
+        } else if (request.arg(ARG_ITEM_FILTER) == ARG_ITEM_FILTER_UNDEFINED) {
+          getItems(request, response, [this] (DataEntry const& entry) { return _definitions.get(entry.id).isUndefined(); });
         } else {
           getItems(request, response);
         }
