@@ -211,7 +211,9 @@ private:
 
     writer.openList();
     for (auto& data : collectionData) {
-      DataConfig{data.second}.serialize(writer);
+      if (data.second.isConfigured()) {
+        DataConfig{data.second}.serialize(writer);
+      }
     }
     writer.close();
 
