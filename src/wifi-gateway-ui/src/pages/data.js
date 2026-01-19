@@ -34,6 +34,11 @@ export class DataPage {
             await this.#reload();
             this.updatedSince.enable();
         });
+        this.numbersAsDecimals = view.checkbox(view.label('Show raw values as decimal'), { indeterminate: false }, async () => {
+            this.numbersAsDecimals.disable();
+            await this.#reload();
+            this.numbersAsDecimals.enable();
+        });
         this.table = view.table();
         this.state = view.p();
         this.filter.selected = 'All';
@@ -75,6 +80,10 @@ export class DataPage {
         const updatedSinceValue = this.updatedSince?.value?.trim();
         if (updatedSinceValue) {
             params.push(`updatedSince=${encodeURIComponent(updatedSinceValue)}`);
+        }
+
+        if (this.numbersAsDecimals?.checked) {
+            params.push('numbersAsDecimals');
         }
 
         return params.length ? `?${params.join('&')}` : '';
