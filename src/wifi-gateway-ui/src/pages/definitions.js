@@ -10,6 +10,7 @@ export class DefinitionsPage {
     #converters
     #customConverters
     #definitions
+    #units
 
     #definitionsView
     #addFormView
@@ -28,6 +29,7 @@ export class DefinitionsPage {
     }
 
     async enter(view) {
+        await this.#loadUnits();
         await this.#loadCodecs();
         await this.#loadConverters();
         await this.#loadCustomConverters();
@@ -56,7 +58,8 @@ export class DefinitionsPage {
         
         const idInput = addFieldset.number(addFieldset.label('ID'), { required: true, min: 0 });
         const nameInput = addFieldset.text(addFieldset.label('Name'), { required: true, maxlength: 50 });
-        const unitInput = addFieldset.text(addFieldset.label('Unit'), { maxlength: 20 });
+        const unitOptions = (this.#units || []).map(u => ({ value: u.name, label: u.symbol ? `${u.name} (${u.symbol})` : u.name }));
+        const unitSelect = addFieldset.select(addFieldset.label('Unit'), unitOptions);
         const accessSelect = addFieldset.select(addFieldset.label('Access'), ['None', 'Readable', 'Writable']);
         
         const converterOptions = Array.from(this.#converters.values()).map(c => ({ value: c.key, label: `${c.key} - ${c.description}` }));
@@ -79,7 +82,7 @@ export class DefinitionsPage {
             button.disable();
             const newDefinition = {
                 name: nameInput.value,
-                unit: unitInput.value || '',
+                unit: unitSelect.selected || '',
                 access: accessSelect.selected,
                 converter: converterSelect.selected,
                 codec: codecSelect.selected
@@ -88,7 +91,7 @@ export class DefinitionsPage {
             if (await this.#updateSingleDefinition(idInput.value, newDefinition)) {
                 idInput.value = '';
                 nameInput.value = '';
-                unitInput.value = '';
+                unitSelect.selected = this.#units?.[0]?.name || '';
             }
             button.enable();
         });
@@ -163,9 +166,14 @@ export class DefinitionsPage {
                 nameInput.type = 'text';
                 nameInput.value = definition.name;
                 
-                const unitInput = row.addElement('input');
-                unitInput.type = 'text';
-                unitInput.value = definition.unit;
+                const unitSelect = row.addElement('select');
+                (this.#units || []).forEach(unit => {
+                    const option = document.createElement('option');
+                    option.value = unit.name;
+                    option.textContent = unit.symbol ? `${unit.name} (${unit.symbol})` : unit.name;
+                    option.selected = unit.name === definition.unit;
+                    unitSelect.appendChild(option);
+                });
                 
                 const accessSelect = row.addElement('select');
                 ['None', 'Readable', 'Writable'].forEach(opt => {
@@ -201,7 +209,7 @@ export class DefinitionsPage {
                     saveBtn.disabled = true;
                     const updatedDefinition = {
                         name: nameInput.value,
-                        unit: unitInput.value,
+                        unit: unitSelect.value,
                         access: accessSelect.value,
                         converter: converterSelect.value,
                         codec: codecSelect.value
@@ -324,6 +332,15 @@ export class DefinitionsPage {
         try {
             const response = await this.#client.get('/definitions');
             this.#definitions = await response.json();
+        } catch (err) {
+            alert(err);
+        }
+    }
+
+    async #loadUnits() {
+        try {
+            const response = await this.#client.get('/units');
+            this.#units = await response.json();
         } catch (err) {
             alert(err);
         }

@@ -21,6 +21,10 @@ public:
   : _logger(system.logger("api")), _system(system), _conversions(conversions), _definitions(definitions) {}
   
   void setupApi(iot_core::api::IServer& server) override {
+    server.on(F("/api/units"), iot_core::api::HttpMethod::GET, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
+      getUnits(request, response);
+    });
+
     server.on(F("/api/definitions"), iot_core::api::HttpMethod::GET, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
       getDefinitions(request, response);
     });
@@ -47,6 +51,63 @@ public:
   }
 
 private:
+  void getUnits(iot_core::api::IRequest&, iot_core::api::IResponse& response) {
+    auto& body = response
+      .code(iot_core::api::ResponseCode::Ok)
+      .contentType(iot_core::api::ContentType::ApplicationJson)
+      .sendChunkedBody();
+
+    if (!body.valid()) {
+      return;
+    }
+
+    auto writer = jsons::makeWriter(body);
+
+    auto writeUnit = [&writer](Unit unit) {
+      writer.openObject();
+      writer.property(F("name")).string(unitToString(unit));
+      writer.property(F("symbol")).string(unitSymbol(unit));
+      writer.close();
+    };
+
+    writer.openList();
+    writeUnit(Unit::Unknown);
+    writeUnit(Unit::None);
+    writeUnit(Unit::Percent);
+    writeUnit(Unit::RelativeHumidity);
+    writeUnit(Unit::Hertz);
+    writeUnit(Unit::Celsius);
+    writeUnit(Unit::Kelvin);
+    writeUnit(Unit::Bar);
+    writeUnit(Unit::KelvinPerMinute);
+    writeUnit(Unit::LiterPerMinute);
+    writeUnit(Unit::CubicmeterPerHour);
+    writeUnit(Unit::Years);
+    writeUnit(Unit::Year);
+    writeUnit(Unit::Months);
+    writeUnit(Unit::Month);
+    writeUnit(Unit::Days);
+    writeUnit(Unit::Day);
+    writeUnit(Unit::Weekday);
+    writeUnit(Unit::Hours);
+    writeUnit(Unit::ThousandHours);
+    writeUnit(Unit::Hour);
+    writeUnit(Unit::Minutes);
+    writeUnit(Unit::Minute);
+    writeUnit(Unit::Seconds);
+    writeUnit(Unit::Second);
+    writeUnit(Unit::Watt);
+    writeUnit(Unit::KiloWatt);
+    writeUnit(Unit::WattHour);
+    writeUnit(Unit::KiloWattHour);
+    writeUnit(Unit::MegaWattHour);
+    writeUnit(Unit::Ampere);
+    writeUnit(Unit::Volt);
+    writer.close();
+
+    writer.end();
+  }
+
   void getDefinitions(iot_core::api::IRequest&, iot_core::api::IResponse& response) {
     auto& body = response
       .code(iot_core::api::ResponseCode::Ok)
