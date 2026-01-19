@@ -110,7 +110,12 @@ public:
     _messageHandler = messageHandler;
   }
 
-  void sendCanMessage(const CanMessage& message) override {
+  bool sendCanMessage(const CanMessage& message) override {
+    return true; // FakeCan always accepts messages
+  }
+
+  float getAvailableTokens() const override {
+    return 999.0f; // FakeCan has unlimited budget
   }
 
   CanCounters const& counters() const override {

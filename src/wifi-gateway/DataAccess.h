@@ -22,12 +22,13 @@ struct DataEntry {
   unsigned long lastUpdateMs;
   unsigned long lastRequestMs;
   unsigned long lastWriteMs;
+  uint8_t writeRetries;
   bool subscribed;
   bool writable; // NOTE: this only means that this entry has been marked for writing via the API
 
   bool isConfigured() const { return subscribed || writable; }
 
-  DataEntry() : id(0), source(), rawValue(0), toWrite(0), lastUpdate(), lastUpdateMs(0), lastRequestMs(0), lastWriteMs(0), subscribed(false), writable(false) {}
+  DataEntry() : id(0), source(), rawValue(0), toWrite(0), lastUpdate(), lastUpdateMs(0), lastRequestMs(0), lastWriteMs(0), writeRetries(0), subscribed(false), writable(false) {}
 };
 
 static const char SUBSCRIPTIONS_FILE_HEADER[] = "~S1.0";
@@ -245,7 +246,9 @@ public:
     DataEntry* entry = getEntryInternal(key);
     if (entry != nullptr && entry->writable && getDefinition(entry->id).accessMode == accessMode) {
       entry->toWrite = rawValue;
-      entry->lastWriteMs = 1;
+      entry->lastWriteMs = millis() - WRITE_INTERVAL_MS; // Schedule immediate write on next maintenance cycle
+      entry->writeRetries = 0;
+      _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Write scheduled for %u: %u"), entry->id, rawValue));
       return true;
     }
 
@@ -404,43 +407,74 @@ private:
     }
   }
 
-  static constexpr uint32_t MIN_UPDATE_INTERVAL_MS = 30000;
-  static constexpr unsigned long WRITE_INTERVAL_MS = 30000;
-  static constexpr unsigned long MAINTENANCE_INTERVAL_MS = 375;
-  static constexpr size_t MAX_CONCURRENT_OPERATIONS = 2;
+  // CAN bus protection is now handled by SerialCan with token bucket rate limiting
+  // These constants control retry behavior and timing, not rate limiting
+  static constexpr uint32_t MIN_UPDATE_INTERVAL_MS = 30000; // Min 30s between subscription requests
+  static constexpr unsigned long WRITE_INTERVAL_MS = 3000; // 3s between write retries
+  static constexpr unsigned long WRITE_VERIFY_DELAY_MS = 1000; // Wait 1s after write before requesting verification
+  static constexpr uint8_t MAX_WRITE_RETRIES = 5; // Limit write attempts to avoid infinite retries
+  static constexpr unsigned long MAINTENANCE_INTERVAL_MS = 100; // Check every 100ms
 
   iot_core::IntervalTimer _maintenanceInterval {MAINTENANCE_INTERVAL_MS};
 
   void maintainData() {
     if (_maintenanceInterval.elapsed()) {
       unsigned long currentMs = millis();
+      
       size_t remainingDataEntries = _data.size();
-      size_t remainingRequests = MAX_CONCURRENT_OPERATIONS;
-      while (remainingRequests > 0 && remainingDataEntries > 0) {
+      while (remainingDataEntries > 0) {
         if (_dataIterator == _data.end()) {
           _dataIterator = _data.begin();
         }
         
         DataEntry& entry = _dataIterator->second;
+        bool messageSent = false;
 
         if (entry.writable) {
           if (entry.lastUpdateMs != 0) { // we already have received a value from the source
             if (entry.lastWriteMs != 0 && (currentMs > entry.lastWriteMs + WRITE_INTERVAL_MS)) {
-              _protocol.write({ _deviceId, entry.source, entry.id, entry.toWrite }); --remainingRequests;
-              entry.lastWriteMs = currentMs;
-              entry.lastUpdateMs = 0; // triggers request for new value from source
+              if (entry.writeRetries >= MAX_WRITE_RETRIES) {
+                _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Write failed after %u retries for %u (wanted: %u, current: %u)"), 
+                  entry.writeRetries, entry.id, entry.toWrite, entry.rawValue));
+                entry.lastWriteMs = 0; // Give up on this write
+                entry.writeRetries = 0;
+              } else {
+                // Attempt write; check if rate limited
+                if (_protocol.write({ _deviceId, entry.source, entry.id, entry.toWrite })) {
+                  entry.lastWriteMs = currentMs;
+                  entry.writeRetries++;
+                  // Wait a bit before requesting verification to give the target time to process
+                  entry.lastRequestMs = currentMs + WRITE_VERIFY_DELAY_MS - MIN_UPDATE_INTERVAL_MS;
+                  entry.lastUpdateMs = 0; // triggers request for new value from source after delay
+                  _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Write attempt %u for %u: %u"), entry.writeRetries, entry.id, entry.toWrite));
+                  messageSent = true;
+                } else {
+                  // Rate limited - stop processing and try again next cycle
+                  break;
+                }
+              }
             }
           } else { // request the value from the source first before allowing to write it
             if (currentMs > entry.lastRequestMs + MIN_UPDATE_INTERVAL_MS) {
-              _protocol.request({ _deviceId, entry.source, entry.id }); --remainingRequests;
-              entry.lastRequestMs = currentMs;
+              if (_protocol.request({ _deviceId, entry.source, entry.id })) {
+                entry.lastRequestMs = currentMs;
+                messageSent = true;
+              } else {
+                // Rate limited - stop processing
+                break;
+              }
             }
           }
         } else if (entry.subscribed) {
           if (currentMs > entry.lastUpdateMs + std::max(MIN_UPDATE_INTERVAL_MS, getDefinition(entry.id).updateIntervalMs)
            && currentMs > entry.lastRequestMs + MIN_UPDATE_INTERVAL_MS) {
-            _protocol.request({ _deviceId, entry.source, entry.id }); --remainingRequests;
-            entry.lastRequestMs = currentMs;
+            if (_protocol.request({ _deviceId, entry.source, entry.id })) {
+              entry.lastRequestMs = currentMs;
+              messageSent = true;
+            } else {
+              // Rate limited - stop processing
+              break;
+            }
           }
         }
 
@@ -492,7 +526,9 @@ private:
       if (entry->lastWriteMs > 0 && entry->toWrite == entry->rawValue) {
         // As there is currently a write in progress and we just received
         // the new value which is now the same, we consider it done.
+        _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Write confirmed for %u: %u (after %u attempts)"), entry->id, entry->rawValue, entry->writeRetries));
         entry->lastWriteMs = 0;
+        entry->writeRetries = 0;
       }
 
       if (_updateHandler) _updateHandler(*entry);

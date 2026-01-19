@@ -206,14 +206,14 @@ public:
     return _otherDeviceIds;
   }
 
-  void request(RequestData const& data) {
+  bool request(RequestData const& data) {
     if (!_ready) {
-      return;
+      return false;
     }
 
     if (!data.targetId.isExact() || !data.sourceId.isExact()) {
       _logger.log(iot_core::LogLevel::Error, toolbox::format(F("Request source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
-      return;
+      return false;
     }
 
     _system.lyield();
@@ -230,17 +230,17 @@ public:
     message.data[5] = 0x00u;
     message.data[6] = 0x00u;
 
-    _can.sendCanMessage(message);
+    return _can.sendCanMessage(message);
   }
 
-  void write(WriteData const& data) {
+  bool write(WriteData const& data) {
     if (!_ready) {
-      return;
+      return false;
     }
 
     if (!data.targetId.isExact() || !data.sourceId.isExact()) {
       _logger.log(iot_core::LogLevel::Error, toolbox::format(F("Write source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
-      return;
+      return false;
     }
 
     _system.lyield();
@@ -256,17 +256,17 @@ public:
     setValueId(data.valueId, message.data);
     setValue(data.value, message.data);
     
-    _can.sendCanMessage(message);
+    return _can.sendCanMessage(message);
   }
 
-  void respond(ResponseData const& data) {
+  bool respond(ResponseData const& data) {
     if (!_ready) {
-      return;
+      return false;
     }
 
     if (!data.targetId.isExact() || !data.sourceId.isExact()) {
       _logger.log(iot_core::LogLevel::Error, toolbox::format(F("Response source and target must have exact IDs (but are '%s' and '%s')"), data.sourceId.toString(0), data.targetId.toString(1)));
-      return;
+      return false;
     }
 
     _system.lyield();
@@ -282,7 +282,7 @@ public:
     setValueId(data.valueId, message.data);
     setValue(data.value, message.data);
     
-    _can.sendCanMessage(message);
+    return _can.sendCanMessage(message);
   }
 
   void onResponse(std::function<void(ResponseData const& data)> responseHandler) {
