@@ -24,10 +24,15 @@ export class DataPage {
 
     async enter(view) {
         view.h1('Current data');
-        this.filter = view.select(view.label('Filter:'), ['All', 'Undefined', 'Configured'], {}, async (selected) => {
+        this.filter = view.select(view.label('Filter:'), ['All', 'Undefined', 'Configured', 'Not Configured'], {}, async (selected) => {
             this.filter.disable();
             await this.#reload();
             this.filter.enable();
+        });
+        this.updatedSince = view.text(view.label('Updated since (ISO date/time, optional):'), { placeholder: '2024-01-01T00:00:00' }, async () => {
+            this.updatedSince.disable();
+            await this.#reload();
+            this.updatedSince.enable();
         });
         this.table = view.table();
         this.state = view.p();
@@ -52,14 +57,27 @@ export class DataPage {
     }
 
     #getDataQueryParam() {
+        const params = [];
         switch (this.filter.selected) {
             case 'Undefined':
-                return '?filter=undefined';
+                params.push('filter=undefined');
+                break;
             case 'Configured':
-                return '?filter=configured';
+                params.push('filter=configured');
+                break;
+            case 'Not Configured':
+                params.push('filter=notConfigured');
+                break;
             default:
-                return '';
+                break;
         }
+
+        const updatedSinceValue = this.updatedSince?.value?.trim();
+        if (updatedSinceValue) {
+            params.push(`updatedSince=${encodeURIComponent(updatedSinceValue)}`);
+        }
+
+        return params.length ? `?${params.join('&')}` : '';
     }
 
     async #reload() {
