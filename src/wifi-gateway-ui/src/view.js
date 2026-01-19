@@ -267,7 +267,7 @@ export class CheckboxView extends View {
         super(createElement('input', attributes));
         this._element.type = 'checkbox';
         if (callback) {
-            this._element.onchange = (e) => callback(e.target.value, this);
+            this._element.onchange = (e) => callback(e.target.checked, this);
         }
 
         if (label) {
