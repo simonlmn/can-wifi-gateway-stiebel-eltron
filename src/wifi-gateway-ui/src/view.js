@@ -158,7 +158,7 @@ export class ContainerView extends View {
     }
 
     block(attributes) {
-        return this.addView(new ContainerView(createElement('div', attributes)));
+        return this.addView(new BlockView(attributes));
     }
 
     progress(attributes) {
@@ -171,6 +171,12 @@ export class ContainerView extends View {
 
     loader() {
         return this.addView(new LoaderView());
+    }
+}
+
+export class BlockView extends ContainerView {
+    constructor(attributes) {
+        super(createElement('div', attributes));
     }
 }
 
@@ -493,6 +499,31 @@ export class ButtonView extends View {
                 try {
                     this.disable();
                     callback(this);
+                } finally {
+                    this.enable();
+                }
+            }
+        }
+    }
+
+    disable() {
+        this._element.disabled = true;
+    }
+
+    enable() {
+        this._element.disabled = false;
+    }
+}
+
+export class AsyncButtonView extends View {
+    constructor(text, attributes, asyncCallback) {
+        super(createElement('button', attributes, text));
+        this._element.type = 'button';
+        if (asyncCallback) {
+            this._element.onclick = async () => {
+                this.disable();
+                try {
+                    await asyncCallback(this);
                 } finally {
                     this.enable();
                 }

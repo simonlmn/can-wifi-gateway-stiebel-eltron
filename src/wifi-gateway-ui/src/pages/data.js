@@ -1,4 +1,6 @@
 
+import { BlockView, View, TextView, AsyncButtonView, createElement } from '../view.js';
+
 function formatValue(value) {
     if (value instanceof Object) {
         if (Array.isArray(value)) {
@@ -15,11 +17,13 @@ export class DataPage {
     #client
     #data
     #searchTimeout
+    #hasInputFocus
 
     constructor(client) {
         this.#client = client;
         this.#data = null;
         this.#searchTimeout = null;
+        this.#hasInputFocus = false;
     }
 
     get label() {
@@ -66,12 +70,15 @@ export class DataPage {
     autoRefresh(enable) {
         clearTimeout(this.timeout);
         
-        if (enable) {
+        if (enable && !this.#hasInputFocus) {
             this.#reload()
                 .finally(() => {
                     clearTimeout(this.timeout);
                     this.timeout = setTimeout(() => this.autoRefresh(true), 5000);
                 });
+        } else if (enable && this.#hasInputFocus) {
+            // Schedule retry after focus is lost
+            this.timeout = setTimeout(() => this.autoRefresh(true), 500);
         }
     }
 
@@ -156,17 +163,56 @@ export class DataPage {
                 'Raw Value',
                 'Value',
                 'Unit',
-                'Last Update'
+                'Last Update',
+                'Write Value'
             ]);
             for (const datapoint of filteredDatapoints) {
-                this.table.addRow().addColumns([
+                const writeCell = new BlockView();
+                if (datapoint.writable) {
+                    const input = new TextView(null, {
+                        placeholder: datapoint.value !== undefined ? `${datapoint.value}` : '',
+                        size: 12,
+                        onfocus: () => { this.#hasInputFocus = true; },
+                        onblur: () => { this.#hasInputFocus = false; this.autoRefresh(true); }
+                    });
+                    const status = new View(createElement('small'));
+                    const button = new AsyncButtonView('Write', {}, async () => {
+                        const rawValue = (input.value ?? '').trim();
+                        if (!rawValue) {
+                            status.textContent = 'Enter a value to write.';
+                            return;
+                        }
+
+                        input.disable();
+                        status.textContent = 'Sending...';
+                        try {
+                            const { deviceType, deviceAddress } = this.#parseSource(datapoint.source);
+                            const parsedValue = this.#parseInputValue(rawValue);
+                            const query = datapoint.accessMode ? `?accessMode=${encodeURIComponent(datapoint.accessMode)}` : '';
+                            await this.#client.put(`/data/${encodeURIComponent(deviceType)}/${encodeURIComponent(deviceAddress)}/${encodeURIComponent(datapoint.id)}${query}`, JSON.stringify(parsedValue));
+                            status.textContent = 'Write accepted (processing asynchronously).';
+                        } catch (err) {
+                            status.textContent = `Write failed: ${err.message ?? err}`;
+                        } finally {
+                            input.enable();
+                        }
+                    });
+
+                    writeCell.addView(input);
+                    writeCell.addView(button);
+                    writeCell.addView(status);
+                }
+
+                const row = this.table.addRow();
+                row.addColumns([
                     datapoint.source,
                     datapoint.id,
                     datapoint.name,
                     datapoint.rawValue,
                     formatValue(datapoint.value),
                     datapoint.unit,
-                    datapoint.lastUpdate
+                    datapoint.lastUpdate,
+                    writeCell
                 ]);
             }
             this.state.attribute('class', null);
@@ -177,6 +223,23 @@ export class DataPage {
         } else {
             this.state.attribute('class', 'notice');
             this.state.content = 'No data has been captured yet. You need to configure which datapoints shall be requested and/or captured.';
+        }
+    }
+
+    #parseSource(source) {
+        const parts = (source || '').split('/');
+        if (parts.length !== 2) {
+            throw new Error(`Invalid source '${source}'.`);
+        }
+        return { deviceType: parts[0], deviceAddress: parts[1] };
+    }
+
+    #parseInputValue(rawValue) {
+        try {
+            return JSON.parse(rawValue);
+        } catch (_) {
+            // Fallback: treat as plain string if it is not valid JSON
+            return rawValue;
         }
     }
 }
