@@ -12,11 +12,15 @@ export class DefinitionsPage {
     #definitions
 
     #definitionsView
+    #addFormView
+    #tableView
     #convertersView
     #codecsView
+    #editingDefinitionId
 
     constructor(client) {
         this.#client = client;
+        this.#editingDefinitionId = null;
     }
 
     get label() {
@@ -30,6 +34,10 @@ export class DefinitionsPage {
         await this.#loadDefinitions();
         
         this.#definitionsView = view.section('Definitions').block();
+        this.#addFormView = this.#definitionsView.block();
+        this.#tableView = this.#definitionsView.block();
+        
+        this.#createAddDefinitionForm();
         this.#viewDefinitions();
 
         this.#convertersView = view.section('Converters').block();
@@ -42,11 +50,55 @@ export class DefinitionsPage {
     async leave() {
     }
 
+    #createAddDefinitionForm() {
+        this.#addFormView.clear();
+        const addFieldset = this.#addFormView.fieldset('Add New Definition');
+        
+        const idInput = addFieldset.number(addFieldset.label('ID'), { required: true, min: 0 });
+        const nameInput = addFieldset.text(addFieldset.label('Name'), { required: true, maxlength: 50 });
+        const unitInput = addFieldset.text(addFieldset.label('Unit'), { maxlength: 20 });
+        const accessSelect = addFieldset.select(addFieldset.label('Access'), ['None', 'Readable', 'Writable']);
+        
+        const converterOptions = Array.from(this.#converters.values()).map(c => ({ value: c.key, label: `${c.key} - ${c.description}` }));
+        const converterSelect = addFieldset.select(addFieldset.label('Converter'), converterOptions);
+        
+        const codecOptions = Array.from(this.#codecs.values()).map(c => ({ value: c.key, label: `${c.key} - ${c.description}` }));
+        const codecSelect = addFieldset.select(addFieldset.label('Codec'), codecOptions);
+        
+        addFieldset.button('Add', {}, async (button) => {
+            if (!idInput.value || !nameInput.value) {
+                alert('ID and Name are required');
+                return;
+            }
+            
+            if (this.#definitions[idInput.value]) {
+                alert(`Definition with ID ${idInput.value} already exists`);
+                return;
+            }
+            
+            button.disable();
+            const newDefinition = {
+                name: nameInput.value,
+                unit: unitInput.value || '',
+                access: accessSelect.selected,
+                converter: converterSelect.selected,
+                codec: codecSelect.selected
+            };
+            
+            if (await this.#updateSingleDefinition(idInput.value, newDefinition)) {
+                idInput.value = '';
+                nameInput.value = '';
+                unitInput.value = '';
+            }
+            button.enable();
+        });
+    }
+
     #editDefinitions() {
-        this.#definitionsView.clear();
-        const textarea = this.#definitionsView.textarea(null, { rows: 25 });
+        this.#tableView.clear();
+        const textarea = this.#tableView.textarea(null, { rows: 25 });
         textarea.value = JSON.stringify(this.#definitions, null, 2);
-        this.#definitionsView.button('Save', {}, async (button) => {
+        this.#tableView.button('Save', {}, async (button) => {
             button.disable();
             if (await this.#updateDefinitions(textarea.value)) {
                 this.#viewDefinitions();
@@ -54,19 +106,120 @@ export class DefinitionsPage {
             }
             button.enable();
         });
-        this.#definitionsView.button('Discard', {}, () => this.#viewDefinitions());
+        this.#tableView.button('Discard', {}, () => {
+            this.#viewDefinitions();
+        });
+    }
+
+    #editSingleDefinition(id) {
+        this.#editingDefinitionId = id;
+        this.#viewDefinitions();
     }
 
     #viewDefinitions() {
-        this.#definitionsView.clear();
-        this.#definitionsView.button('Edit', {}, () => this.#editDefinitions());
-        const table =this.#definitionsView.table();
+        this.#tableView.clear();
+        this.#tableView.button('Bulk Edit (JSON)', {}, () => this.#editDefinitions());
+        const table = this.#tableView.table();
         
-        table.addRow().addHeaders(['ID', 'Name', 'Unit', 'Access', 'Converter', 'Codec']);
+        table.addRow().addHeaders(['ID', 'Name', 'Unit', 'Access', 'Converter', 'Codec', 'Actions']);
         for (const [id, definition] of Object.entries(this.#definitions)) {
             const codec = this.#codecs.get(definition.codec);
             const converter = this.#converters.get(definition.converter);
-            table.addRow().addColumns([id, definition.name, definition.unit, definition.access, formatDescription(converter.description), codec.description]);
+            
+            if (this.#editingDefinitionId === id) {
+                // Show edit form inline
+                const row = table.addRow();
+                row.addColumn(id);
+                
+                const nameInput = row.addElement('input');
+                nameInput.type = 'text';
+                nameInput.value = definition.name;
+                
+                const unitInput = row.addElement('input');
+                unitInput.type = 'text';
+                unitInput.value = definition.unit;
+                
+                const accessSelect = row.addElement('select');
+                ['None', 'Readable', 'Writable'].forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt;
+                    option.selected = opt === definition.access;
+                    accessSelect.appendChild(option);
+                });
+                
+                const converterSelect = row.addElement('select');
+                Array.from(this.#converters.values()).forEach(c => {
+                    const option = document.createElement('option');
+                    option.value = c.key;
+                    option.textContent = c.key;
+                    option.selected = c.key === definition.converter;
+                    converterSelect.appendChild(option);
+                });
+                
+                const codecSelect = row.addElement('select');
+                Array.from(this.#codecs.values()).forEach(c => {
+                    const option = document.createElement('option');
+                    option.value = c.key;
+                    option.textContent = c.key;
+                    option.selected = c.key === definition.codec;
+                    codecSelect.appendChild(option);
+                });
+                
+                const actionsCell = row.addElement('td');
+                const saveBtn = document.createElement('button');
+                saveBtn.textContent = 'Save';
+                saveBtn.onclick = async () => {
+                    saveBtn.disabled = true;
+                    const updatedDefinition = {
+                        name: nameInput.value,
+                        unit: unitInput.value,
+                        access: accessSelect.value,
+                        converter: converterSelect.value,
+                        codec: codecSelect.value
+                    };
+                    if (await this.#updateSingleDefinition(id, updatedDefinition)) {
+                        this.#editingDefinitionId = null;
+                    }
+                    saveBtn.disabled = false;
+                };
+                actionsCell.appendChild(saveBtn);
+                
+                const cancelBtn = document.createElement('button');
+                cancelBtn.textContent = 'Cancel';
+                cancelBtn.onclick = () => {
+                    this.#editingDefinitionId = null;
+                    this.#viewDefinitions();
+                };
+                actionsCell.appendChild(cancelBtn);
+            } else {
+                // Show normal row
+                const row = table.addRow();
+                row.addColumns([
+                    id,
+                    definition.name,
+                    definition.unit,
+                    definition.access,
+                    formatDescription(converter.description),
+                    codec.description
+                ]);
+                
+                const actionsCell = row.addElement('td');
+                const editBtn = document.createElement('button');
+                editBtn.textContent = 'Edit';
+                editBtn.onclick = () => this.#editSingleDefinition(id);
+                actionsCell.appendChild(editBtn);
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.onclick = async () => {
+                    if (confirm(`Delete definition ${id} (${definition.name})?`)) {
+                        deleteBtn.disabled = true;
+                        await this.#deleteSingleDefinition(id);
+                    }
+                };
+                actionsCell.appendChild(deleteBtn);
+            }
         }
     }
 
@@ -160,6 +313,32 @@ export class DefinitionsPage {
                 await this.#client.put(`/definitions/${id}`, JSON.stringify(definition));
             }
             await this.#loadDefinitions();
+            return true;
+        } catch (err) {
+            alert(err);
+            return false;
+        }
+    }
+
+    async #updateSingleDefinition(id, definition) {
+        try {
+            await this.#client.put(`/definitions/${id}`, JSON.stringify(definition));
+            await this.#loadDefinitions();
+            this.#editingDefinitionId = null;
+            this.#viewDefinitions();
+            return true;
+        } catch (err) {
+            alert(err);
+            return false;
+        }
+    }
+
+    async #deleteSingleDefinition(id) {
+        try {
+            await this.#client.delete(`/definitions/${id}`);
+            await this.#loadDefinitions();
+            this.#editingDefinitionId = null;
+            this.#viewDefinitions();
             return true;
         } catch (err) {
             alert(err);
