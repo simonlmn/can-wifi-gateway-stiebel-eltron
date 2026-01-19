@@ -556,7 +556,7 @@
         "name": "compressor power",
         "unit": "Watt",
         "codec": "U16",
-        "converter": "10^1",
+        "converter": "10^-1",
         "access": "Readable"
     },
     "1697": {
