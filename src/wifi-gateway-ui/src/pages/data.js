@@ -54,9 +54,9 @@ export class DataPage {
     #getDataQueryParam() {
         switch (this.filter.selected) {
             case 'Undefined':
-                return '?onlyUndefined';
+                return '?filter=undefined';
             case 'Configured':
-                return '?onlyConfigured';
+                return '?filter=configured';
             default:
                 return '';
         }
