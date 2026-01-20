@@ -60,6 +60,25 @@ DataCaptureMode dataCaptureModeFromString(const toolbox::strref& mode) {
   return DataCaptureMode::None;
 }
 
+enum struct WriteResult : uint8_t {
+  Accepted = 0,
+  ReadOnly = 1,
+  NotFound = 2,
+  NotWritable = 3,
+  ConfirmationRequired = 4,
+};
+
+const char* writeResultToString(WriteResult result) {
+  switch (result) {
+    case WriteResult::Accepted: return "Accepted";
+    case WriteResult::ReadOnly: return "Write access is disabled (read-only mode)";
+    case WriteResult::NotFound: return "Data entry not found or not configured";
+    case WriteResult::NotWritable: return "Value is not defined/configured as writable";
+    case WriteResult::ConfirmationRequired: return "Write confirmation required for protected value";
+    default: return "Unknown error";
+  }
+}
+
 class DataAccess final : public iot_core::IApplicationComponent, public IStiebelEltronDevice {
 public:
   using DataKey = std::pair<DeviceId, ValueId>;
@@ -239,21 +258,32 @@ public:
     return _system.currentDateTime();
   }
 
-  bool write(DataKey const& key, uint16_t rawValue, ValueAccessMode accessMode) {
+  WriteResult write(DataKey const& key, uint16_t rawValue, bool confirmWrite = false) {
     if (effectiveReadOnly()) {
-      return false;
+      return WriteResult::ReadOnly;
     }
 
     DataEntry* entry = getEntryInternal(key);
-    if (entry != nullptr && entry->writable && getDefinition(entry->id).accessMode == accessMode) {
-      entry->toWrite = rawValue;
-      entry->lastWriteMs = millis() - WRITE_INTERVAL_MS; // Schedule immediate write on next maintenance cycle
-      entry->writeRetries = 0;
-      _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Write scheduled for %u: %u"), entry->id, rawValue));
-      return true;
+    if (entry == nullptr || !entry->isConfigured()) {
+      return WriteResult::NotFound;
     }
 
-    return false;
+    const ValueDefinition& definition = getDefinition(entry->id);
+    if (!entry->writable || definition.accessMode < ValueAccessMode::Writable) {
+      return WriteResult::NotWritable;
+    }
+
+    // Require confirmation for protected values
+    if ((definition.accessMode == ValueAccessMode::WritableProtected || 
+         definition.accessMode == ValueAccessMode::WritableExtraProtected) && !confirmWrite) {
+      return WriteResult::ConfirmationRequired;
+    }
+
+    entry->toWrite = rawValue;
+    entry->lastWriteMs = millis() - WRITE_INTERVAL_MS; // Schedule immediate write on next maintenance cycle
+    entry->writeRetries = 0;
+    _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Write scheduled for %u: %u"), entry->id, rawValue));
+    return WriteResult::Accepted;
   }
 
 private:

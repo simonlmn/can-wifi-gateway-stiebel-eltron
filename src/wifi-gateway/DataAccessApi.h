@@ -107,25 +107,7 @@ public:
     });
 
     server.on(UriBraces(F("/api/data/{}/{}/{}")), iot_core::api::HttpMethod::PUT, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-      doItem(request, response, [&] (DataAccess::DataKey const& key, DataEntry const& entry) {
-        ValueAccessMode accessMode = valueAccessModeFromString(request.arg(ARG_ACCESS_MODE));
-
-        auto reader = jsons::makeReader(request.body());
-        auto json = reader.begin();
-        auto rawValue = _conversionService.fromJson(json, key.second);
-        reader.end();
-        if (reader.failed()) {
-          _logger.log(iot_core::LogLevel::Warning, [&] () { return toolbox::format(F("PUT data: JSON error %s"), reader.diagnostics().errorMessage.cstr()); });
-          return false;
-        }
-
-        if (rawValue) {
-          return _access.write(key, rawValue.get(), accessMode);
-        } else {
-          _logger.log(iot_core::LogLevel::Warning, [&] () { return toolbox::format(F("PUT data: value error %s"), request.body().content().cstr()); });
-          return false;
-        }
-      });
+      putItem(request, response);
     });
 
     server.on(F("/api/data/config"), iot_core::api::HttpMethod::GET, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
@@ -349,19 +331,20 @@ private:
   }
 
   /**
-   * Execute an operation on a specific, single item identified by a data key.
+   * Write a value to a specific data item identified by device type, address, and value ID.
    * 
    * The endpoint _must_ provide three path arguments which correspond to:
    *  1. DeviceType
    *  2. DeviceAddress
    *  3. ValueId
    */
-  void doItem(iot_core::api::IRequest& request, iot_core::api::IResponse& response, std::function<bool(DataAccess::DataKey const&, DataEntry const&)> itemOperation = {}) {
+  void putItem(iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
     _system.lyield();
 
-    _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("doItem '%s/%s/%s': %s"), request.pathArg(0), request.pathArg(1), request.pathArg(2), request.body().content()); });
+    _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("PUT data '%s/%s/%s': %s"), request.pathArg(0), request.pathArg(1), request.pathArg(2), request.body().content()); });
 
     bool validateOnly = request.hasArg(ARG_VALIDATE_ONLY);
+    bool confirmWrite = request.hasArg(F("confirmWrite")) && request.arg(F("confirmWrite")) == F("true");
     
     DeviceType type = deviceTypeFromString(request.pathArg(0));
     if (type == DeviceType::Any) {
@@ -394,12 +377,26 @@ private:
     }
 
     const DataAccess::DataKey key {DeviceId{type, DeviceAddress(addressNumber)}, ValueId(valueIdNumber)};
-    const DataEntry* entry = _access.getEntry(key);
-    if (entry == nullptr) {
+
+    auto reader = jsons::makeReader(request.body());
+    auto json = reader.begin();
+    auto rawValue = _conversionService.fromJson(json, key.second);
+    reader.end();
+    if (reader.failed()) {
+      _logger.log(iot_core::LogLevel::Warning, [&] () { return toolbox::format(F("PUT data: JSON error %s"), reader.diagnostics().errorMessage.cstr()); });
       response
-        .code(iot_core::api::ResponseCode::BadRequestNotFound)
+        .code(iot_core::api::ResponseCode::BadRequest)
         .contentType(iot_core::api::ContentType::TextPlain)
-        .sendSingleBody().write(F("item not found"));
+        .sendSingleBody().write(F("invalid JSON value"));
+      return;
+    }
+
+    if (!rawValue) {
+      _logger.log(iot_core::LogLevel::Warning, [&] () { return toolbox::format(F("PUT data: value error %s"), request.body().content().cstr()); });
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(F("invalid value"));
       return;
     }
 
@@ -411,14 +408,16 @@ private:
         .contentType(iot_core::api::ContentType::TextPlain)
         .sendSingleBody().write(request.body().content());
     } else {
-      if (itemOperation(key, *entry)) {
+      WriteResult result = _access.write(key, rawValue.get(), confirmWrite);
+      
+      if (result == WriteResult::Accepted) {
         response.code(iot_core::api::ResponseCode::OkAccepted);
       } else {
-        _logger.log(iot_core::LogLevel::Warning, F("doItem: operation failed"));
+        _logger.log(iot_core::LogLevel::Warning, [&] () { return toolbox::format(F("PUT data: write failed - %s"), writeResultToString(result)); });
         response
           .code(iot_core::api::ResponseCode::BadRequest)
           .contentType(iot_core::api::ContentType::TextPlain)
-          .sendSingleBody().write(F("operation failed"));
+          .sendSingleBody().write(writeResultToString(result));
       }
     }
   }

@@ -188,8 +188,7 @@ export class DataPage {
                         try {
                             const { deviceType, deviceAddress } = this.#parseSource(datapoint.source);
                             const parsedValue = this.#parseInputValue(rawValue);
-                            const query = datapoint.accessMode ? `?accessMode=${encodeURIComponent(datapoint.accessMode)}` : '';
-                            await this.#client.put(`/data/${encodeURIComponent(deviceType)}/${encodeURIComponent(deviceAddress)}/${encodeURIComponent(datapoint.id)}${query}`, JSON.stringify(parsedValue));
+                            await this.#client.put(`/data/${encodeURIComponent(deviceType)}/${encodeURIComponent(deviceAddress)}/${encodeURIComponent(datapoint.id)}`, JSON.stringify(parsedValue));
                             status.textContent = 'Write accepted (processing asynchronously).';
                         } catch (err) {
                             status.textContent = `Write failed: ${err.message ?? err}`;
