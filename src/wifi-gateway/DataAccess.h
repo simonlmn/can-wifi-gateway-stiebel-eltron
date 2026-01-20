@@ -445,6 +445,7 @@ private:
               entry.lastWriteMs = 0; // Give up on this write
               entry.writeRetries = 0;
             } else {
+              _logger.log(iot_core::LogLevel::Debug, toolbox::format(F("Attempting write for %u: %u"), entry.id, entry.toWrite));
               sendResult = _protocol.write({ _deviceId, entry.source, entry.id, entry.toWrite });
               if (sendResult == OperationResult::Accepted) {
                 entry.lastWriteMs = currentMs;
@@ -458,6 +459,7 @@ private:
           }
         } else { // request the value from the source first before allowing to write it
           if (currentMs > entry.lastRequestMs + MIN_UPDATE_INTERVAL_MS) {
+            _logger.log(iot_core::LogLevel::Debug, toolbox::format(F("Requesting initial value for writable %u"), entry.id));
             sendResult = _protocol.request({ _deviceId, entry.source, entry.id });
             if (sendResult == OperationResult::Accepted) {
               entry.lastRequestMs = currentMs;
@@ -467,6 +469,7 @@ private:
       } else if (entry.subscribed) {
         if (currentMs > entry.lastUpdateMs + std::max(MIN_UPDATE_INTERVAL_MS, getDefinition(entry.id).updateIntervalMs)
           && currentMs > entry.lastRequestMs + MIN_UPDATE_INTERVAL_MS) {
+          _logger.log(iot_core::LogLevel::Debug, toolbox::format(F("Requesting update for subscribed %u"), entry.id));
           sendResult = _protocol.request({ _deviceId, entry.source, entry.id });
           if (sendResult == OperationResult::Accepted) {
             entry.lastRequestMs = currentMs;
@@ -481,10 +484,13 @@ private:
           break;
         case OperationResult::Invalid:
           // Should normally not happen, but if it does, skip this entry this time and proceed with next entry
+          _logger.log(iot_core::LogLevel::Error, toolbox::format(F("Failed to send request/write for %u: Invalid parameters."), entry.id));
           break;
         case OperationResult::NotReady:
         case OperationResult::RateLimited:
           // stop processing for now, try again later
+          _logger.log(iot_core::LogLevel::Debug, toolbox::format(F("Deferring further data maintenance due to %s."), 
+            sendResult == OperationResult::NotReady ? F("NotReady") : F("RateLimited")));
           return;
       }
 
