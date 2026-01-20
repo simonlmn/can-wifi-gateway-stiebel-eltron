@@ -15,8 +15,9 @@ static const char ARG_ITEM_FILTER_CONFIGURED[] = "configured";
 static const char ARG_ITEM_FILTER_NOT_CONFIGURED[] = "notConfigured";
 static const char ARG_ITEM_FILTER_UNDEFINED[] = "undefined";
 static const char ARG_NUMBERS_AS_DECIMALS[] = "numbersAsDecimals";
-static const char ARG_ACCESS_MODE[] = "accessMode";
+static const char ARG_CONFIRM_WRITE[] = "confirmWrite";
 static const char ARG_VALIDATE_ONLY[] = "validateOnly";
+static const char ARG_WRITE_RAW[] = "writeRaw";
 
 class DataConfig final {
   ValueId _valueId {};
@@ -344,7 +345,8 @@ private:
     _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("PUT data '%s/%s/%s': %s"), request.pathArg(0), request.pathArg(1), request.pathArg(2), request.body().content()); });
 
     bool validateOnly = request.hasArg(ARG_VALIDATE_ONLY);
-    bool confirmWrite = request.hasArg(F("confirmWrite")) && request.arg(F("confirmWrite")) == F("true");
+    bool writeRaw = request.hasArg(ARG_WRITE_RAW);
+    bool confirmWrite = request.hasArg(ARG_CONFIRM_WRITE) && request.arg(ARG_CONFIRM_WRITE) == F("yes");
     
     DeviceType type = deviceTypeFromString(request.pathArg(0));
     if (type == DeviceType::Any) {
@@ -380,7 +382,7 @@ private:
 
     auto reader = jsons::makeReader(request.body());
     auto json = reader.begin();
-    auto rawValue = _conversionService.fromJson(json, key.second);
+    auto rawValue = writeRaw ? RAW_CONVERSION.fromJson(json) : _conversionService.fromJson(json, key.second);
     reader.end();
     if (reader.failed()) {
       _logger.log(iot_core::LogLevel::Warning, [&] () { return toolbox::format(F("PUT data: JSON error %s"), reader.diagnostics().errorMessage.cstr()); });

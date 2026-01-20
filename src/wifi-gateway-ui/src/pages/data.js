@@ -1,5 +1,5 @@
 
-import { BlockView, View, TextView, AsyncButtonView, createElement } from '../view.js';
+import { BlockView, View, TextView, AsyncButtonView, ButtonView, createElement } from '../view.js';
 
 function formatValue(value) {
     if (value instanceof Object) {
@@ -17,13 +17,15 @@ export class DataPage {
     #client
     #data
     #searchTimeout
-    #hasInputFocus
+    #editingKey
+    #writeInProgress
 
     constructor(client) {
         this.#client = client;
         this.#data = null;
         this.#searchTimeout = null;
-        this.#hasInputFocus = false;
+        this.#editingKey = null;
+        this.#writeInProgress = false;
     }
 
     get label() {
@@ -70,16 +72,20 @@ export class DataPage {
     autoRefresh(enable) {
         clearTimeout(this.timeout);
         
-        if (enable && !this.#hasInputFocus) {
+        if (enable && !this.#isBusy()) {
             this.#reload()
                 .finally(() => {
                     clearTimeout(this.timeout);
                     this.timeout = setTimeout(() => this.autoRefresh(true), 5000);
                 });
-        } else if (enable && this.#hasInputFocus) {
-            // Schedule retry after focus is lost
+        } else if (enable && this.#isBusy()) {
+            // Schedule retry after editing or write completes
             this.timeout = setTimeout(() => this.autoRefresh(true), 500);
         }
+    }
+
+    #isBusy() {
+        return this.#editingKey !== null || this.#writeInProgress;
     }
 
     #getDataQueryParam() {
@@ -167,39 +173,59 @@ export class DataPage {
                 'Write Value'
             ]);
             for (const datapoint of filteredDatapoints) {
+                const editKey = `${datapoint.source}#${datapoint.id}`;
+                const isEditing = this.#editingKey === editKey;
+
                 const writeCell = new BlockView();
                 if (datapoint.writable) {
-                    const input = new TextView(null, {
-                        placeholder: datapoint.value !== undefined ? `${datapoint.value}` : '',
-                        size: 12,
-                        onfocus: () => { this.#hasInputFocus = true; },
-                        onblur: () => { this.#hasInputFocus = false; this.autoRefresh(true); }
-                    });
-                    const status = new View(createElement('small'));
-                    const button = new AsyncButtonView('Write', {}, async () => {
-                        const rawValue = (input.value ?? '').trim();
-                        if (!rawValue) {
-                            status.textContent = 'Enter a value to write.';
-                            return;
-                        }
+                    if (isEditing) {
+                        const input = new TextView(null, {
+                            placeholder: datapoint.value !== undefined ? `${datapoint.value}` : '',
+                            size: 12,
+                            value: datapoint.value !== undefined ? `${datapoint.value}` : ''
+                        });
+                        const status = new View(createElement('small'));
+                        const writeButton = new AsyncButtonView('Write', {}, async () => {
+                            const rawValue = (input.value ?? '').trim();
+                            if (!rawValue) {
+                                status.textContent = 'Enter a value to write.';
+                                return;
+                            }
 
-                        input.disable();
-                        status.textContent = 'Sending...';
-                        try {
-                            const { deviceType, deviceAddress } = this.#parseSource(datapoint.source);
-                            const parsedValue = this.#parseInputValue(rawValue);
-                            await this.#client.put(`/data/${encodeURIComponent(deviceType)}/${encodeURIComponent(deviceAddress)}/${encodeURIComponent(datapoint.id)}`, JSON.stringify(parsedValue));
-                            status.textContent = 'Write accepted (processing asynchronously).';
-                        } catch (err) {
-                            status.textContent = `Write failed: ${err.message ?? err}`;
-                        } finally {
-                            input.enable();
-                        }
-                    });
+                            this.#writeInProgress = true;
+                            status.textContent = 'Sending...';
+                            try {
+                                const { deviceType, deviceAddress } = this.#parseSource(datapoint.source);
+                                const parsedValue = this.#parseInputValue(rawValue);
+                                await this.#client.put(`/data/${encodeURIComponent(deviceType)}/${encodeURIComponent(deviceAddress)}/${encodeURIComponent(datapoint.id)}`, JSON.stringify(parsedValue));
+                                status.textContent = 'Write accepted.';
+                                this.#editingKey = null;
+                                await this.#reload();
+                                this.autoRefresh(true);
+                            } catch (err) {
+                                status.textContent = `Write failed: ${err.message ?? err}`;
+                            } finally {
+                                this.#writeInProgress = false;
+                            }
+                        });
 
-                    writeCell.addView(input);
-                    writeCell.addView(button);
-                    writeCell.addView(status);
+                        const cancelButton = new ButtonView('Cancel', {}, () => {
+                            this.#editingKey = null;
+                            this.autoRefresh(true);
+                        });
+
+                        writeCell.addView(input);
+                        writeCell.addView(writeButton);
+                        writeCell.addView(cancelButton);
+                        writeCell.addView(status);
+                    } else {
+                        const editButton = new ButtonView('Edit', {}, () => {
+                            this.#editingKey = editKey;
+                            this.autoRefresh(false);
+                            this.#refreshTable();
+                        });
+                        writeCell.addView(editButton);
+                    }
                 }
 
                 const row = this.table.addRow();

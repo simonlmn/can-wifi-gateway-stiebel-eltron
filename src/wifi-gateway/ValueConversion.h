@@ -675,6 +675,8 @@ public:
   }
 };
 
+static const Conversion RAW_CONVERSION = { &Unsigned16BitCodec::INSTANCE, &HexStringConverter::INSTANCE };
+
 using CodecId = uint8_t;
 using ConverterId = uint8_t;
 
