@@ -6,4 +6,4 @@ profiles:
       - platform: arduino:avr (1.8.6)
     libraries:
       - ACAN2515 (2.1.2)
-      - serial-transport (0.1.0)
+      - serial-transport (0.3.0)

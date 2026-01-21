@@ -44,7 +44,7 @@ public:
     _counters(),
     _lastTokenRefillMs(0),
     _availableTokens(MAX_BURST_TOKENS),
-    _serial([this] (const char* message, serial_transport::Endpoint& serial) { processReceived(message, serial); }, [this] (serial_transport::ErrorCode errorCode, serial_transport::Endpoint& serial) { handleError(errorCode, serial); })
+    _serial([this] (const char* message, serial_transport::Endpoint& serial) { processReceived(message, serial); }, [this] (serial_transport::ErrorCode errorCode, char detail, serial_transport::Endpoint& serial) { handleError(errorCode, detail, serial); })
   {
   }
 
@@ -176,8 +176,8 @@ private:
     _resetInterval.restart();
   }
 
-  void handleError(serial_transport::ErrorCode errorCode, serial_transport::Endpoint& /*serial*/) {
-    _logger.log(iot_core::LogLevel::Warning, [&] () { return toolbox::format(F("Serial error %c: %s"), static_cast<char>(errorCode), serial_transport::describe(errorCode)); });
+  void handleError(serial_transport::ErrorCode errorCode, char detail, serial_transport::Endpoint& /*serial*/) {
+    _logger.log(iot_core::LogLevel::Warning, [&] () { return toolbox::format(F("Serial error %c (%c): %s"), static_cast<char>(errorCode), detail, serial_transport::describe(errorCode)); });
     _counters.err += 1;
   }
 
@@ -221,9 +221,20 @@ private:
 
       _counters.rx += 1;
     } else if (strncmp(start, "CANTX ", 6) == 0) {
-      if (strncmp(start + 6, "OK ", 3) != 0) {
+      if (strncmp(start + 6, "OK", 2) == 0) {
+        // Success - no action needed
+      } else if (strncmp(start + 6, "ENVAL", 5) == 0) {
         _counters.err += 1;
-        _logger.log(iot_core::LogLevel::Error, message);
+        _logger.log(iot_core::LogLevel::Error, F("CANTX ENVAL: Invalid CAN message format or parameters"));
+      } else if (strncmp(start + 6, "ESEND", 5) == 0) {
+        _counters.err += 1;
+        _logger.log(iot_core::LogLevel::Error, F("CANTX ESEND: CAN TX buffer full, message dropped"));
+      } else if (strncmp(start + 6, "ENOAV", 5) == 0) {
+        _counters.err += 1;
+        _logger.log(iot_core::LogLevel::Error, F("CANTX ENOAV: CAN module not available"));
+      } else {
+        _counters.err += 1;
+        _logger.log(iot_core::LogLevel::Error, [&] () { return toolbox::format(F("CANTX unknown error: %s"), message); });
       }
     } else if (strncmp(start, "READY", 5) == 0) {
       serial.queue("SETUP %X %s", CAN_BITRATE, toSetupModeString(effectiveMode()));
