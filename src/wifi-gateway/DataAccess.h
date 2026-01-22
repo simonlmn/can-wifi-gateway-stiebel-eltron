@@ -518,9 +518,9 @@ private:
           break;
         case OperationResult::NotReady:
         case OperationResult::RateLimited:
+        case OperationResult::QueueFull:
           // stop processing for now, try again later
-          _logger.log(iot_core::LogLevel::Debug, toolbox::format(F("Deferring further data maintenance due to %s."), 
-            sendResult == OperationResult::NotReady ? F("NotReady") : F("RateLimited")));
+          _logger.log(iot_core::LogLevel::Debug, toolbox::format(F("Deferring further data maintenance due to %s."), operationResultToString(sendResult)));
           return;
       }
 

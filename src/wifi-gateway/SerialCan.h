@@ -11,6 +11,12 @@ private:
   static const uint32_t CAN_BITRATE = 20UL * 1000UL; // 20 kbit/s
   static constexpr uint32_t MAX_ERR_COUNT = 5;
 
+  // Token bucket rate limiter for 20 kbit/s bus protection
+  // Analysis: ~4.4ms per CAN frame (worst case with bit stuffing)
+  // Theoretical max: ~220 frames/sec, we use ~12 frames/sec = ~5.4% bus utilization
+  static constexpr float MAX_FRAMES_PER_SECOND = 12.0f;
+  static constexpr float MAX_BURST_TOKENS = 6.0f;
+
   iot_core::Logger _logger;
   iot_core::ISystem& _system;
   gpiobj::DigitalOutput& _resetPin;
@@ -20,11 +26,6 @@ private:
   std::function<void()> _readyHandler;
   std::function<void(const CanMessage& message)> _messageHandler;
   
-  // Token bucket rate limiter for 20 kbit/s bus protection
-  // Analysis: ~4.4ms per CAN frame (worst case with bit stuffing)
-  // Theoretical max: ~220 frames/sec, we use ~12 frames/sec = ~5.4% bus utilization
-  static constexpr float MAX_FRAMES_PER_SECOND = 12.0f; // Direct, intuitive bus load limit
-  static constexpr float MAX_BURST_TOKENS = 6.0f; // Allow small bursts for responsiveness
   unsigned long _lastTokenRefillMs;
   float _availableTokens;
   
@@ -44,7 +45,12 @@ public:
     _counters(),
     _lastTokenRefillMs(0),
     _availableTokens(MAX_BURST_TOKENS),
-    _serial([this] (const char* message, serial_transport::Endpoint& serial) { processReceived(message, serial); }, [this] (serial_transport::ErrorCode errorCode, char detail, serial_transport::Endpoint& serial) { handleError(errorCode, detail, serial); })
+    _serial(
+      Serial,
+      [this] (const char* message, serial_transport::Endpoint& serial) { processReceived(message, serial); },
+      [this] (serial_transport::ConnectionState state, serial_transport::Endpoint& serial) { handleConnectionState(state, serial); },
+      [this] (char direction, uint8_t type, uint8_t sequenceNumber, const uint8_t* payload, uint8_t payloadLen) { handleFrame(direction, type, sequenceNumber, payload, payloadLen); }
+    )
   {
   }
 
@@ -137,8 +143,9 @@ public:
 
     logCanMessage("TX", message);
 
-    // TODO check _serial.canQueue() and/or result from queueCanTxMessage() ?
-    queueCanTxMessage(_serial, message.id, message.ext, message.rtr, message.len, message.data);
+    if (!queueCanTxMessage(_serial, message.id, message.ext, message.rtr, message.len, message.data)) {
+      return OperationResult::QueueFull;
+    }
 
     _availableTokens -= 1.0f;
     _counters.tx += 1;
@@ -176,9 +183,22 @@ private:
     _resetInterval.restart();
   }
 
-  void handleError(serial_transport::ErrorCode errorCode, char detail, serial_transport::Endpoint& /*serial*/) {
-    _logger.log(iot_core::LogLevel::Warning, [&] () { return toolbox::format(F("Serial error %c (%c): %s"), static_cast<char>(errorCode), detail, serial_transport::describe(errorCode)); });
-    _counters.err += 1;
+  void handleConnectionState(serial_transport::ConnectionState state, serial_transport::Endpoint& /*serial*/) {
+    iot_core::LogLevel level = state == serial_transport::ConnectionState::UNSYNCED ? iot_core::LogLevel::Warning : iot_core::LogLevel::Info;
+    _logger.log(level, [&] () { return toolbox::format(F("Serial connection: %s"), serial_transport::describe(state)); });
+  }
+
+  void handleFrame(char direction, uint8_t type, uint8_t sequenceNumber, const uint8_t* payload, uint8_t payloadLen) {
+    _logger.log(iot_core::LogLevel::Debug, [&] () {
+      static char logMessage[96]; // "TX|RX FRAME type=XX seq=XX len=X ...";
+      int insertPos = 0;
+      insertPos += snprintf(logMessage + insertPos, 96 - insertPos, "%cX FRAME T=%02X S=%02X L=%u ", direction, type, sequenceNumber, payloadLen);
+      for (size_t i = 0; i < payloadLen; ++i) {
+        logMessage[insertPos++] = payload[i];
+      }
+      logMessage[insertPos] = '\0';
+      return logMessage;
+    });
   }
 
   void processReceived(const char* message, serial_transport::Endpoint& serial) {
