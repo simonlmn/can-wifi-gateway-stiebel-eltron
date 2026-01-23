@@ -475,7 +475,7 @@ private:
               entry.lastWriteMs = 0; // Give up on this write
               entry.writeRetries = 0;
             } else {
-              _logger.log(iot_core::LogLevel::Debug, toolbox::format(F("Attempting write for %u: %u"), entry.id, entry.toWrite));
+              _logger.log(iot_core::LogLevel::Debug, toolbox::format(F("Write attempt %u for %u: %u"), entry.writeRetries + 1, entry.id, entry.toWrite));
               sendResult = _protocol.write({ _deviceId, entry.source, entry.id, entry.toWrite });
               if (sendResult == OperationResult::Accepted) {
                 entry.lastWriteMs = currentMs;
@@ -483,7 +483,6 @@ private:
                 // Wait a bit before requesting verification to give the target time to process
                 entry.lastRequestMs = currentMs + WRITE_VERIFY_DELAY_MS - MIN_UPDATE_INTERVAL_MS;
                 entry.lastUpdateMs = 0; // triggers request for new value from source after delay
-                _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Write attempt %u for %u: %u"), entry.writeRetries, entry.id, entry.toWrite));
               }
             }
           }

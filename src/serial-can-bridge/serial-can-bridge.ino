@@ -13,13 +13,26 @@ ACAN2515Settings::RequestedMode canMode = ACAN2515Settings::ListenOnlyMode;
 ACAN2515 can (MCP2515_CS_PIN, SPI, MCP2515_INT_PIN);
 
 // Serial transport interface
-serial_transport::Endpoint serial { Serial };
+serial_transport::Endpoint serial { serial_transport::EndpointRole::SERVER, Serial };
+
+// Status LED
+uint8_t HEARTBEAT_LED_PIN = 8;
+unsigned long _ledToggleTime = 0;
+unsigned long _ledToggleInterval = 500;
+
+void teardownCan() {
+  if (!canAvailable) {
+    return;
+  }
+
+  can.end();
+  canAvailable = false;
+
+  _ledToggleInterval = 500;
+}
 
 void setupCan() {
-  if (canAvailable) {
-    can.end();
-    canAvailable = false;
-  }
+  teardownCan();
 
   ACAN2515Settings settings (CAN_QUARTZ_FREQUENCY, canBitRate);
   settings.mRequestedMode = canMode;
@@ -38,8 +51,12 @@ void setupCan() {
       (unsigned long)settings.actualBitRate(),
       (unsigned long)settings.samplePointFromBitStart()
     );
+
+    _ledToggleInterval = 1000;
   } else {
     serial.queue("SETUP E%04X", errorCode);
+
+    _ledToggleInterval = 250;
   }
 }
 
@@ -121,17 +138,22 @@ void processReceived(const char* message, serial_transport::Endpoint& serial) {
   }
 }
 
-uint8_t HEARTBEAT_LED_PIN = 8;
-unsigned long _ledToggleTime = 0;
+void connectionStateChanged(serial_transport::ConnectionState state, serial_transport::Endpoint& serial) {
+  if (state == serial_transport::ConnectionState::CONNECTED) {
+    serial.queue("READY");
+  } else {
+    teardownCan();
+  }
+}
 
 void setup() {
   pinMode(HEARTBEAT_LED_PIN, OUTPUT);
   digitalWrite(HEARTBEAT_LED_PIN, HIGH);
 
   serial.setReceiveCallback(&processReceived);
+  serial.setStateCallback(&connectionStateChanged);
   serial.setup();
   SPI.begin();
-  serial.queue("READY");
 
   digitalWrite(HEARTBEAT_LED_PIN, LOW);
 }
@@ -153,7 +175,7 @@ void loop() {
     }
   }
 
-  if (millis() - _ledToggleTime >= 1000) {
+  if (millis() - _ledToggleTime >= _ledToggleInterval) {
     _ledToggleTime = millis();
     digitalWrite(HEARTBEAT_LED_PIN, HIGH - digitalRead(HEARTBEAT_LED_PIN));
   }

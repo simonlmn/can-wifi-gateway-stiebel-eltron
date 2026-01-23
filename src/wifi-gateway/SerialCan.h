@@ -46,8 +46,9 @@ public:
     _lastTokenRefillMs(0),
     _availableTokens(MAX_BURST_TOKENS),
     _serial(
+      serial_transport::EndpointRole::CLIENT,
       Serial,
-      [this] (const char* message, serial_transport::Endpoint& serial) { processReceived(message, serial); },
+      [this] (const uint8_t* payload, uint8_t payloadLen, serial_transport::Endpoint& serial) { processReceived(reinterpret_cast<const char*>(payload), serial); },
       [this] (serial_transport::ConnectionState state, serial_transport::Endpoint& serial) { handleConnectionState(state, serial); },
       [this] (char direction, uint8_t type, uint8_t sequenceNumber, const uint8_t* payload, uint8_t payloadLen) { handleFrame(direction, type, sequenceNumber, payload, payloadLen); }
     )
@@ -184,12 +185,12 @@ private:
   }
 
   void handleConnectionState(serial_transport::ConnectionState state, serial_transport::Endpoint& /*serial*/) {
-    iot_core::LogLevel level = state == serial_transport::ConnectionState::UNSYNCED ? iot_core::LogLevel::Warning : iot_core::LogLevel::Info;
+    iot_core::LogLevel level = state == serial_transport::ConnectionState::CLOSED ? iot_core::LogLevel::Warning : iot_core::LogLevel::Info;
     _logger.log(level, [&] () { return toolbox::format(F("Serial connection: %s"), serial_transport::describe(state)); });
   }
 
   void handleFrame(char direction, uint8_t type, uint8_t sequenceNumber, const uint8_t* payload, uint8_t payloadLen) {
-    _logger.log(iot_core::LogLevel::Debug, [&] () {
+    _logger.log(iot_core::LogLevel::Trace, [&] () {
       static char logMessage[96]; // "TX|RX FRAME type=XX seq=XX len=X ...";
       int insertPos = 0;
       insertPos += snprintf(logMessage + insertPos, 96 - insertPos, "%cX FRAME T=%02X S=%02X L=%u ", direction, type, sequenceNumber, payloadLen);
