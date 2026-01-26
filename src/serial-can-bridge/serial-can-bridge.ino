@@ -1,4 +1,5 @@
 #include <ACAN2515.h>
+#include <toolbox.h>
 #include <serial_transport.h>
 
 // CAN interface
@@ -36,11 +37,13 @@ void setupCan() {
 
   ACAN2515Settings settings (CAN_QUARTZ_FREQUENCY, canBitRate);
   settings.mRequestedMode = canMode;
+  settings.mReceiveBufferSize = 16;
+  settings.mTransmitBuffer0Size = 8;
   const uint16_t errorCode = can.begin(settings, NULL);
   canAvailable = errorCode == 0;
 
   if (canAvailable) {
-    serial.queue("SETUP OK %u %u %u %u %u %u %u %lu %lu",
+    serial.queue(toolbox::format(F("SETUP OK %u %u %u %u %u %u %u %lu %lu"),
       settings.mRequestedMode,
       settings.mBitRatePrescaler,
       settings.mPropagationSegment,
@@ -50,11 +53,11 @@ void setupCan() {
       settings.mTripleSampling,
       (unsigned long)settings.actualBitRate(),
       (unsigned long)settings.samplePointFromBitStart()
-    );
+    ));
 
     _ledToggleInterval = 1000;
   } else {
-    serial.queue("SETUP E%04X", errorCode);
+    serial.queue(toolbox::format(F("SETUP E%04X"), errorCode));
 
     _ledToggleInterval = 250;
   }
@@ -67,7 +70,7 @@ void processReceived(const char* message, serial_transport::Endpoint& serial) {
   if (strncmp(start, "SETUP ", 6) == 0) {
     auto bitrate = strtol(start + 6, &end, 16);
     if (end == start) {
-      serial.queue("SETUP ENVAL");
+      serial.queue(F("SETUP ENVAL"));
       return;
     }
     start = end;
@@ -82,7 +85,7 @@ void processReceived(const char* message, serial_transport::Endpoint& serial) {
     } else if (strcmp(start, " LIS") == 0) {
       newCanMode = ACAN2515Settings::ListenOnlyMode;
     } else {
-      serial.queue("SETUP ENVAL");
+      serial.queue(F("SETUP ENVAL"));
       return;
     }
 
@@ -92,20 +95,20 @@ void processReceived(const char* message, serial_transport::Endpoint& serial) {
     doCanSetup = true; // Trigger CAN setup in main loop
   } else if (strncmp(start, "CANTX ", 6) == 0) {
     if (!canAvailable) {
-      serial.queue("CANTX ENOAV");
+      serial.queue(F("CANTX ENOAV"));
       return;
     }
     
     auto id = strtol(start + 6, &end, 16);
     if (end == start) {
-      serial.queue("CANTX ENVAL");
+      serial.queue(F("CANTX ENVAL"));
       return;
     }
     start = end;
 
     auto len = strtol(start, &end, 10);
     if (end == start) {
-      serial.queue("CANTX ENVAL");
+      serial.queue(F("CANTX ENVAL"));
       return;
     }
     start = end;
@@ -119,40 +122,67 @@ void processReceived(const char* message, serial_transport::Endpoint& serial) {
     for (size_t i = 0; i < frame.len; ++i) {
       frame.data[i] = strtol(start, &end, 16);
       if (end == start) {
-        serial.queue("CANTX ENVAL");
+        serial.queue(F("CANTX ENVAL"));
         return;
       }
       start = end;
     }
 
     if (can.tryToSend(frame)) {
-      serial.queue("CANTX OK");
+      serial.queue(F("CANTX OK"));
       return;
     } else {
-      serial.queue("CANTX ESEND");
+      serial.queue(F("CANTX ESEND"));
       return;
     }
   } else {
-    serial.queue("ERROR UNK");
+    serial.queue(F("ERROR UNK"));
     return;
   }
 }
 
 void connectionStateChanged(serial_transport::ConnectionState state, serial_transport::Endpoint& serial) {
   if (state == serial_transport::ConnectionState::CONNECTED) {
-    serial.queue("READY");
+    serial.queue(F("READY"));
   } else {
     teardownCan();
   }
 }
 
+toolbox::strref decodeResetReason(uint8_t reason) {
+  switch (reason) {
+    case 0x00: return F("POWERON?"); // No reset source detected
+    case 0x01: return F("POWERON");
+    case 0x02: return F("EXTERNAL");
+    case 0x04: return F("BROWNOUT");
+    case 0x08: return F("WATCHDOG");
+    case 0x10: return F("JTAG");
+    case 0x20: return F("SOFTWARE");
+    default:   return F("UNKNOWN");
+  }
+}
+
 void setup() {
+  // read reset reason
+  uint8_t resetReason = MCUSR;
+  MCUSR = 0;
+
   pinMode(HEARTBEAT_LED_PIN, OUTPUT);
   digitalWrite(HEARTBEAT_LED_PIN, HIGH);
+
+  serial.diagnostics(serial_transport::Endpoint::DIAG_CONNECTION_STATE | 
+                     serial_transport::Endpoint::DIAG_RESETS |
+                     serial_transport::Endpoint::DIAG_RX_HANDSHAKE_FRAMES |
+                     serial_transport::Endpoint::DIAG_PERIODIC_STATS);
 
   serial.setReceiveCallback(&processReceived);
   serial.setStateCallback(&connectionStateChanged);
   serial.setup();
+
+  const char* resetMessage = toolbox::format(F("RESET %s"), decodeResetReason(resetReason).ref());
+  serial.sendDebug(resetMessage);
+  serial.queue(resetMessage);
+
   SPI.begin();
 
   digitalWrite(HEARTBEAT_LED_PIN, LOW);
