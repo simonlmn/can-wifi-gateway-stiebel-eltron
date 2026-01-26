@@ -142,11 +142,11 @@ public:
       return OperationResult::RateLimited;
     }
 
-    logCanMessage("TX", message);
-
     if (!queueCanTxMessage(_serial, message.id, message.ext, message.rtr, message.len, message.data)) {
       return OperationResult::QueueFull;
     }
+
+    logCanMessage("TX", message);
 
     _availableTokens -= 1.0f;
     _counters.tx += 1;
@@ -185,15 +185,23 @@ private:
   }
 
   void handleConnectionState(serial_transport::ConnectionState state, serial_transport::Endpoint& /*serial*/) {
+    if (state == serial_transport::ConnectionState::CLOSED) {
+      _canAvailable = false;
+      _resetInterval.restart();
+    }
+
     iot_core::LogLevel level = state == serial_transport::ConnectionState::CLOSED ? iot_core::LogLevel::Warning : iot_core::LogLevel::Info;
-    _logger.log(level, [&] () { return toolbox::format(F("Serial connection: %s"), serial_transport::describe(state)); });
+    _logger.log(level, toolbox::format(F("Serial connection: %s"), serial_transport::describe(state).ref()));
   }
 
   void handleFrame(char direction, uint8_t type, uint8_t sequenceNumber, const uint8_t* payload, uint8_t payloadLen) {
-    _logger.log(iot_core::LogLevel::Trace, [&] () {
+    bool isDataOrAck = (type == serial_transport::Endpoint::FRAME_TYPE_DATA) || (type == serial_transport::Endpoint::FRAME_TYPE_ACK);
+    if (isDataOrAck) {
+      return;
+    }
+    _logger.log(iot_core::LogLevel::Debug, [&] () {
       static char logMessage[96]; // "TX|RX FRAME type=XX seq=XX len=X ...";
-      int insertPos = 0;
-      insertPos += snprintf(logMessage + insertPos, 96 - insertPos, "%cX FRAME T=%02X S=%02X L=%u ", direction, type, sequenceNumber, payloadLen);
+      int insertPos = snprintf(logMessage, 96, "%cX FRAME T=%02X S=%02X L=%u ", direction, type, sequenceNumber, payloadLen);
       for (size_t i = 0; i < payloadLen; ++i) {
         logMessage[insertPos++] = payload[i];
       }
@@ -210,13 +218,15 @@ private:
       auto id = strtol(start + 6, &end, 16);
       if (end == start) {
         _counters.err += 1;
+        _logger.log(iot_core::LogLevel::Error, toolbox::format(F("CANRX: Invalid ID '%s'"), message));
         return;
       }
       start = end;
-
+      
       auto len = strtol(start, &end, 10);
       if (end == start) {
         _counters.err += 1;
+        _logger.log(iot_core::LogLevel::Error, toolbox::format(F("CANRX: Invalid length '%s'"), message));
         return;
       }
       start = end;
@@ -231,6 +241,7 @@ private:
         message.data[i] = strtol(start, &end, 16);
         if (end == start) {
           _counters.err += 1;
+          _logger.log(iot_core::LogLevel::Error, toolbox::format(F("CANRX: Invalid data at index %u '%s'"), i, message));
           return;
         }
         start = end;
@@ -258,7 +269,7 @@ private:
         _logger.log(iot_core::LogLevel::Error, [&] () { return toolbox::format(F("CANTX unknown error: %s"), message); });
       }
     } else if (strncmp(start, "READY", 5) == 0) {
-      serial.queue("SETUP %X %s", CAN_BITRATE, toSetupModeString(effectiveMode()));
+      serial.queue(toolbox::format(F("SETUP %X %s"), CAN_BITRATE, toSetupModeString(effectiveMode())));
     } else if (strncmp(start, "SETUP ", 6) == 0) {
       _canAvailable = strncmp(start + 6, "OK ", 3) == 0;
       if (_canAvailable) {
@@ -267,6 +278,8 @@ private:
       } else {
         _logger.log(iot_core::LogLevel::Error, message);
       }
+    } else if (strncmp(start, "RESET ", 6) == 0) {
+      _logger.log(iot_core::LogLevel::Info, toolbox::format(F("CAN bridge reset reason: %s"), start + 6));
     } else {
       _counters.err += 1;
       _logger.log(iot_core::LogLevel::Error, message);

@@ -11,5 +11,5 @@ profiles:
       - gpiobj (0.5.0)
       - esp-iot-core (0.9.0)
       - jsons (0.4.0)
-      - serial-transport (1.1.0)
-      - toolbox (0.6.1)
+      - serial-transport (1.2.0)
+      - toolbox (0.7.0)
