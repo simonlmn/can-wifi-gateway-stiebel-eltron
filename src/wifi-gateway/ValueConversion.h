@@ -912,12 +912,12 @@ public:
   }
 
   bool configure(const char* name, const char* value) override {
-    if (strcmp(name, "examples") == 0) return setDefineExamples(iot_core::convert<bool>::fromString(value, false));
+    if (strcmp(name, "examples") == 0) return setDefineExamples(toolbox::convert<bool>::fromString(value).otherwise(false));
     return false;
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
-    writer("examples", iot_core::convert<bool>::toString(_defineExamplesIfEmpty));
+    writer("examples", toolbox::convert<bool>::toString(_defineExamplesIfEmpty).cstr());
   }
 
   bool setDefineExamples(bool enabled) {

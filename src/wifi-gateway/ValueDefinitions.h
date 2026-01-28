@@ -325,10 +325,10 @@ private:
       auto json = reader.begin();
       for (auto& property : json.asObject()) {
         ++stored;
-        ValueId valueId = iot_core::convert<ValueId>::fromString(property.name().cstr(), nullptr, 10); // TODO validation
+        toolbox::Maybe<ValueId> valueId = toolbox::convert<ValueId>::fromString(property.name(), nullptr, 10);
         ValueDefinition definition {};
-        if (definition.deserialize(property, _conversionRepo) && !reader.failed()) {
-          _definitions.insert(valueId, definition);
+        if (valueId.available() && definition.deserialize(property, _conversionRepo) && !reader.failed()) {
+          _definitions.insert(valueId.get(), definition);
         } else {
           _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to load definition %u: %s"), valueId, reader.diagnostics().errorMessage.toString().c_str()));
         }
@@ -346,7 +346,7 @@ private:
       auto writer = jsons::makeWriter(output);
       writer.openObject();
       for (auto& entry : _definitions) {
-        writer.property(iot_core::convert<long>::toString(entry.key(), 10));
+        writer.property(toolbox::convert<long>::toString(entry.key(), 10));
         entry.value().serialize(writer, NullConversionRepository{});
       }
       writer.end();
@@ -389,8 +389,8 @@ public:
   }
   
   void getDiagnostics(iot_core::IDiagnosticsCollector& collector) const override {
-    collector.addValue("size", iot_core::convert<size_t>::toString(_definitions.size(), 10));
-    collector.addValue("capacity", iot_core::convert<size_t>::toString(_definitions.capacity(), 10));
+    collector.addValue("size", toolbox::convert<size_t>::toString(_definitions.size(), 10));
+    collector.addValue("capacity", toolbox::convert<size_t>::toString(_definitions.capacity(), 10));
   }
 
   bool store(ValueId id, const ValueDefinition& definition) override {

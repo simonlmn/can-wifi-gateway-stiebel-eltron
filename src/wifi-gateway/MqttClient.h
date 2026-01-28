@@ -48,17 +48,17 @@ public:
   }
 
   bool configure(const char* name, const char* value) override {
-    if (strcmp(name, "enabled") == 0) return setEnabled(iot_core::convert<bool>::fromString(value, false));
+    if (strcmp(name, "enabled") == 0) return setEnabled(toolbox::convert<bool>::fromString(value).otherwise(false));
     if (strcmp(name, "broker") == 0) return setBrokerAddress(value);
-    if (strcmp(name, "port") == 0) return setBrokerPort(iot_core::convert<uint16_t>::fromString(value, nullptr, 10));
+    if (strcmp(name, "port") == 0) return setBrokerPort(toolbox::convert<uint16_t>::fromString(value, nullptr, 10).otherwise(1883));
     if (strcmp(name, "topic") == 0) return setTopic(value);
     return false;
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
-    writer("enabled", iot_core::convert<bool>::toString(_enabled));
+    writer("enabled", toolbox::convert<bool>::toString(_enabled).cstr());
     writer("broker", _brokerAddress);
-    writer("port", iot_core::convert<uint16_t>::toString(_brokerPort, 10));
+    writer("port", toolbox::convert<uint16_t>::toString(_brokerPort, 10).cstr());
     writer("topic", _topic);
   }
 

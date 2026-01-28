@@ -4,6 +4,7 @@
 #include <iot_core/Interfaces.h>
 #include <iot_core/DateTime.h>
 #include <iot_core/Utils.h>
+#include <toolbox/Conversion.h>
 #include "DateTimeSource.h"
 #include "OperationResult.h"
 #include "StiebelEltronProtocol.h"
@@ -126,16 +127,16 @@ public:
   bool configure(const char* name, const char* value) override {
     if (strcmp(name, "deviceId") == 0) return DeviceId::fromString(value).then([this] (DeviceId id) { return setDeviceId(id); }).otherwise([] () { return false; });
     if (strcmp(name, "mode") == 0) return setMode(dataCaptureModeFromString(value));
-    if (strcmp(name, "readOnly") == 0) return setReadOnly(iot_core::convert<bool>::fromString(value, true));
-    if (strcmp(name, "ignoreDateTime") == 0) return setIgnoreDateTime(iot_core::convert<bool>::fromString(value, false));
+    if (strcmp(name, "readOnly") == 0) return setReadOnly(toolbox::convert<bool>::fromString(value).otherwise(true));
+    if (strcmp(name, "ignoreDateTime") == 0) return setIgnoreDateTime(toolbox::convert<bool>::fromString(value).otherwise(false));
     return false;
   }
 
   void getConfig(std::function<void(const char*, const char*)> writer) const override {
     writer("deviceId", _deviceId.toString());
     writer("mode", dataCaptureModeToString(_mode));
-    writer("readOnly", iot_core::convert<bool>::toString(_readOnly));
-    writer("ignoreDateTime", iot_core::convert<bool>::toString(_ignoreDateTime));
+    writer("readOnly", toolbox::convert<bool>::toString(_readOnly).cstr());
+    writer("ignoreDateTime", toolbox::convert<bool>::toString(_ignoreDateTime).cstr());
   }
 
   bool setDeviceId(DeviceId deviceId) {

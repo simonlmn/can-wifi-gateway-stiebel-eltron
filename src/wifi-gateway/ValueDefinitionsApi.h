@@ -6,6 +6,7 @@
 #include <uri/UriBraces.h>
 #include <jsons/Writer.h>
 #include <toolbox/Repository.h>
+#include <toolbox/Conversion.h>
 #include "ValueDefinitions.h"
 
 class DefinitionsApi final : public iot_core::api::IProvider {
@@ -123,7 +124,7 @@ private:
     writer.openObject();
     for (auto& mapping : _definitions.all()) {
       if (!mapping.value().isUndefined()) {
-        writer.property(iot_core::convert<long>::toString(mapping.key(), 10));
+        writer.property(toolbox::convert<long>::toString(mapping.key(), 10));
         mapping.value().serialize(writer, _conversions);
       }
     }
@@ -138,7 +139,15 @@ private:
     auto reader = jsons::makeReader(request.body());
     auto json = reader.begin();
     for (auto& property : json.asObject()) {
-      ValueId valueId = iot_core::convert<ValueId>::fromString(property.name().cstr(), nullptr, 10); // TODO validation
+      toolbox::Maybe<ValueId> valueId = toolbox::convert<ValueId>::fromString(property.name(), nullptr, 10);
+      if (!valueId) {
+        response
+          .code(iot_core::api::ResponseCode::BadRequest)
+          .contentType(iot_core::api::ContentType::TextPlain)
+          .sendSingleBody().write(toolbox::format(F("Invalid value ID: %s"), property.name().cstr()));
+        return;
+      }
+
       ValueDefinition definition {};
       if (!definition.deserialize(property, _conversions) || reader.failed()) {
         response
@@ -148,7 +157,7 @@ private:
         return;
       }
       
-      if (!_definitions.store(valueId, definition)) {
+      if (!_definitions.store(valueId.get(), definition)) {
         response.code(iot_core::api::ResponseCode::InsufficientStorage);
         return;
       }
@@ -174,9 +183,16 @@ private:
   }
 
   void getDefinition(iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-    ValueId valueId = iot_core::convert<ValueId>::fromString(request.pathArg(0).cstr(), nullptr, 10); // TODO validation
-
-    auto& definition = _definitions.get(valueId);
+    toolbox::Maybe<ValueId> valueId = toolbox::convert<ValueId>::fromString(request.pathArg(0), nullptr, 10);
+    if (!valueId) {
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(toolbox::format(F("Invalid value ID: %s"), request.pathArg(0).cstr()));
+      return;
+    }
+    
+    auto& definition = _definitions.get(valueId.get());
 
     if (definition.isUndefined()) {
       response.code(iot_core::api::ResponseCode::BadRequestNotFound);
@@ -200,7 +216,15 @@ private:
   void putDefinition(iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
     auto transaction = toolbox::beginTransaction(_definitions);
 
-    ValueId valueId = iot_core::convert<ValueId>::fromString(request.pathArg(0).cstr(), nullptr, 10); // TODO validation
+    toolbox::Maybe<ValueId> valueId = toolbox::convert<ValueId>::fromString(request.pathArg(0), nullptr, 10);
+    if (!valueId) {
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(toolbox::format(F("Invalid value ID: %s"), request.pathArg(0).cstr()));
+      return;
+    }
+
     ValueDefinition definition {};
     
     auto reader = jsons::makeReader(request.body());
@@ -213,7 +237,7 @@ private:
       return;
     }
     
-    if (!_definitions.store(valueId, definition)) {
+    if (!_definitions.store(valueId.get(), definition)) {
       response.code(iot_core::api::ResponseCode::InsufficientStorage);
       return;
     }
@@ -224,8 +248,15 @@ private:
   }
 
   void deleteDefinition(iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
-    ValueId valueId = iot_core::convert<ValueId>::fromString(request.pathArg(0).cstr(), nullptr, 10); // TODO validation
-    _definitions.remove(valueId);
+    toolbox::Maybe<ValueId> valueId = toolbox::convert<ValueId>::fromString(request.pathArg(0), nullptr, 10);
+    if (!valueId) {
+      response
+        .code(iot_core::api::ResponseCode::BadRequest)
+        .contentType(iot_core::api::ContentType::TextPlain)
+        .sendSingleBody().write(toolbox::format(F("Invalid value ID: %s"), request.pathArg(0).cstr()));
+      return;
+    }
+    _definitions.remove(valueId.get());
     _definitions.commit();
     response.code(iot_core::api::ResponseCode::OkNoContent);
   }

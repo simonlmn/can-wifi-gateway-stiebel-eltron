@@ -41,7 +41,7 @@ public:
     _resetPin(resetPin),
     _txEnablePin(txEnablePin),
     _canAvailable(false),
-    _resetInterval(30000),
+    _resetInterval(5000),
     _counters(),
     _lastTokenRefillMs(0),
     _availableTokens(MAX_BURST_TOKENS),
@@ -103,10 +103,10 @@ public:
   }
   
   void getDiagnostics(iot_core::IDiagnosticsCollector& collector) const override {
-    collector.addValue("available", iot_core::convert<bool>::toString(_canAvailable));
-    collector.addValue("err", iot_core::convert<uint32_t>::toString(_counters.err, 10));
-    collector.addValue("rx", iot_core::convert<uint32_t>::toString(_counters.rx, 10));
-    collector.addValue("tx", iot_core::convert<uint32_t>::toString(_counters.tx, 10));
+    collector.addValue("available", toolbox::convert<bool>::toString(_canAvailable));
+    collector.addValue("err", toolbox::convert<uint32_t>::toString(_counters.err, 10));
+    collector.addValue("rx", toolbox::convert<uint32_t>::toString(_counters.rx, 10));
+    collector.addValue("tx", toolbox::convert<uint32_t>::toString(_counters.tx, 10));
   }
 
   void reset() override {
@@ -176,7 +176,7 @@ private:
     _counters = CanCounters{};
 
     _resetPin = true;
-    delay(100);
+    delay(200);
     _serial.reset();
     delay(100);
     _resetPin = false;
@@ -186,8 +186,10 @@ private:
 
   void handleConnectionState(serial_transport::ConnectionState state, serial_transport::Endpoint& /*serial*/) {
     if (state == serial_transport::ConnectionState::CLOSED) {
-      _canAvailable = false;
       _resetInterval.restart();
+    }
+    if (state != serial_transport::ConnectionState::CONNECTED) {
+      _canAvailable = false;
     }
 
     iot_core::LogLevel level = state == serial_transport::ConnectionState::CLOSED ? iot_core::LogLevel::Warning : iot_core::LogLevel::Info;
@@ -196,7 +198,8 @@ private:
 
   void handleFrame(char direction, uint8_t type, uint8_t sequenceNumber, const uint8_t* payload, uint8_t payloadLen) {
     bool isDataOrAck = (type == serial_transport::Endpoint::FRAME_TYPE_DATA) || (type == serial_transport::Endpoint::FRAME_TYPE_ACK);
-    if (isDataOrAck) {
+    bool isCanTx = isDataOrAck && (payloadLen >= 6) && (strncmp(reinterpret_cast<const char*>(payload), "CANTX", 5) == 0);
+    if (isDataOrAck && !isCanTx) {
       return;
     }
     _logger.log(iot_core::LogLevel::Debug, [&] () {

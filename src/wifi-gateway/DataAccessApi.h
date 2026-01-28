@@ -5,6 +5,7 @@
 #include <uri/UriBraces.h>
 #include <jsons/Writer.h>
 #include <toolbox/Repository.h>
+#include <toolbox/Conversion.h>
 #include "Serializer.h"
 #include "DataAccess.h"
 #include "ValueConversion.h"
@@ -215,10 +216,9 @@ private:
       return;
     }
 
-    char* end;
     toolbox::strref addressArg = request.pathArg(1);
-    long addressNumber = iot_core::convert<long>::fromString(addressArg.cstr(), &end, 10);
-    if (end == addressArg.cstr() || addressNumber < 0 || addressNumber > 0x7F) {
+    toolbox::Maybe<uint8_t> addressNumber = toolbox::convert<uint8_t>::fromString(addressArg, nullptr, 10);
+    if (!addressNumber || addressNumber.get() > 0x7F) {
       response
         .code(iot_core::api::ResponseCode::BadRequest)
         .contentType(iot_core::api::ContentType::TextPlain)
@@ -227,8 +227,8 @@ private:
     }
 
     toolbox::strref valueIdArg = request.pathArg(2);
-    long valueIdNumber = iot_core::convert<long>::fromString(valueIdArg.cstr(), &end, 0);
-    if (end == valueIdArg.cstr() || valueIdNumber < 0 || valueIdNumber > 0xFFFF) {
+    toolbox::Maybe<uint16_t> valueIdNumber = toolbox::convert<uint16_t>::fromString(valueIdArg, nullptr, 10);
+    if (!valueIdNumber) {
       response
         .code(iot_core::api::ResponseCode::BadRequest)
         .contentType(iot_core::api::ContentType::TextPlain)
@@ -236,7 +236,7 @@ private:
       return;
     }
 
-    const DataAccess::DataKey key {DeviceId{type, DeviceAddress(addressNumber)}, ValueId(valueIdNumber)};
+    const DataAccess::DataKey key {DeviceId{type, DeviceAddress(addressNumber.get())}, ValueId(valueIdNumber.get())};
 
     DataConfig config;
     auto reader = jsons::makeReader(request.body());
@@ -302,10 +302,9 @@ private:
       return;
     }
 
-    char* end;
     toolbox::strref addressArg = request.pathArg(1);
-    long addressNumber = iot_core::convert<long>::fromString(addressArg.cstr(), &end, 10);
-    if (end == addressArg.cstr() || addressNumber < 0 || addressNumber > 0x7F) {
+    toolbox::Maybe<uint8_t> addressNumber = toolbox::convert<uint8_t>::fromString(addressArg, nullptr, 10);
+    if (!addressNumber || addressNumber.get() > 0x7F) {
       response
         .code(iot_core::api::ResponseCode::BadRequest)
         .contentType(iot_core::api::ContentType::TextPlain)
@@ -314,8 +313,8 @@ private:
     }
 
     toolbox::strref valueIdArg = request.pathArg(2);
-    long valueIdNumber = iot_core::convert<long>::fromString(valueIdArg.cstr(), &end, 0);
-    if (end == valueIdArg.cstr() || valueIdNumber < 0 || valueIdNumber > 0xFFFF) {
+    toolbox::Maybe<uint16_t> valueIdNumber = toolbox::convert<uint16_t>::fromString(valueIdArg, nullptr, 10);
+    if (!valueIdNumber) {
       response
         .code(iot_core::api::ResponseCode::BadRequest)
         .contentType(iot_core::api::ContentType::TextPlain)
@@ -323,7 +322,7 @@ private:
       return;
     }
 
-    const DataAccess::DataKey key {DeviceId{type, DeviceAddress(addressNumber)}, ValueId(valueIdNumber)};
+    const DataAccess::DataKey key {DeviceId{type, DeviceAddress(addressNumber.get())}, ValueId(valueIdNumber.get())};
     
     _access.removeSubscription(key);
     _access.removeWritable(key);
@@ -357,10 +356,9 @@ private:
       return;
     }
 
-    char* end;
     toolbox::strref addressArg = request.pathArg(1);
-    long addressNumber = iot_core::convert<long>::fromString(addressArg.cstr(), &end, 10);
-    if (end == addressArg.cstr() || addressNumber < 0 || addressNumber > 0x7F) {
+    toolbox::Maybe<uint8_t> addressNumber = toolbox::convert<uint8_t>::fromString(addressArg, nullptr, 10);
+    if (!addressNumber || addressNumber.get() > 0x7F) {
       response
         .code(iot_core::api::ResponseCode::BadRequest)
         .contentType(iot_core::api::ContentType::TextPlain)
@@ -369,8 +367,8 @@ private:
     }
 
     toolbox::strref valueIdArg = request.pathArg(2);
-    long valueIdNumber = iot_core::convert<long>::fromString(valueIdArg.cstr(), &end, 0);
-    if (end == valueIdArg.cstr() || valueIdNumber < 0 || valueIdNumber > 0xFFFF) {
+    toolbox::Maybe<uint16_t> valueIdNumber = toolbox::convert<uint16_t>::fromString(valueIdArg, nullptr, 10);
+    if (!valueIdNumber) {
       response
         .code(iot_core::api::ResponseCode::BadRequest)
         .contentType(iot_core::api::ContentType::TextPlain)
@@ -378,7 +376,7 @@ private:
       return;
     }
 
-    const DataAccess::DataKey key {DeviceId{type, DeviceAddress(addressNumber)}, ValueId(valueIdNumber)};
+    const DataAccess::DataKey key {DeviceId{type, DeviceAddress(addressNumber.get())}, ValueId(valueIdNumber.get())};
 
     auto reader = jsons::makeReader(request.body());
     auto json = reader.begin();
@@ -462,7 +460,7 @@ private:
           type = data.first.first.type;
           address = data.first.first.address;
           writer.property(deviceTypeToString(type)).openObject();
-          writer.property(iot_core::convert<DeviceAddress>::toString(address, 10)).openObject();
+          writer.property(toolbox::convert<DeviceAddress>::toString(address, 10)).openObject();
         } else {
           if (type != data.first.first.type) {
             writer.close();
@@ -470,15 +468,15 @@ private:
             type = data.first.first.type;
             address = data.first.first.address;
             writer.property(deviceTypeToString(type)).openObject();
-            writer.property(iot_core::convert<DeviceAddress>::toString(address, 10)).openObject();
+            writer.property(toolbox::convert<DeviceAddress>::toString(address, 10)).openObject();
           } else if (address != data.first.first.address) {
             writer.close();
             address = data.first.first.address;
-            writer.property(iot_core::convert<DeviceAddress>::toString(address, 10)).openObject();
+            writer.property(toolbox::convert<DeviceAddress>::toString(address, 10)).openObject();
           }
         }
 
-        writer.property(iot_core::convert<ValueId>::toString(data.second.id, 10));
+        writer.property(toolbox::convert<ValueId>::toString(data.second.id, 10));
         serializer::serialize(writer, _conversionService, _definitions, data.second, false, numbersAsDecimals);
 
         ++i;

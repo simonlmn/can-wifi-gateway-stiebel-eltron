@@ -144,7 +144,7 @@ private:
     auto key = request.pathArg(0);
     auto converterId = _conversions.getConverterIdByKey(key);
     if (!isCustomConverterId(converterId)) {
-      converterId = iot_core::convert<ConverterId>::fromString(key.cstr(), nullptr, 10);
+      converterId = toolbox::convert<ConverterId>::fromString(key, nullptr, 10).otherwise(NONE_CONVERTER_ID);
     }
     auto converter = _customConverters.getCustomConverter(converterId);
 
@@ -182,7 +182,7 @@ private:
     auto key = request.pathArg(0);
     auto converterId = _conversions.getConverterIdByKey(key);
     if (!isCustomConverterId(converterId)) {
-      converterId = iot_core::convert<ConverterId>::fromString(key.cstr(), nullptr, 10);
+      converterId = toolbox::convert<ConverterId>::fromString(key, nullptr, 10).otherwise(NONE_CONVERTER_ID);
     }
     auto existing = _customConverters.getCustomConverter(converterId);
 
@@ -234,7 +234,7 @@ private:
     auto key = request.pathArg(0);
     auto converterId = _conversions.getConverterIdByKey(key);
     if (!isCustomConverterId(converterId)) {
-      converterId = iot_core::convert<ConverterId>::fromString(key.cstr(), nullptr, 10);
+      converterId = toolbox::convert<ConverterId>::fromString(key, nullptr, 10).otherwise(NONE_CONVERTER_ID);
     }
 
     _customConverters.remove(converterId);

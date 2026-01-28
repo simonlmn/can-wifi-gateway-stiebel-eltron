@@ -54,7 +54,7 @@ DeviceType deviceTypeFromString(const toolbox::strref& type) {
   if (type == "DIS") return DeviceType::Display;
   if (type == "ANY") return DeviceType::Any;
   if (type.length() == 3 && (type.charAt(0) == 'X')) {
-    return DeviceType(iot_core::convert<uint8_t>::fromString(type.skip(1).toString().c_str(), nullptr, 16));
+    return DeviceType(toolbox::convert<uint8_t>::fromString(type.skip(1), nullptr, 16).otherwise(0xFFu));
   }
   
   return DeviceType::Any;
@@ -119,7 +119,11 @@ struct DeviceId {
     if (string.charAt(4) == '*') {
       address = DEVICE_ADDR_ANY;
     } else {
-      address = iot_core::convert<DeviceAddress>::fromString(string.skip(4).cstr(), nullptr, 10);
+      auto addressPart = toolbox::convert<DeviceAddress>::fromString(string.skip(4), nullptr, 10);
+      if (!addressPart) {
+        return {};
+      }
+      address = addressPart.get();
     }
     return DeviceId{type, address};
   }
