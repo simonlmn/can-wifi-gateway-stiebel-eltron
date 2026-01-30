@@ -330,7 +330,7 @@ private:
         if (valueId.available() && definition.deserialize(property, _conversionRepo) && !reader.failed()) {
           _definitions.insert(valueId.get(), definition);
         } else {
-          _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to load definition %u: %s"), valueId, reader.diagnostics().errorMessage.toString().c_str()));
+          _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to load definition %u: %s"), valueId, reader.diagnostics().errorMessage.cstr()));
         }
       }
     }

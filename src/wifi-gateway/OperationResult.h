@@ -7,6 +7,7 @@ enum struct OperationResult {
 	RateLimited,  // Rejected because a rate limit/budget prevented acceptance
 	QueueFull,    // Rejected because the queue was full
 	NotReady,     // Rejected because the subsystem was not ready/initialized
+	Unavailable,  // Rejected because the operation is not available in the current mode/state
 	Invalid,      // Rejected because parameters were invalid
 };
 
@@ -16,6 +17,7 @@ const char* operationResultToString(OperationResult result) {
 		case OperationResult::RateLimited: return "RateLimited";
 		case OperationResult::QueueFull: return "QueueFull";
 		case OperationResult::NotReady: return "NotReady";
+		case OperationResult::Unavailable: return "Unavailable";
 		case OperationResult::Invalid: return "Invalid";
 		default: return "?OperationResult?";
 	}

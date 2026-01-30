@@ -854,7 +854,7 @@ private:
         reader.end();
         if (reader.failed()) {
           replaceCustomConverter(converterId, nullptr);
-          _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to load converter %u: %s"), converterId, reader.diagnostics().errorMessage.toString().c_str()));
+          _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Failed to load converter %u: %s"), converterId, reader.diagnostics().errorMessage.cstr()));
         } else {
           ++loaded;
           _logger.log(iot_core::LogLevel::Info, toolbox::format(F("Loaded converter %u."), converterId));

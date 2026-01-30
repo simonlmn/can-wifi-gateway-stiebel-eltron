@@ -2,26 +2,28 @@
 #define SERIALCAN_H_
 
 #include <iot_core/Interfaces.h>
+#include <toolbox/String.h>
+#include <toolbox/Conversion.h>
 #include <serial_transport.h>
 #include <gpiobj.h>
 #include "CanInterface.h"
 
 class SerialCan final : public ICanInterface, public iot_core::IApplicationComponent {
 private:
-  static const uint32_t CAN_BITRATE = 20UL * 1000UL; // 20 kbit/s
   static constexpr uint32_t MAX_ERR_COUNT = 5;
 
-  // Token bucket rate limiter for 20 kbit/s bus protection
-  // Analysis: ~4.4ms per CAN frame (worst case with bit stuffing)
-  // Theoretical max: ~220 frames/sec, we use ~12 frames/sec = ~5.4% bus utilization
-  static constexpr float MAX_FRAMES_PER_SECOND = 12.0f;
-  static constexpr float MAX_BURST_TOKENS = 6.0f;
+  static const uint32_t CAN_BITRATE = 20000UL; // 20 kbit/s
+  static constexpr float MAX_BUS_UTILIZATION = 0.1f;
+
+  static constexpr uint32_t CAN_MAX_BITS_PER_FRAME = 125ul; // 125 bits per CAN frame (worst case with bit stuffing)
+  static constexpr float MAX_FRAMES_PER_SECOND = MAX_BUS_UTILIZATION * (CAN_BITRATE / CAN_MAX_BITS_PER_FRAME);
+  static constexpr float MAX_BURST_TOKENS = MAX_FRAMES_PER_SECOND / 2.0f;
 
   iot_core::Logger _logger;
   iot_core::ISystem& _system;
   gpiobj::DigitalOutput& _resetPin;
   gpiobj::DigitalInput& _txEnablePin;
-  bool _canAvailable;
+  bool _canReady;
   iot_core::IntervalTimer _resetInterval;
   std::function<void()> _readyHandler;
   std::function<void(const CanMessage& message)> _messageHandler;
@@ -40,7 +42,7 @@ public:
     _system(system),
     _resetPin(resetPin),
     _txEnablePin(txEnablePin),
-    _canAvailable(false),
+    _canReady(false),
     _resetInterval(5000),
     _counters(),
     _lastTokenRefillMs(0),
@@ -48,9 +50,9 @@ public:
     _serial(
       serial_transport::EndpointRole::CLIENT,
       Serial,
-      [this] (const uint8_t* payload, uint8_t payloadLen, serial_transport::Endpoint& serial) { processReceived(reinterpret_cast<const char*>(payload), serial); },
+      [this] (const uint8_t* payload, uint8_t payloadLen, serial_transport::Endpoint& serial) { processReceived({reinterpret_cast<const char*>(payload), payloadLen}, serial); },
       [this] (serial_transport::ConnectionState state, serial_transport::Endpoint& serial) { handleConnectionState(state, serial); },
-      [this] (char direction, uint8_t type, uint8_t sequenceNumber, const uint8_t* payload, uint8_t payloadLen) { handleFrame(direction, type, sequenceNumber, payload, payloadLen); }
+      [this] (char direction, uint8_t type, uint8_t sequenceNumber, const uint8_t* payload, uint8_t payloadLen) { logFrame(direction, type, sequenceNumber, payload, payloadLen); }
     )
   {
   }
@@ -103,7 +105,7 @@ public:
   }
   
   void getDiagnostics(iot_core::IDiagnosticsCollector& collector) const override {
-    collector.addValue("available", toolbox::convert<bool>::toString(_canAvailable));
+    collector.addValue("available", toolbox::convert<bool>::toString(_canReady));
     collector.addValue("err", toolbox::convert<uint32_t>::toString(_counters.err, 10));
     collector.addValue("rx", toolbox::convert<uint32_t>::toString(_counters.rx, 10));
     collector.addValue("tx", toolbox::convert<uint32_t>::toString(_counters.tx, 10));
@@ -115,12 +117,12 @@ public:
   }
 
   bool ready() const override {
-    return _canAvailable;
+    return _canReady;
   }
 
   void onReady(std::function<void()> readyHandler) override {
     _readyHandler = readyHandler;
-    if (_canAvailable) {
+    if (_canReady) {
       if (_readyHandler) _readyHandler();
     }
   }
@@ -130,23 +132,23 @@ public:
   }
 
   OperationResult sendCanMessage(const CanMessage& message) override {
-    if (effectiveMode() == CanMode::ListenOnly) {
+    if (!_canReady) {
       return OperationResult::NotReady;
     }
-
-    if (!_canAvailable) {
-      return OperationResult::NotReady;
+    
+    if (effectiveMode() == CanMode::ListenOnly) {
+      return OperationResult::Unavailable;
     }
 
     if (_availableTokens < 1.0f) {
       return OperationResult::RateLimited;
     }
 
-    if (!queueCanTxMessage(_serial, message.id, message.ext, message.rtr, message.len, message.data)) {
+    if (!queueCanTxMessage(message.id, message.ext, message.rtr, message.len, message.data)) {
       return OperationResult::QueueFull;
     }
 
-    logCanMessage("TX", message);
+    logCanMessage('T', message);
 
     _availableTokens -= 1.0f;
     _counters.tx += 1;
@@ -172,7 +174,7 @@ private:
   }
 
   void resetInternal() {
-    _canAvailable = false;
+    _canReady = false;
     _counters = CanCounters{};
 
     _resetPin = true;
@@ -189,20 +191,16 @@ private:
       _resetInterval.restart();
     }
     if (state != serial_transport::ConnectionState::CONNECTED) {
-      _canAvailable = false;
+      _canReady = false;
     }
 
     iot_core::LogLevel level = state == serial_transport::ConnectionState::CLOSED ? iot_core::LogLevel::Warning : iot_core::LogLevel::Info;
     _logger.log(level, toolbox::format(F("Serial connection: %s"), serial_transport::describe(state).ref()));
   }
 
-  void handleFrame(char direction, uint8_t type, uint8_t sequenceNumber, const uint8_t* payload, uint8_t payloadLen) {
+  void logFrame(char direction, uint8_t type, uint8_t sequenceNumber, const uint8_t* payload, uint8_t payloadLen) {
     bool isDataOrAck = (type == serial_transport::Endpoint::FRAME_TYPE_DATA) || (type == serial_transport::Endpoint::FRAME_TYPE_ACK);
-    bool isCanTx = isDataOrAck && (payloadLen >= 6) && (strncmp(reinterpret_cast<const char*>(payload), "CANTX", 5) == 0);
-    if (isDataOrAck && !isCanTx) {
-      return;
-    }
-    _logger.log(iot_core::LogLevel::Debug, [&] () {
+    _logger.log(isDataOrAck ? iot_core::LogLevel::Trace : iot_core::LogLevel::Debug, [&] () {
       static char logMessage[96]; // "TX|RX FRAME type=XX seq=XX len=X ...";
       int insertPos = snprintf(logMessage, 96, "%cX FRAME T=%02X S=%02X L=%u ", direction, type, sequenceNumber, payloadLen);
       for (size_t i = 0; i < payloadLen; ++i) {
@@ -213,87 +211,102 @@ private:
     });
   }
 
-  void processReceived(const char* message, serial_transport::Endpoint& serial) {
-    const char* start = message;
-    char* end = nullptr;
+  bool queueCanTxMessage(uint32_t id, bool ext, bool rtr, uint8_t length, const uint8_t (&data)[8]) {
+    return _serial.queue(toolbox::format(F("CANTX %08lX %u %02X %02X %02X %02X %02X %02X %02X %02X"),
+      id | (uint32_t(ext) << 31) | (uint32_t(rtr) << 30),
+      length,
+      data[0],
+      data[1],
+      data[2],
+      data[3],
+      data[4],
+      data[5],
+      data[6],
+      data[7]
+    ));
+  }
 
-    if (strncmp(start, "CANRX ", 6) == 0) {
-      auto id = strtol(start + 6, &end, 16);
-      if (end == start) {
+  void processReceived(const toolbox::strref& message, serial_transport::Endpoint& serial) {
+    toolbox::strref part = message;
+    toolbox::strref next;
+    
+    if (part.startsWith(F("CANRX "))) {
+      part = part.skip(6);
+      toolbox::Maybe<uint32_t> id = toolbox::convert<uint32_t>::fromString(part, &next, 16) ;
+      if (!id) {
         _counters.err += 1;
-        _logger.log(iot_core::LogLevel::Error, toolbox::format(F("CANRX: Invalid ID '%s'"), message));
+        _logger.log(iot_core::LogLevel::Error, toolbox::format(F("CANRX: Invalid ID '%s'"), message.cstr()));
         return;
       }
-      start = end;
-      
-      auto len = strtol(start, &end, 10);
-      if (end == start) {
+      part = next;
+      toolbox::Maybe<uint8_t> len = toolbox::convert<uint8_t>::fromString(part, &next, 10);
+      if (!len || len.get() > 8u) {
         _counters.err += 1;
-        _logger.log(iot_core::LogLevel::Error, toolbox::format(F("CANRX: Invalid length '%s'"), message));
+        _logger.log(iot_core::LogLevel::Error, toolbox::format(F("CANRX: Invalid length '%s'"), message.cstr()));
         return;
       }
-      start = end;
+      part = next;
 
-      CanMessage message;
-      message.id = id & 0x1FFFFFFFu;
-      message.ext = (id & 0x80000000u) != 0;
-      message.rtr = (id & 0x40000000u) != 0;
-      message.len = len;
-
-      for (size_t i = 0; i < message.len; ++i) {
-        message.data[i] = strtol(start, &end, 16);
-        if (end == start) {
+      CanMessage canMessage;
+      canMessage.id = id.get() & 0x1FFFFFFFu;
+      canMessage.ext = (id.get() & 0x80000000u) != 0;
+      canMessage.rtr = (id.get() & 0x40000000u) != 0;
+      canMessage.len = len.get();
+      for (uint8_t i = 0; i < canMessage.len; ++i) {
+        toolbox::Maybe<uint8_t> byte = toolbox::convert<uint8_t>::fromString(part, &next, 16);
+        if (!byte) {
           _counters.err += 1;
-          _logger.log(iot_core::LogLevel::Error, toolbox::format(F("CANRX: Invalid data at index %u '%s'"), i, message));
+          _logger.log(iot_core::LogLevel::Error, toolbox::format(F("CANRX: Invalid data at index %u '%s'"), i, message.cstr()));
           return;
         }
-        start = end;
+        canMessage.data[i] = byte.get();
+        part = next;
       }
 
-      logCanMessage("RX", message);
+      logCanMessage('R', canMessage);
 
-      if (_messageHandler) _messageHandler(message);
+      if (_messageHandler) _messageHandler(canMessage);
 
       _counters.rx += 1;
-    } else if (strncmp(start, "CANTX ", 6) == 0) {
-      if (strncmp(start + 6, "OK", 2) == 0) {
+    } else if (part.startsWith(F("CANTX "))) {
+      part = part.skip(6);
+      if (part == F("OK")) {
         // Success - no action needed
-      } else if (strncmp(start + 6, "ENVAL", 5) == 0) {
+      } else if (part == F("ENVAL")) {
         _counters.err += 1;
         _logger.log(iot_core::LogLevel::Error, F("CANTX ENVAL: Invalid CAN message format or parameters"));
-      } else if (strncmp(start + 6, "ESEND", 5) == 0) {
+      } else if (part == F("ESEND")) {
         _counters.err += 1;
         _logger.log(iot_core::LogLevel::Error, F("CANTX ESEND: CAN TX buffer full, message dropped"));
-      } else if (strncmp(start + 6, "ENOAV", 5) == 0) {
+      } else if (part == F("ENOAV")) {
         _counters.err += 1;
         _logger.log(iot_core::LogLevel::Error, F("CANTX ENOAV: CAN module not available"));
       } else {
         _counters.err += 1;
-        _logger.log(iot_core::LogLevel::Error, [&] () { return toolbox::format(F("CANTX unknown error: %s"), message); });
+        _logger.log(iot_core::LogLevel::Error, [&] () { return toolbox::format(F("CANTX unknown error: %s"), message.cstr()); });
       }
-    } else if (strncmp(start, "READY", 5) == 0) {
+    } else if (part == F("READY")) {
       serial.queue(toolbox::format(F("SETUP %X %s"), CAN_BITRATE, toSetupModeString(effectiveMode())));
-    } else if (strncmp(start, "SETUP ", 6) == 0) {
-      _canAvailable = strncmp(start + 6, "OK ", 3) == 0;
-      if (_canAvailable) {
-        _logger.log(iot_core::LogLevel::Info, message);
+    } else if (part.startsWith(F("SETUP "))) {
+      part = part.skip(6);
+      _canReady = part.startsWith(F("OK "));
+      if (_canReady) {
+        _logger.log(iot_core::LogLevel::Info, message.cstr());
         if (_readyHandler) _readyHandler();
       } else {
-        _logger.log(iot_core::LogLevel::Error, message);
+        _logger.log(iot_core::LogLevel::Error, message.cstr());
       }
-    } else if (strncmp(start, "RESET ", 6) == 0) {
-      _logger.log(iot_core::LogLevel::Info, toolbox::format(F("CAN bridge reset reason: %s"), start + 6));
     } else {
       _counters.err += 1;
-      _logger.log(iot_core::LogLevel::Error, message);
+      _logger.log(iot_core::LogLevel::Error, message.cstr());
     }
   }
 
-  void logCanMessage(const char* prefix, const CanMessage& message) {
+  void logCanMessage(char direction, const CanMessage& message) {
     _logger.log(iot_core::LogLevel::Debug, [&] () {
       static char logMessage[36]; // "XX 123456789 xr 8 FFFFFFFFFFFFFFFF";
       int insertPos = 0;
-      insertPos += snprintf(logMessage + insertPos, 36 - insertPos, "%s %x ", prefix, message.id);
+      insertPos += snprintf(logMessage + insertPos, 36 - insertPos, "%cX %x ", direction, message.id);
       if (message.ext) {
         logMessage[insertPos++] = 'x';
       }

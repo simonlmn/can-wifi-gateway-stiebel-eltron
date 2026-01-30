@@ -1,3 +1,5 @@
+#include <Arduino.h>
+#include <SPI.h>
 #include <ACAN2515.h>
 #include <toolbox.h>
 #include <serial_transport.h>
@@ -6,17 +8,16 @@
 static const int MCP2515_CS_PIN  = 5;
 static const int MCP2515_INT_PIN = 255;
 static const uint32_t CAN_QUARTZ_FREQUENCY = 8UL * 1000UL * 1000UL ; // 8 MHz
-static bool canAvailable = false;
-
-bool doCanSetup = false; // Flag to defer CAN setup to main loop
-uint32_t canBitRate = 20000ul;
-ACAN2515Settings::RequestedMode canMode = ACAN2515Settings::ListenOnlyMode;
 ACAN2515 can (MCP2515_CS_PIN, SPI, MCP2515_INT_PIN);
+static bool canAvailable = false;
 
 // Serial transport interface
 serial_transport::Endpoint serial { serial_transport::EndpointRole::SERVER, Serial };
 
 // Status LED
+unsigned long HEARTBEAT_INTERVAL_DEFAULT = 500;
+unsigned long HEARTBEAT_INTERVAL_OK = 1000;
+unsigned long HEARTBEAT_INTERVAL_ERROR = 250;
 uint8_t HEARTBEAT_LED_PIN = 8;
 unsigned long _ledToggleTime = 0;
 unsigned long _ledToggleInterval = 500;
@@ -29,10 +30,10 @@ void teardownCan() {
   can.end();
   canAvailable = false;
 
-  _ledToggleInterval = 500;
+  _ledToggleInterval = HEARTBEAT_INTERVAL_DEFAULT;
 }
 
-void setupCan() {
+void setupCan(uint32_t canBitRate, ACAN2515Settings::RequestedMode canMode) {
   teardownCan();
 
   ACAN2515Settings settings (CAN_QUARTZ_FREQUENCY, canBitRate);
@@ -40,6 +41,7 @@ void setupCan() {
   settings.mReceiveBufferSize = 16;
   settings.mTransmitBuffer0Size = 8;
   const uint16_t errorCode = can.begin(settings, NULL);
+  
   canAvailable = errorCode == 0;
 
   if (canAvailable) {
@@ -55,77 +57,75 @@ void setupCan() {
       (unsigned long)settings.samplePointFromBitStart()
     ));
 
-    _ledToggleInterval = 1000;
+    _ledToggleInterval = HEARTBEAT_INTERVAL_OK;
   } else {
     serial.queue(toolbox::format(F("SETUP E%04X"), errorCode));
 
-    _ledToggleInterval = 250;
+    _ledToggleInterval = HEARTBEAT_INTERVAL_ERROR;
   }
 }
 
-void processReceived(const char* message, serial_transport::Endpoint& serial) {
-  const char* start = message;
-  char* end = nullptr;
+void processReceived(const uint8_t* payload, uint8_t payloadLen, serial_transport::Endpoint& serial) {
+  toolbox::strref part { reinterpret_cast<const char*>(payload), payloadLen };
+  toolbox::strref next;
 
-  if (strncmp(start, "SETUP ", 6) == 0) {
-    auto bitrate = strtol(start + 6, &end, 16);
-    if (end == start) {
-      serial.queue(F("SETUP ENVAL"));
+  if (part.startsWith(F("SETUP "))) {
+    toolbox::Maybe<uint32_t> bitrate = toolbox::convert<uint32_t>::fromString(part.skip(6), &next, 16);
+    if (!bitrate.available()) {
+      serial.queue(F("SETUP ENVAL BITRATE"));
       return;
     }
-    start = end;
+    part = next;
 
-    ACAN2515Settings::RequestedMode newCanMode = ACAN2515Settings::NormalMode;
-    if (strcmp(start, " NOR") == 0) {
-      newCanMode = ACAN2515Settings::NormalMode;
-    } else if (strcmp(start, " LOP") == 0) {
-      newCanMode = ACAN2515Settings::LoopBackMode;
-    } else if (strcmp(start, " SLP") == 0) {
-      newCanMode = ACAN2515Settings::SleepMode;
-    } else if (strcmp(start, " LIS") == 0) {
-      newCanMode = ACAN2515Settings::ListenOnlyMode;
+    ACAN2515Settings::RequestedMode canMode = ACAN2515Settings::NormalMode;
+    if (part == F(" NOR")) {
+      canMode = ACAN2515Settings::NormalMode;
+    } else if (part == F(" LOP")) {
+      canMode = ACAN2515Settings::LoopBackMode;
+    } else if (part == F(" SLP")) {
+      canMode = ACAN2515Settings::SleepMode;
+    } else if (part == F(" LIS")) {
+      canMode = ACAN2515Settings::ListenOnlyMode;
     } else {
-      serial.queue(F("SETUP ENVAL"));
+      serial.queue(F("SETUP ENVAL MODE"));
       return;
     }
 
-    canBitRate = bitrate;
-    canMode = newCanMode;
-
-    doCanSetup = true; // Trigger CAN setup in main loop
-  } else if (strncmp(start, "CANTX ", 6) == 0) {
+    setupCan(bitrate.get(), canMode);
+  } else if (part.startsWith(F("CANTX "))) {
     if (!canAvailable) {
       serial.queue(F("CANTX ENOAV"));
       return;
     }
     
-    auto id = strtol(start + 6, &end, 16);
-    if (end == start) {
-      serial.queue(F("CANTX ENVAL"));
+    toolbox::Maybe<uint32_t> id = toolbox::convert<uint32_t>::fromString(part.skip(6), &next, 16);
+    if (!id.available()) {
+      serial.queue(F("CANTX ENVAL ID"));
       return;
     }
-    start = end;
+    part = next;
 
-    auto len = strtol(start, &end, 10);
-    if (end == start) {
-      serial.queue(F("CANTX ENVAL"));
+    toolbox::Maybe<uint8_t> len = toolbox::convert<uint8_t>::fromString(part, &next, 10);
+    if (!len.available() || len.get() > 8) {
+      serial.queue(F("CANTX ENVAL LEN"));
       return;
     }
-    start = end;
+    part = next;
 
     CANMessage frame;
-    frame.id = id & 0x1FFFFFFFu;
-    frame.ext = (id & 0x80000000u) != 0;
-    frame.rtr = (id & 0x40000000u) != 0;
-    frame.len = len;
+    frame.id = id.get() & 0x1FFFFFFFul;
+    frame.ext = (id.get() & 0x80000000ul) != 0;
+    frame.rtr = (id.get() & 0x40000000ul) != 0;
+    frame.len = len.get();
 
     for (size_t i = 0; i < frame.len; ++i) {
-      frame.data[i] = strtol(start, &end, 16);
-      if (end == start) {
-        serial.queue(F("CANTX ENVAL"));
+      toolbox::Maybe<uint8_t> byte = toolbox::convert<uint8_t>::fromString(part, &next, 16);
+      if (!byte.available()) {
+        serial.queue(F("CANTX ENVAL DATA"));
         return;
       }
-      start = end;
+      frame.data[i] = byte.get();
+      part = next;
     }
 
     if (can.tryToSend(frame)) {
@@ -141,6 +141,21 @@ void processReceived(const char* message, serial_transport::Endpoint& serial) {
   }
 }
 
+void queueCanRxMessage(uint32_t id, bool ext, bool rtr, uint8_t length, const uint8_t (&data)[8]) {
+  serial.queue(toolbox::format(F("CANRX %08lX %u %02X %02X %02X %02X %02X %02X %02X %02X"),
+    id | (uint32_t(ext) << 31) | (uint32_t(rtr) << 30),
+    length,
+    data[0],
+    data[1],
+    data[2],
+    data[3],
+    data[4],
+    data[5],
+    data[6],
+    data[7]
+  ));
+}
+
 void connectionStateChanged(serial_transport::ConnectionState state, serial_transport::Endpoint& serial) {
   if (state == serial_transport::ConnectionState::CONNECTED) {
     serial.queue(F("READY"));
@@ -149,64 +164,40 @@ void connectionStateChanged(serial_transport::ConnectionState state, serial_tran
   }
 }
 
-toolbox::strref decodeResetReason(uint8_t reason) {
-  switch (reason) {
-    case 0x00: return F("POWERON?"); // No reset source detected
-    case 0x01: return F("POWERON");
-    case 0x02: return F("EXTERNAL");
-    case 0x04: return F("BROWNOUT");
-    case 0x08: return F("WATCHDOG");
-    case 0x10: return F("JTAG");
-    case 0x20: return F("SOFTWARE");
-    default:   return F("UNKNOWN");
-  }
-}
-
 void setup() {
-  // read reset reason
-  uint8_t resetReason = MCUSR;
-  MCUSR = 0;
-
+  toolbox::initFormatBuffers(65u, 2u);
+  
   pinMode(HEARTBEAT_LED_PIN, OUTPUT);
   digitalWrite(HEARTBEAT_LED_PIN, HIGH);
 
-  serial.diagnostics(serial_transport::Endpoint::DIAG_CONNECTION_STATE | 
-                     serial_transport::Endpoint::DIAG_RESETS |
-                     serial_transport::Endpoint::DIAG_RX_HANDSHAKE_FRAMES |
-                     serial_transport::Endpoint::DIAG_PERIODIC_STATS);
+  pinMode(SS, OUTPUT);
+  digitalWrite(SS, HIGH);
+  SPI.begin();
 
   serial.setReceiveCallback(&processReceived);
   serial.setStateCallback(&connectionStateChanged);
   serial.setup();
 
-  const char* resetMessage = toolbox::format(F("RESET %s"), decodeResetReason(resetReason).ref());
-  serial.sendDebug(resetMessage);
-  serial.queue(resetMessage);
-
-  SPI.begin();
-
   digitalWrite(HEARTBEAT_LED_PIN, LOW);
 }
+
+int _heartbeatLedState = LOW;
 
 void loop() {
   serial.loop();
 
-  if (doCanSetup) {
-    doCanSetup = false;
-    setupCan();
-  }
-    
   if (canAvailable) {
     can.poll();
 
     CANMessage frame;
     while (serial.canQueue() && can.receive(frame)) {
-      queueCanRxMessage(serial, frame.id, frame.ext, frame.rtr, frame.len, frame.data);
+      queueCanRxMessage(frame.id, frame.ext, frame.rtr, frame.len, frame.data);
     }
   }
 
   if (millis() - _ledToggleTime >= _ledToggleInterval) {
     _ledToggleTime = millis();
-    digitalWrite(HEARTBEAT_LED_PIN, HIGH - digitalRead(HEARTBEAT_LED_PIN));
+    _heartbeatLedState = HIGH - _heartbeatLedState;
+    digitalWrite(HEARTBEAT_LED_PIN, _heartbeatLedState);
   }
 }
