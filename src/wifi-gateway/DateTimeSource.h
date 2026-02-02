@@ -50,21 +50,21 @@ public:
     _dateTimeFields(),
     _currentDateTime() {}
 
-  const char* name() const override {
-    return "dts";
+  toolbox::strref name() const override {
+    return F("dts");
   }
 
-  const char* description() const override {
-    return "Date Time Source";
+  toolbox::strref description() const override {
+    return F("Date Time Source");
   }
 
-  bool configure(const char* /*name*/, const char* /*value*/) override {
+  bool configure(const toolbox::strref& /*name*/, const toolbox::strref& /*value*/) override {
     return false;
   }
 
-  void getConfig(std::function<void(const char*, const char*)> /*writer*/) const override {
+  void getConfig(iot_core::ConfigWriter /*writer*/) const override {
   }
-
+  
   void setup(bool /*connected*/) override {
     _protocol.addDevice(this);
     _protocol.onResponse([this] (ResponseData data) { processData(data.valueId, data.value); });

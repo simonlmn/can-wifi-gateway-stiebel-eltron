@@ -23,43 +23,44 @@ private:
   iot_core::Buffer<640u> _buffer;
 
   bool _enabled = false;
-  char _brokerAddress[16] = {};
-  uint16_t _brokerPort = 1883;
-  char _topic[32] = {};
+  toolbox::str<16> _brokerAddress;
+  uint16_t _brokerPort;
+  toolbox::str<32> _topic;
 
   size_t _discardedUpdates = 0u;
 
 public:
   MqttClient(iot_core::ISystem& system, DataAccess& access, IConversionService& conversion, IDefinitionRepository& definitions) :
-    _logger(system.logger("mqc")),
+    _logger(system.logger(F("mqc"))),
     _system(system),
     _access(access),
     _conversion(conversion),
     _definitions(definitions),
     _wifiClient(),
-    _mqttClient(_wifiClient)
+    _mqttClient(_wifiClient),
+    _brokerAddress(F("52.29.250.158")),
+    _brokerPort(1883),
+    _topic(F("can-wifi-gateway-stiebel-eltron"))
   {
-    toolbox::strref(F("52.29.250.158") /* broker.hivemq.com */).copy(_brokerAddress, 16, true);
-    toolbox::strref(F("can-wifi-gateway-stiebel-eltron")).copy(_topic, 32, true);
   }
 
-  const char* name() const override {
-    return "mqc";
+  toolbox::strref name() const override {
+    return F("mqc");
   }
 
-  bool configure(const char* name, const char* value) override {
-    if (strcmp(name, "enabled") == 0) return setEnabled(toolbox::convert<bool>::fromString(value).otherwise(false));
-    if (strcmp(name, "broker") == 0) return setBrokerAddress(value);
-    if (strcmp(name, "port") == 0) return setBrokerPort(toolbox::convert<uint16_t>::fromString(value, nullptr, 10).otherwise(1883));
-    if (strcmp(name, "topic") == 0) return setTopic(value);
+  bool configure(const toolbox::strref& name, const toolbox::strref& value) override {
+    if (name == F("enabled")) return setEnabled(toolbox::convert<bool>::fromString(value).otherwise(false));
+    if (name == F("broker")) return setBrokerAddress(value);
+    if (name == F("port")) return setBrokerPort(toolbox::convert<uint16_t>::fromString(value, nullptr, 10).otherwise(1883));
+    if (name == F("topic")) return setTopic(value);
     return false;
   }
 
-  void getConfig(std::function<void(const char*, const char*)> writer) const override {
-    writer("enabled", toolbox::convert<bool>::toString(_enabled).cstr());
-    writer("broker", _brokerAddress);
-    writer("port", toolbox::convert<uint16_t>::toString(_brokerPort, 10).cstr());
-    writer("topic", _topic);
+  void getConfig(iot_core::ConfigWriter writer) const override {
+    writer(F("enabled"), toolbox::convert<bool>::toString(_enabled));
+    writer(F("broker"), _brokerAddress);
+    writer(F("port"), toolbox::convert<uint16_t>::toString(_brokerPort, 10));
+    writer(F("topic"), _topic);
   }
 
   bool setEnabled(bool enabled) {
@@ -71,9 +72,9 @@ public:
     return true;
   }
 
-  bool setBrokerAddress(const char* address) {
-    toolbox::strref(address).copy(_brokerAddress, 16, true);
-    _logger.log(toolbox::format(F("Using address '%s'."), _brokerAddress));
+  bool setBrokerAddress(const toolbox::strref& address) {
+    _brokerAddress = address;
+    _logger.log(toolbox::format(F("Using address '%s'."), _brokerAddress.cstr()));
     reset();
     return true;
   }
@@ -85,9 +86,9 @@ public:
     return true;
   }
 
-  bool setTopic(const char* topic) {
-    toolbox::strref(topic).copy(_topic, 32, true);
-    _logger.log(toolbox::format(F("Using topic '%s'."), _topic));
+  bool setTopic(const toolbox::strref& topic) {
+    _topic = topic;
+    _logger.log(toolbox::format(F("Using topic '%s'."), _topic.cstr()));
     return true;
   }
 
@@ -104,7 +105,7 @@ public:
     _mqttClient.loop();
 
     if (!_mqttClient.connected()) {
-      _mqttClient.connect(toolbox::format(F("wifi-gateway-%s"), _system.id()));
+      _mqttClient.connect(toolbox::format(F("wifi-gateway-%s"), _system.id().cstr()));
     } else {
       if (_discardedUpdates != 0u) {
         _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("Discarded %u updates while disconnected."), _discardedUpdates));
@@ -145,7 +146,7 @@ private:
       _logger.log(iot_core::LogLevel::Warning, F("Serialized data entry too large for buffer."));
     } else {
       _mqttClient.publish(
-        toolbox::format("%s/%s/%u/%u", _topic, deviceTypeToString(entry.source.type), entry.source.address, entry.id),
+        toolbox::format(F("%s/%s/%u/%u"), _topic.cstr(), deviceTypeToString(entry.source.type).cstr(), entry.source.address, entry.id),
         _buffer.data(),
         _buffer.size()
       );

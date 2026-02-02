@@ -18,7 +18,7 @@ public:
       response
         .code(iot_core::api::ResponseCode::Ok)
         .contentType(iot_core::api::ContentType::TextHtml)
-        .header("Content-Encoding", "gzip")
+        .header(F("Content-Encoding"), F("gzip"))
         .sendSingleBody()
       #ifdef WIFI_GATEWAY_UI_H
         .write(toolbox::strref{FPSTR(wifi_gateway_ui::HTML), wifi_gateway_ui::HTML_SIZE});

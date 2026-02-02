@@ -54,18 +54,18 @@ public:
     auto object = input.asObject();
     if (object.valid()) {
       for (auto& property : object) {
-        if (property.name() == "valueId" && property.type() == jsons::ValueType::Integer) {
+        if (property.name() == F("valueId") && property.type() == jsons::ValueType::Integer) {
           _valueId = property.asInteger().get();
-        } else if (property.name() == "source" && property.type() == jsons::ValueType::String) {
+        } else if (property.name() == F("source") && property.type() == jsons::ValueType::String) {
           auto deviceId = DeviceId::fromString(property.asString().get());
           if (deviceId) {
             _source = deviceId.get();
           } else {
             return false;
           }
-        } else if (property.name() == "subscribed" && property.type() == jsons::ValueType::Boolean) {
+        } else if (property.name() == F("subscribed") && property.type() == jsons::ValueType::Boolean) {
           _subscribed = property.asBoolean().get();
-        } else if (property.name() == "writable" && property.type() == jsons::ValueType::Boolean) {
+        } else if (property.name() == F("writable") && property.type() == jsons::ValueType::Boolean) {
           _writable = property.asBoolean().get();
         } else {
           return false;
@@ -89,7 +89,7 @@ private:
 
 public:
   DataAccessApi(iot_core::ISystem& system, DataAccess& access, IConversionService& conversionService, IDefinitionRepository& definitions)
-  : _logger(system.logger("api")), _system(system), _access(access), _conversionService(conversionService), _definitions(definitions) {}
+  : _logger(system.logger(F("api"))), _system(system), _access(access), _conversionService(conversionService), _definitions(definitions) {}
   
   void setupApi(iot_core::api::IServer& server) override {
     server.on(F("/api/data"), iot_core::api::HttpMethod::GET, [this](iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
@@ -341,7 +341,7 @@ private:
   void putItem(iot_core::api::IRequest& request, iot_core::api::IResponse& response) {
     _system.lyield();
 
-    _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("PUT data '%s/%s/%s': %s"), request.pathArg(0), request.pathArg(1), request.pathArg(2), request.body().content()); });
+    _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("PUT data '%s/%s/%s': %s"), request.pathArg(0).cstr(), request.pathArg(1).cstr(), request.pathArg(2).cstr(), request.body().content().cstr()); });
 
     bool validateOnly = request.hasArg(ARG_VALIDATE_ONLY);
     bool writeRaw = request.hasArg(ARG_WRITE_RAW);
@@ -383,7 +383,7 @@ private:
     auto rawValue = writeRaw ? RAW_CONVERSION.fromJson(json) : _conversionService.fromJson(json, key.second);
     reader.end();
     if (reader.failed()) {
-      _logger.log(iot_core::LogLevel::Warning, [&] () { return toolbox::format(F("PUT data: JSON error %s"), reader.diagnostics().errorMessage.cstr()); });
+      _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("PUT data: JSON error %s"), reader.diagnostics().errorMessage.cstr()));
       response
         .code(iot_core::api::ResponseCode::BadRequest)
         .contentType(iot_core::api::ContentType::TextPlain)
@@ -392,7 +392,7 @@ private:
     }
 
     if (!rawValue) {
-      _logger.log(iot_core::LogLevel::Warning, [&] () { return toolbox::format(F("PUT data: value error %s"), request.body().content().cstr()); });
+      _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("PUT data: value error %s"), request.body().content().cstr()));
       response
         .code(iot_core::api::ResponseCode::BadRequest)
         .contentType(iot_core::api::ContentType::TextPlain)
@@ -413,11 +413,11 @@ private:
       if (result == WriteResult::Accepted) {
         response.code(iot_core::api::ResponseCode::OkAccepted);
       } else {
-        _logger.log(iot_core::LogLevel::Warning, [&] () { return toolbox::format(F("PUT data: write failed - %s"), writeResultToString(result)); });
+        _logger.log(iot_core::LogLevel::Warning, toolbox::format(F("PUT data: write failed - %s"), writeResultToString(result).cstr()));
         response
           .code(iot_core::api::ResponseCode::BadRequest)
           .contentType(iot_core::api::ContentType::TextPlain)
-          .sendSingleBody().write(writeResultToString(result));
+          .sendSingleBody().write(writeResultToString(result).cstr());
       }
     }
   }

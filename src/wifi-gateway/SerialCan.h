@@ -38,7 +38,7 @@ private:
 
 public:
   SerialCan(iot_core::ISystem& system, gpiobj::DigitalOutput& resetPin, gpiobj::DigitalInput& txEnablePin) :
-    _logger(system.logger("can")),
+    _logger(system.logger(F("can"))),
     _system(system),
     _resetPin(resetPin),
     _txEnablePin(txEnablePin),
@@ -57,17 +57,17 @@ public:
   {
   }
 
-  const char* name() const override {
-    return "can";
+  toolbox::strref name() const override {
+    return F("can");
   }
 
-  bool configure(const char* name, const char* value) override {
-    if (strcmp(name, "mode") == 0) return setMode(canModeFromString(value));
+  bool configure(const toolbox::strref& name, const toolbox::strref& value) override {
+    if (name == F("mode")) return setMode(canModeFromString(value));
     return false;
   }
 
-  void getConfig(std::function<void(const char*, const char*)> writer) const override {
-    writer("mode", canModeToString(_mode).cstr());
+  void getConfig(iot_core::ConfigWriter writer) const override {
+    writer(F("mode"), canModeToString(_mode));
   }
 
   bool setMode(CanMode mode) override {
@@ -105,10 +105,10 @@ public:
   }
   
   void getDiagnostics(iot_core::IDiagnosticsCollector& collector) const override {
-    collector.addValue("available", toolbox::convert<bool>::toString(_canReady));
-    collector.addValue("err", toolbox::convert<uint32_t>::toString(_counters.err, 10));
-    collector.addValue("rx", toolbox::convert<uint32_t>::toString(_counters.rx, 10));
-    collector.addValue("tx", toolbox::convert<uint32_t>::toString(_counters.tx, 10));
+    collector.addValue(F("available"), toolbox::convert<bool>::toString(_canReady));
+    collector.addValue(F("err"), toolbox::convert<uint32_t>::toString(_counters.err, 10));
+    collector.addValue(F("rx"), toolbox::convert<uint32_t>::toString(_counters.rx, 10));
+    collector.addValue(F("tx"), toolbox::convert<uint32_t>::toString(_counters.tx, 10));
   }
 
   void reset() override {
@@ -195,7 +195,7 @@ private:
     }
 
     iot_core::LogLevel level = state == serial_transport::ConnectionState::CLOSED ? iot_core::LogLevel::Warning : iot_core::LogLevel::Info;
-    _logger.log(level, toolbox::format(F("Serial connection: %s"), serial_transport::describe(state).ref()));
+    _logger.log(level, toolbox::format(F("Serial connection: %s"), serial_transport::describe(state).cstr()));
   }
 
   void logFrame(char direction, uint8_t type, uint8_t sequenceNumber, const uint8_t* payload, uint8_t payloadLen) {

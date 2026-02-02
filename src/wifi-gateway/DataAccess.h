@@ -43,12 +43,12 @@ enum struct DataCaptureMode : uint8_t {
   Any = 3, // Store any data, even if no ValueDefinition exists.
 };
 
-const char* dataCaptureModeToString(DataCaptureMode mode) {
+toolbox::strref dataCaptureModeToString(DataCaptureMode mode) {
   switch (mode) {
-    case DataCaptureMode::None: return "None";
-    case DataCaptureMode::Configured: return "Configured";
-    case DataCaptureMode::Defined: return "Defined";
-    case DataCaptureMode::Any: return "Any";
+    case DataCaptureMode::None: return F("None");
+    case DataCaptureMode::Configured: return F("Configured");
+    case DataCaptureMode::Defined: return F("Defined");
+    case DataCaptureMode::Any: return F("Any");
     default: return "?";
   }
 }
@@ -69,14 +69,14 @@ enum struct WriteResult : uint8_t {
   ConfirmationRequired = 4,
 };
 
-const char* writeResultToString(WriteResult result) {
+toolbox::strref writeResultToString(WriteResult result) {
   switch (result) {
-    case WriteResult::Accepted: return "Accepted";
-    case WriteResult::ReadOnly: return "Write access is disabled (read-only mode)";
-    case WriteResult::NotFound: return "Data entry not found or not configured";
-    case WriteResult::NotWritable: return "Value is not defined/configured as writable";
-    case WriteResult::ConfirmationRequired: return "Write confirmation required for protected value";
-    default: return "Unknown error";
+    case WriteResult::Accepted: return F("Accepted");
+    case WriteResult::ReadOnly: return F("Write access is disabled (read-only mode)");
+    case WriteResult::NotFound: return F("Data entry not found or not configured");
+    case WriteResult::NotWritable: return F("Value is not defined/configured as writable");
+    case WriteResult::ConfirmationRequired: return F("Write confirmation required for protected value");
+    default: return F("Unknown error");
   }
 }
 
@@ -102,7 +102,7 @@ private:
 
 public:
   DataAccess(iot_core::ISystem& system, StiebelEltronProtocol& protocol, IDefinitionRepository& definitions, gpiobj::DigitalInput& writeEnablePin)
-    : _logger(system.logger("dta")),
+    : _logger(system.logger(F("dta"))),
     _system(system),
     _protocol(protocol),
     _definitions(definitions),
@@ -116,27 +116,27 @@ public:
     _updateHandler()
   { }
 
-  const char* name() const override {
-    return "dta";
+  toolbox::strref name() const override {
+    return F("dta");
   }
 
-  const char* description() const override {
-    return "Data Access";
+  toolbox::strref description() const override {
+    return F("Data Access");
   }
 
-  bool configure(const char* name, const char* value) override {
-    if (strcmp(name, "deviceId") == 0) return DeviceId::fromString(value).then([this] (DeviceId id) { return setDeviceId(id); }).otherwise([] () { return false; });
-    if (strcmp(name, "mode") == 0) return setMode(dataCaptureModeFromString(value));
-    if (strcmp(name, "readOnly") == 0) return setReadOnly(toolbox::convert<bool>::fromString(value).otherwise(true));
-    if (strcmp(name, "ignoreDateTime") == 0) return setIgnoreDateTime(toolbox::convert<bool>::fromString(value).otherwise(false));
+  bool configure(const toolbox::strref& name, const toolbox::strref& value) override {
+    if (name == F("deviceId")) return DeviceId::fromString(value).then([this] (DeviceId id) { return setDeviceId(id); }).otherwise(false);
+    if (name == F("mode")) return setMode(dataCaptureModeFromString(value));
+    if (name == F("readOnly")) return setReadOnly(toolbox::convert<bool>::fromString(value).otherwise(true));
+    if (name == F("ignoreDateTime")) return setIgnoreDateTime(toolbox::convert<bool>::fromString(value).otherwise(false));
     return false;
   }
 
-  void getConfig(std::function<void(const char*, const char*)> writer) const override {
-    writer("deviceId", _deviceId.toString());
-    writer("mode", dataCaptureModeToString(_mode));
-    writer("readOnly", toolbox::convert<bool>::toString(_readOnly).cstr());
-    writer("ignoreDateTime", toolbox::convert<bool>::toString(_ignoreDateTime).cstr());
+  void getConfig(iot_core::ConfigWriter writer) const override {
+    writer(F("deviceId"), _deviceId.toString());
+    writer(F("mode"), dataCaptureModeToString(_mode));
+    writer(F("readOnly"), toolbox::convert<bool>::toString(_readOnly));
+    writer(F("ignoreDateTime"), toolbox::convert<bool>::toString(_ignoreDateTime));
   }
 
   bool setDeviceId(DeviceId deviceId) {
@@ -151,7 +151,7 @@ public:
 
   bool setMode(DataCaptureMode mode) {
     _mode = mode;
-    _logger.log(toolbox::format(F("Set mode '%s'."), dataCaptureModeToString(_mode)));
+    _logger.log(toolbox::format(F("Set mode '%s'."), dataCaptureModeToString(_mode).cstr()));
     return true;
   }
 
@@ -520,7 +520,7 @@ private:
         case OperationResult::RateLimited:
         case OperationResult::QueueFull:
           // stop processing for now, try again later
-          _logger.log(iot_core::LogLevel::Debug, toolbox::format(F("Deferring further data maintenance due to %s."), operationResultToString(sendResult)));
+          _logger.log(iot_core::LogLevel::Debug, toolbox::format(F("Deferring further data maintenance due to %s."), operationResultToString(sendResult).cstr()));
           return;
       }
 

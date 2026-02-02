@@ -28,18 +28,18 @@ enum struct DeviceType : uint8_t {
   Any = 0xFFu
 };
 
-const char* deviceTypeToString(DeviceType type) {
+toolbox::strref deviceTypeToString(DeviceType type) {
   switch (type) {
     case DeviceType::System:
-      return "SYS";
+      return F("SYS");
     case DeviceType::HeatingCircuit:
-      return "HEA";
+      return F("HEA");
     case DeviceType::Sensor:
-      return "SEN";
+      return F("SEN");
     case DeviceType::Display:
-      return "DIS";
+      return F("DIS");
     case DeviceType::Any:
-      return "ANY";
+      return F("ANY");
     default:
       static char buffer[4];
       snprintf(buffer, 4, "X%02X", static_cast<uint8_t>(type));
@@ -48,11 +48,11 @@ const char* deviceTypeToString(DeviceType type) {
 }
 
 DeviceType deviceTypeFromString(const toolbox::strref& type) {
-  if (type == "SYS") return DeviceType::System;
-  if (type == "HEA") return DeviceType::HeatingCircuit;
-  if (type == "SEN") return DeviceType::Sensor;
-  if (type == "DIS") return DeviceType::Display;
-  if (type == "ANY") return DeviceType::Any;
+  if (type == F("SYS")) return DeviceType::System;
+  if (type == F("HEA")) return DeviceType::HeatingCircuit;
+  if (type == F("SEN")) return DeviceType::Sensor;
+  if (type == F("DIS")) return DeviceType::Display;
+  if (type == F("ANY")) return DeviceType::Any;
   if (type.length() == 3 && (type.charAt(0) == 'X')) {
     return DeviceType(toolbox::convert<uint8_t>::fromString(type.skip(1), nullptr, 16).otherwise(0xFFu));
   }
@@ -98,7 +98,7 @@ struct DeviceId {
     }
 
     char* string = buffers[bufferIndex]; 
-    snprintf(string, 8, "%s/%u", deviceTypeToString(type), address);
+    snprintf(string, 8, "%s/%u", deviceTypeToString(type).cstr(), address);
     if (address == DEVICE_ADDR_ANY) {
       string[4] = '*';
       string[5] = '\0';

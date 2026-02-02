@@ -15,21 +15,21 @@ private:
   
 public:
   FakeCan(iot_core::ISystem& system) :
-    _logger(system.logger("fan")),
+    _logger(system.logger(F("fan"))),
     _system(system),
     _canAvailable(false)
   {
   }
 
-  const char* name() const override {
-    return "fan";
+  toolbox::strref name() const override {
+    return F("fan");
   }
 
-  bool configure(const char* name, const char* value) override {
+  bool configure(const toolbox::strref& name, const toolbox::strref& value) override {
     return false;
   }
 
-  void getConfig(std::function<void(const char*, const char*)> writer) const override {
+  void getConfig(iot_core::ConfigWriter writer) const override {
   }
 
   bool setMode(CanMode mode) override {
@@ -43,7 +43,7 @@ public:
     if (!_canAvailable && millis() > 10000) {
       _canAvailable = true;
       if (_readyHandler) {
-        Serial.println("CAN calling reading handler");
+        Serial.println(F("CAN calling reading handler"));
         _readyHandler();
       }
     }

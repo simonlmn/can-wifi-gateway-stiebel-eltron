@@ -1,6 +1,8 @@
 #ifndef OPERATIONRESULT_H_
 #define OPERATIONRESULT_H_
 
+#include <toolbox/String.h>
+
 // Describes the outcome of a queued/send-like operation.
 enum struct OperationResult {
 	Accepted,     // Operation queued/accepted for processing
@@ -11,15 +13,15 @@ enum struct OperationResult {
 	Invalid,      // Rejected because parameters were invalid
 };
 
-const char* operationResultToString(OperationResult result) {
+toolbox::strref operationResultToString(OperationResult result) {
 	switch (result) {
-		case OperationResult::Accepted: return "Accepted";
-		case OperationResult::RateLimited: return "RateLimited";
-		case OperationResult::QueueFull: return "QueueFull";
-		case OperationResult::NotReady: return "NotReady";
-		case OperationResult::Unavailable: return "Unavailable";
-		case OperationResult::Invalid: return "Invalid";
-		default: return "?OperationResult?";
+		case OperationResult::Accepted: return F("Accepted");
+		case OperationResult::RateLimited: return F("RateLimited");
+		case OperationResult::QueueFull: return F("QueueFull");
+		case OperationResult::NotReady: return F("NotReady");
+		case OperationResult::Unavailable: return F("Unavailable");
+		case OperationResult::Invalid: return F("Invalid");
+		default: return F("?OperationResult?");
 	}
 }
 

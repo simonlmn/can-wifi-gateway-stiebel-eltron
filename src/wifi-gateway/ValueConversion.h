@@ -36,16 +36,16 @@ class ICodec {
 public:
   virtual toolbox::Maybe<int32_t> decode(uint16_t value) const = 0;
   virtual toolbox::Maybe<uint16_t> encode(const toolbox::Maybe<int32_t>& value) const = 0;
-  virtual const char* describe() const = 0;
-  virtual const char* key() const = 0;
+  virtual toolbox::strref describe() const = 0;
+  virtual toolbox::strref key() const = 0;
 };
 
 class IConverter {
 public:
   virtual void toJson(const toolbox::Maybe<int32_t>& value, jsons::IWriter& output) const = 0;
   virtual toolbox::Maybe<int32_t> fromJson(jsons::Value& input) const = 0;
-  virtual const char* describe() const = 0;
-  virtual const char* key() const = 0;
+  virtual toolbox::strref describe() const = 0;
+  virtual toolbox::strref key() const = 0;
 };
 
 class ICustomConverter : public IConverter {
@@ -63,11 +63,11 @@ struct NoneCodec final : public ICodec {
   toolbox::Maybe<uint16_t> encode(const toolbox::Maybe<int32_t>& value) const override {
     return {};
   }
-  const char* describe() const override {
-    return "none";
+  toolbox::strref describe() const override {
+    return F("none");
   }
-  const char* key() const override {
-    return "";
+  toolbox::strref key() const override {
+    return F("");
   }
 };
 const NoneCodec NoneCodec::INSTANCE {};
@@ -88,11 +88,11 @@ struct Unsigned8BitCodec final : public ICodec {
       return {};
     }
   }
-  const char* describe() const override {
-    return "8 bit, unsigned";
+  toolbox::strref describe() const override {
+    return F("8 bit, unsigned");
   }
-  const char* key() const override {
-    return "U8";
+  toolbox::strref key() const override {
+    return F("U8");
   }
 };
 const Unsigned8BitCodec Unsigned8BitCodec::INSTANCE {};
@@ -114,11 +114,11 @@ struct Signed8BitCodec final : public ICodec {
       return {};
     }
   }
-  const char* describe() const override {
-    return "8 bit, signed";
+  toolbox::strref describe() const override {
+    return F("8 bit, signed");
   }
-  const char* key() const override {
-    return "S8";
+  toolbox::strref key() const override {
+    return F("S8");
   }
 };
 const Signed8BitCodec Signed8BitCodec::INSTANCE {};
@@ -135,11 +135,11 @@ struct Unsigned16BitCodec final : public ICodec {
       return {};
     }
   }
-  const char* describe() const override {
-    return "16 bit, unsigned";
+  toolbox::strref describe() const override {
+    return F("16 bit, unsigned");
   }
-  const char* key() const override {
-    return "U16";
+  toolbox::strref key() const override {
+    return F("U16");
   }
 };
 const Unsigned16BitCodec Unsigned16BitCodec::INSTANCE {};
@@ -156,11 +156,11 @@ struct Signed16BitCodec final : public ICodec {
       return {};
     }
   }
-  const char* describe() const override {
-    return "16 bit, signed";
+  toolbox::strref describe() const override {
+    return F("16 bit, signed");
   }
-  const char* key() const override {
-    return "S16";
+  toolbox::strref key() const override {
+    return F("S16");
   }
 };
 const Signed16BitCodec Signed16BitCodec::INSTANCE {};
@@ -174,11 +174,11 @@ public:
   toolbox::Maybe<int32_t> fromJson(jsons::Value& input) const override {
     return {};
   }
-  const char* describe() const override {
-    return "none";
+  toolbox::strref describe() const override {
+    return F("none");
   }
-  const char* key() const override {
-    return "";
+  toolbox::strref key() const override {
+    return F("");
   }
 };
 const NoneConverter NoneConverter::INSTANCE {};
@@ -196,16 +196,16 @@ public:
   toolbox::Maybe<int32_t> fromJson(jsons::Value& input) const override {
     auto string = input.asString();
     if (string) {
-      return strtol(string.get().ref(), nullptr, 16); // TODO replace with strref based conversion
+      return toolbox::convert<int32_t>::fromString(string.get(), nullptr, 16);
     } else {
       return {};
     }
   }
-  const char* describe() const override {
-    return "raw value as hex string";
+  toolbox::strref describe() const override {
+    return F("raw value as hex string");
   }
-  const char* key() const override {
-    return "raw";
+  toolbox::strref key() const override {
+    return F("raw");
   }
 };
 HexStringConverter HexStringConverter::INSTANCE {};
@@ -230,11 +230,11 @@ public:
       return {};
     }
   }
-  const char* describe() const override {
-    return "boolean (0 = false, 1 = true)";
+  toolbox::strref describe() const override {
+    return F("boolean (0 = false, 1 = true)");
   }
-  const char* key() const override {
-    return "bool";
+  toolbox::strref key() const override {
+    return F("bool");
   }
 };
 BooleanConverter BooleanConverter::INSTANCE {};
@@ -259,10 +259,10 @@ public:
       return {};
     }
   }
-  const char* describe() const override {
-    return _decimalPlaces == 0 ? "integer number" : toolbox::format("decimal number (scale 10^%i)", -_decimalPlaces);
+  toolbox::strref describe() const override {
+    return _decimalPlaces == 0 ? toolbox::strref{F("integer number")} : toolbox::strref{toolbox::format(F("decimal number (scale 10^%i)"), -_decimalPlaces)};
   }
-  const char* key() const override {
+  toolbox::strref key() const override {
     return KEY;
   }
 };
@@ -356,10 +356,10 @@ public:
       return {};
     }
   }
-  const char* describe() const override {
-    return toolbox::format("%s bitfield", key());
+  toolbox::strref describe() const override {
+    return toolbox::format(F("%s bitfield"), key().cstr());
   }
-  const char* key() const override {
+  toolbox::strref key() const override {
     return _key;
   }
 
@@ -369,8 +369,8 @@ public:
   }
   void serialize(jsons::IWriter& output) const override {
     output.openObject();
-    output.property("key").string(_key);
-    output.property("fields");
+    output.property(F("key")).string(_key);
+    output.property(F("fields"));
     output.openList();
     for (size_t i = 0; i < MAX_BITFIELD_FIELDS; ++i) {
       output.string(_fields.at(i));
@@ -382,9 +382,9 @@ public:
     auto object = input.asObject();
     if (object.valid()) {
       for (auto& property : object) {
-        if (property.name() == "key" && property.type() == jsons::ValueType::String) {
+        if (property.name() == F("key") && property.type() == jsons::ValueType::String) {
           _key = property.asString();
-        } else if (property.name() == "fields" && property.type() == jsons::ValueType::List) {
+        } else if (property.name() == F("fields") && property.type() == jsons::ValueType::List) {
           size_t i = 0;
           for (auto& field : property.asList()) {
             auto fieldName = field.asString();
@@ -541,10 +541,10 @@ public:
       return {};
     }
   }
-  const char* describe() const override {
-    return toolbox::format("%s enum", key());
+  toolbox::strref describe() const override {
+    return toolbox::format(F("%s enum"), key().cstr());
   }
-  const char* key() const override {
+  toolbox::strref key() const override {
     return _key;
   }
 
@@ -554,8 +554,8 @@ public:
   }
   void serialize(jsons::IWriter& output) const override {
     output.openObject();
-    output.property("key").string(_key);
-    output.property("enum");
+    output.property(F("key")).string(_key);
+    output.property(F("enum"));
     output.openObject();
     for (auto& value : _enum) {
       output.property(value.name()).number(value.value());
@@ -567,9 +567,9 @@ public:
     auto object = input.asObject();
     if (object.valid()) {
       for (auto& property : object) {
-        if (property.name() == "key" && property.type() == jsons::ValueType::String) {
+        if (property.name() == F("key") && property.type() == jsons::ValueType::String) {
           _key = property.asString();
-        } else if (property.name() == "enum" && property.type() == jsons::ValueType::Object) {
+        } else if (property.name() == F("enum") && property.type() == jsons::ValueType::Object) {
           for (auto& property : property.asObject()) {
             auto integer = property.asInteger();
             if (integer) {
@@ -903,21 +903,21 @@ private:
 
 public:
   ConversionRepository(iot_core::ISystem& system) :
-    _logger(system.logger("cvt")),
+    _logger(system.logger(F("cvt"))),
     _system(system)
   {}
 
-  const char* name() const override {
-    return "cvt";
+  toolbox::strref name() const override {
+    return F("cvt");
   }
 
-  bool configure(const char* name, const char* value) override {
-    if (strcmp(name, "examples") == 0) return setDefineExamples(toolbox::convert<bool>::fromString(value).otherwise(false));
+  bool configure(const toolbox::strref& name, const toolbox::strref& value) override {
+    if (name == F("examples")) return setDefineExamples(toolbox::convert<bool>::fromString(value).otherwise(false));
     return false;
   }
 
-  void getConfig(std::function<void(const char*, const char*)> writer) const override {
-    writer("examples", toolbox::convert<bool>::toString(_defineExamplesIfEmpty).cstr());
+  void getConfig(iot_core::ConfigWriter writer) const override {
+    writer(F("examples"), toolbox::convert<bool>::toString(_defineExamplesIfEmpty));
   }
 
   bool setDefineExamples(bool enabled) {

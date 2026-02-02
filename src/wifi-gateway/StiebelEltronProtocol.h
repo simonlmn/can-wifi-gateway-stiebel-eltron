@@ -43,16 +43,16 @@ enum struct MessageType : uint8_t {
   Register = 0x06u
 };
 
-const char* messageTypeToString(MessageType type) {
+toolbox::strref messageTypeToString(MessageType type) {
   switch (type) {
     case MessageType::Write:
-      return "WRT";
+      return F("WRT");
     case MessageType::Request:
-      return "REQ";
+      return F("REQ");
     case MessageType::Response:
-      return "RES";
+      return F("RES");
     case MessageType::Register:
-      return "REG";
+      return F("REG");
     default:
       static char buffer[4];
       snprintf(buffer, 4, "X%02X", static_cast<uint8_t>(type));
@@ -126,8 +126,8 @@ uint16_t getValue(const uint8_t (&data)[8]) {
 
 class IStiebelEltronDevice {
 public:
-  virtual const char* name() const = 0;
-  virtual const char* description() const = 0;
+  virtual toolbox::strref name() const = 0;
+  virtual toolbox::strref description() const = 0;
   virtual const DeviceId& deviceId() const = 0;
   virtual void request(const RequestData& data) = 0;
   virtual void write(const WriteData& data) = 0;
@@ -141,7 +141,7 @@ private:
   ICanInterface& _can;
   bool _ready = false;
 
-  iot_core::ConstStrMap<IStiebelEltronDevice*> _devices {};
+  std::map<toolbox::strref, IStiebelEltronDevice*> _devices {};
 
   std::set<DeviceId> _otherDeviceIds {};
 
@@ -151,20 +151,20 @@ private:
   
 public:
   StiebelEltronProtocol(iot_core::ISystem& system, ICanInterface& can)
-    : _logger(system.logger("sep")),
+    : _logger(system.logger(F("sep"))),
     _system(system),
     _can(can)
   { }
 
-  const char* name() const override {
-    return "sep";
+  toolbox::strref name() const override {
+    return F("sep");
   }
 
-  bool configure(const char* name, const char* value) override {
+  bool configure(const toolbox::strref& name, const toolbox::strref& value) override {
     return false;
   }
 
-  void getConfig(std::function<void(const char*, const char*)> writer) const override {
+  void getConfig(iot_core::ConfigWriter writer) const override {
   }
 
   void setup(bool /*connected*/) override {
@@ -198,7 +198,7 @@ public:
     _devices.erase(device->name());
   }
 
-  const iot_core::ConstStrMap<IStiebelEltronDevice*>& getDevices() const {
+  const std::map<toolbox::strref, IStiebelEltronDevice*>& getDevices() const {
     return _devices;
   }
 
@@ -406,19 +406,19 @@ private:
     switch (type)
     {
     case MessageType::Register:
-      _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
+      _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type).cstr(), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
       break;
     case MessageType::Write:
-      _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("%s t:%s s:%s id:%04X%c v:%04X"), messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
+      _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("%s t:%s s:%s id:%04X%c v:%04X"), messageTypeToString(type).cstr(), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
       break;
     case MessageType::Response:
-      _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("%s t:%s s:%s id:%04X%c v:%04X"), messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
+      _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("%s t:%s s:%s id:%04X%c v:%04X"), messageTypeToString(type).cstr(), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l', value); });
       break;
     case MessageType::Request:
-      _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("%s t:%s s:%s id:%04X%c"), messageTypeToString(type), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l'); });
+      _logger.log(iot_core::LogLevel::Debug, [&] () { return toolbox::format(F("%s t:%s s:%s id:%04X%c"), messageTypeToString(type).cstr(), target.toString(0), source.toString(1), valueId, hasShortValueId(frame.data) ? 's' : 'l'); });
       break;
     default:
-      _logger.log(iot_core::LogLevel::Info, [&] () { return toolbox::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
+      _logger.log(iot_core::LogLevel::Info, [&] () { return toolbox::format(F("%s t:%s s:%s %02X %02X %02X %02X %02X"), messageTypeToString(type).cstr(), target.toString(0), source.toString(1), frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6]); });
       break;
     }
   }

@@ -45,113 +45,113 @@ enum struct Unit : uint8_t {
 
 toolbox::strref unitToString(Unit unit) {
   switch (unit) {
-    case Unit::Unknown: return "Unknown";
-    case Unit::None: return "None";
-    case Unit::Percent: return "Percent";
-    case Unit::RelativeHumidity: return "RelativeHumidity";
-    case Unit::Hertz: return "Hertz";
-    case Unit::Celsius: return "Celsius";
-    case Unit::Kelvin: return "Kelvin";
-    case Unit::Bar: return "Bar";
-    case Unit::KelvinPerMinute: return "KelvinPerMinute";
-    case Unit::LiterPerMinute: return "LiterPerMinute";
-    case Unit::CubicmeterPerHour: return "CubicmeterPerHour";
-    case Unit::Years: return "Years";
-    case Unit::Year: return "Year";
-    case Unit::Months: return "Months";
-    case Unit::Month: return "Month";
-    case Unit::Days: return "Days";
-    case Unit::Day: return "Day";
-    case Unit::Weekday: return "Weekday";
-    case Unit::Hours: return "Hours";
-    case Unit::ThousandHours: return "ThousandHours";
-    case Unit::Hour: return "Hour";
-    case Unit::Minutes: return "Minutes";
-    case Unit::Minute: return "Minute";
-    case Unit::Seconds: return "Seconds";
-    case Unit::Second: return "Second";
-    case Unit::Watt: return "Watt";
-    case Unit::KiloWatt: return "KiloWatt";
-    case Unit::WattHour: return "WattHour";
-    case Unit::KiloWattHour: return "KiloWattHour";
-    case Unit::MegaWattHour: return "MegaWattHour";
-    case Unit::Ampere: return "Ampere";
-    case Unit::Volt: return "Volt";
-    default: return "?";
+    case Unit::Unknown: return F("Unknown");
+    case Unit::None: return F("None");
+    case Unit::Percent: return F("Percent");
+    case Unit::RelativeHumidity: return F("RelativeHumidity");
+    case Unit::Hertz: return F("Hertz");
+    case Unit::Celsius: return F("Celsius");
+    case Unit::Kelvin: return F("Kelvin");
+    case Unit::Bar: return F("Bar");
+    case Unit::KelvinPerMinute: return F("KelvinPerMinute");
+    case Unit::LiterPerMinute: return F("LiterPerMinute");
+    case Unit::CubicmeterPerHour: return F("CubicmeterPerHour");
+    case Unit::Years: return F("Years");
+    case Unit::Year: return F("Year");
+    case Unit::Months: return F("Months");
+    case Unit::Month: return F("Month");
+    case Unit::Days: return F("Days");
+    case Unit::Day: return F("Day");
+    case Unit::Weekday: return F("Weekday");
+    case Unit::Hours: return F("Hours");
+    case Unit::ThousandHours: return F("ThousandHours");
+    case Unit::Hour: return F("Hour");
+    case Unit::Minutes: return F("Minutes");
+    case Unit::Minute: return F("Minute");
+    case Unit::Seconds: return F("Seconds");
+    case Unit::Second: return F("Second");
+    case Unit::Watt: return F("Watt");
+    case Unit::KiloWatt: return F("KiloWatt");
+    case Unit::WattHour: return F("WattHour");
+    case Unit::KiloWattHour: return F("KiloWattHour");
+    case Unit::MegaWattHour: return F("MegaWattHour");
+    case Unit::Ampere: return F("Ampere");
+    case Unit::Volt: return F("Volt");
+    default: return F("?");
   }
 }
 
 Unit unitFromString(const toolbox::strref& unit) {
-  if (unit == "Unknown") return Unit::Unknown;
-  if (unit == "None") return Unit::None;
-  if (unit == "Percent") return Unit::Percent;
-  if (unit == "RelativeHumidity") return Unit::RelativeHumidity;
-  if (unit == "Hertz") return Unit::Hertz;
-  if (unit == "Celsius") return Unit::Celsius;
-  if (unit == "Kelvin") return Unit::Kelvin;
-  if (unit == "Bar") return Unit::Bar;
-  if (unit == "KelvinPerMinute") return Unit::KelvinPerMinute;
-  if (unit == "LiterPerMinute") return Unit::LiterPerMinute;
-  if (unit == "CubicmeterPerHour") return Unit::CubicmeterPerHour;
-  if (unit == "Years") return Unit::Years;
-  if (unit == "Year") return Unit::Year;
-  if (unit == "Months") return Unit::Months;
-  if (unit == "Month") return Unit::Month;
-  if (unit == "Days") return Unit::Days;
-  if (unit == "Day") return Unit::Day;
-  if (unit == "Weekday") return Unit::Weekday;
-  if (unit == "Hours") return Unit::Hours;
-  if (unit == "ThousandHours") return Unit::ThousandHours;
-  if (unit == "Hour") return Unit::Hour;
-  if (unit == "Minutes") return Unit::Minutes;
-  if (unit == "Minute") return Unit::Minute;
-  if (unit == "Seconds") return Unit::Seconds;
-  if (unit == "Second") return Unit::Second;
-  if (unit == "Watt") return Unit::Watt;
-  if (unit == "KiloWatt") return Unit::KiloWatt;
-  if (unit == "WattHour") return Unit::WattHour;
-  if (unit == "KiloWattHour") return Unit::KiloWattHour;
-  if (unit == "MegaWattHour") return Unit::MegaWattHour;
-  if (unit == "Ampere") return Unit::Ampere;
-  if (unit == "Volt") return Unit::Volt;
+  if (unit == F("Unknown")) return Unit::Unknown;
+  if (unit == F("None")) return Unit::None;
+  if (unit == F("Percent")) return Unit::Percent;
+  if (unit == F("RelativeHumidity")) return Unit::RelativeHumidity;
+  if (unit == F("Hertz")) return Unit::Hertz;
+  if (unit == F("Celsius")) return Unit::Celsius;
+  if (unit == F("Kelvin")) return Unit::Kelvin;
+  if (unit == F("Bar")) return Unit::Bar;
+  if (unit == F("KelvinPerMinute")) return Unit::KelvinPerMinute;
+  if (unit == F("LiterPerMinute")) return Unit::LiterPerMinute;
+  if (unit == F("CubicmeterPerHour")) return Unit::CubicmeterPerHour;
+  if (unit == F("Years")) return Unit::Years;
+  if (unit == F("Year")) return Unit::Year;
+  if (unit == F("Months")) return Unit::Months;
+  if (unit == F("Month")) return Unit::Month;
+  if (unit == F("Days")) return Unit::Days;
+  if (unit == F("Day")) return Unit::Day;
+  if (unit == F("Weekday")) return Unit::Weekday;
+  if (unit == F("Hours")) return Unit::Hours;
+  if (unit == F("ThousandHours")) return Unit::ThousandHours;
+  if (unit == F("Hour")) return Unit::Hour;
+  if (unit == F("Minutes")) return Unit::Minutes;
+  if (unit == F("Minute")) return Unit::Minute;
+  if (unit == F("Seconds")) return Unit::Seconds;
+  if (unit == F("Second")) return Unit::Second;
+  if (unit == F("Watt")) return Unit::Watt;
+  if (unit == F("KiloWatt")) return Unit::KiloWatt;
+  if (unit == F("WattHour")) return Unit::WattHour;
+  if (unit == F("KiloWattHour")) return Unit::KiloWattHour;
+  if (unit == F("MegaWattHour")) return Unit::MegaWattHour;
+  if (unit == F("Ampere")) return Unit::Ampere;
+  if (unit == F("Volt")) return Unit::Volt;
   return Unit::Unknown;
 }
 
 toolbox::strref unitSymbol(Unit unit) {
   switch (unit) {
-    case Unit::Unknown: return "?";
-    case Unit::None: return "";
-    case Unit::Percent: return "%";
-    case Unit::RelativeHumidity: return "% RH";
-    case Unit::Hertz: return "Hz";
-    case Unit::Celsius: return "°C";
-    case Unit::Kelvin: return "K";
-    case Unit::Bar: return "bar";
-    case Unit::KelvinPerMinute: return "K/min";
-    case Unit::LiterPerMinute: return "l/min";
-    case Unit::CubicmeterPerHour: return "m^3/h";
-    case Unit::Years: return "years";
-    case Unit::Year: return "";
-    case Unit::Months: return "months";
-    case Unit::Month: return "";
-    case Unit::Days: return "days";
-    case Unit::Day: return "";
-    case Unit::Weekday: return "";
-    case Unit::Hours: return "h";
-    case Unit::ThousandHours: return "1000h";
-    case Unit::Hour: return "";
-    case Unit::Minutes: return "min";
-    case Unit::Minute: return "";
-    case Unit::Seconds: return "s";
-    case Unit::Second: return "";
-    case Unit::Watt: return "W";
-    case Unit::KiloWatt: return "kW";
-    case Unit::WattHour: return "Wh";
-    case Unit::KiloWattHour: return "kWh";
-    case Unit::MegaWattHour: return "MWh";
-    case Unit::Ampere: return "A";
-    case Unit::Volt: return "V";
-    default: return "?";
+    case Unit::Unknown: return F("?"); 
+    case Unit::None: return F("");
+    case Unit::Percent: return F("%");
+    case Unit::RelativeHumidity: return F("% RH");
+    case Unit::Hertz: return F("Hz");
+    case Unit::Celsius: return F("°C");
+    case Unit::Kelvin: return F("K");
+    case Unit::Bar: return F("bar");
+    case Unit::KelvinPerMinute: return F("K/min");
+    case Unit::LiterPerMinute: return F("l/min");
+    case Unit::CubicmeterPerHour: return F("m^3/h");
+    case Unit::Years: return F("years");
+    case Unit::Year: return F("");
+    case Unit::Months: return F("months");
+    case Unit::Month: return F("");
+    case Unit::Days: return F("days");
+    case Unit::Day: return F("");
+    case Unit::Weekday: return F("");
+    case Unit::Hours: return F("h");
+    case Unit::ThousandHours: return F("1000h");
+    case Unit::Hour: return F("");
+    case Unit::Minutes: return F("min");
+    case Unit::Minute: return F("");
+    case Unit::Seconds: return F("s");
+    case Unit::Second: return F("");
+    case Unit::Watt: return F("W");
+    case Unit::KiloWatt: return F("kW");
+    case Unit::WattHour: return F("Wh");
+    case Unit::KiloWattHour: return F("kWh");
+    case Unit::MegaWattHour: return F("MWh");
+    case Unit::Ampere: return F("A");
+    case Unit::Volt: return F("V");
+    default: return F("?");
   }
 }
 
@@ -183,21 +183,21 @@ enum struct ValueAccessMode : uint8_t {
 
 toolbox::strref valueAccessModeToString(ValueAccessMode accessMode) {
   switch (accessMode) {
-    case ValueAccessMode::None: return "None";
-    case ValueAccessMode::Readable: return "Readable";
-    case ValueAccessMode::Writable: return "Writable";
-    case ValueAccessMode::WritableProtected: return "WritableProtected";
-    case ValueAccessMode::WritableExtraProtected: return "WritableExtraProtected";
-    default: return "";
+    case ValueAccessMode::None: return F("None");
+    case ValueAccessMode::Readable: return F("Readable");
+    case ValueAccessMode::Writable: return F("Writable");
+    case ValueAccessMode::WritableProtected: return F("WritableProtected");
+    case ValueAccessMode::WritableExtraProtected: return F("WritableExtraProtected");
+    default: return F("");
   }
 }
 
 ValueAccessMode valueAccessModeFromString(const toolbox::strref& accessMode) {
-  if (accessMode == "None") return ValueAccessMode::None;
-  if (accessMode == "Readable") return ValueAccessMode::Readable;
-  if (accessMode == "Writable") return ValueAccessMode::Writable;
-  if (accessMode == "WritableProtected") return ValueAccessMode::WritableProtected;
-  if (accessMode == "WritableExtraProtected") return ValueAccessMode::WritableExtraProtected;
+  if (accessMode == F("None")) return ValueAccessMode::None;
+  if (accessMode == F("Readable")) return ValueAccessMode::Readable;
+  if (accessMode == F("Writable")) return ValueAccessMode::Writable;
+  if (accessMode == F("WritableProtected")) return ValueAccessMode::WritableProtected;
+  if (accessMode == F("WritableExtraProtected")) return ValueAccessMode::WritableExtraProtected;
   return ValueAccessMode::None;
 }
 
@@ -264,15 +264,15 @@ struct __attribute__((__packed__)) ValueDefinition final {
     auto object = input.asObject();
     if (object.valid()) {
       for (auto& property : object) {
-        if (property.name() == "name" && property.type() == jsons::ValueType::String) {
+        if (property.name() == F("name") && property.type() == jsons::ValueType::String) {
           property.asString().get().copy(name, MAX_DEFINITION_NAME_LENGTH, true);
-        } else if (property.name() == "unit" && property.type() == jsons::ValueType::String) {
+        } else if (property.name() == F("unit") && property.type() == jsons::ValueType::String) {
           unit = unitFromString(property.asString().get());
-        } else if (property.name() == "access" && property.type() == jsons::ValueType::String) {
+        } else if (property.name() == F("access") && property.type() == jsons::ValueType::String) {
           accessMode = valueAccessModeFromString(property.asString().get());
-        } else if (property.name() == "interval" && property.type() == jsons::ValueType::Integer) {
+        } else if (property.name() == F("interval") && property.type() == jsons::ValueType::Integer) {
           updateIntervalMs = property.asInteger().get();
-        } else if (property.name() == "codec") {
+        } else if (property.name() == F("codec")) {
           if (property.type() == jsons::ValueType::Integer) {
             codec = property.asInteger().get();
           } else if (property.type() == jsons::ValueType::String) {
@@ -280,7 +280,7 @@ struct __attribute__((__packed__)) ValueDefinition final {
           } else {
             return false;
           }
-        } else if (property.name() == "converter") {
+        } else if (property.name() == F("converter")) {
           if (property.type() == jsons::ValueType::Integer) {
             converter = property.asInteger().get();
           } else if (property.type() == jsons::ValueType::String) {
@@ -365,20 +365,20 @@ private:
 
 public:
   DefinitionRepository(iot_core::ISystem& system, IConversionRepository& conversionRepo) :
-    _logger(system.logger("def")),
+    _logger(system.logger(F("def"))),
     _system(system),
     _conversionRepo(conversionRepo)
   {}
 
-  const char* name() const override {
-    return "def";
+  toolbox::strref name() const override {
+    return F("def");
   }
 
-  bool configure(const char* /*name*/, const char* /*value*/) override {
+  bool configure(const toolbox::strref& /*name*/, const toolbox::strref& /*value*/) override {
     return false;
   }
 
-  void getConfig(std::function<void(const char*, const char*)> /*writer*/) const override {
+  void getConfig(iot_core::ConfigWriter writer) const override {
   }
 
   void setup(bool /*connected*/) override {
@@ -389,8 +389,8 @@ public:
   }
   
   void getDiagnostics(iot_core::IDiagnosticsCollector& collector) const override {
-    collector.addValue("size", toolbox::convert<size_t>::toString(_definitions.size(), 10));
-    collector.addValue("capacity", toolbox::convert<size_t>::toString(_definitions.capacity(), 10));
+    collector.addValue(F("size"), toolbox::convert<size_t>::toString(_definitions.size(), 10));
+    collector.addValue(F("capacity"), toolbox::convert<size_t>::toString(_definitions.capacity(), 10));
   }
 
   bool store(ValueId id, const ValueDefinition& definition) override {
@@ -410,7 +410,6 @@ public:
   void removeAll() override {
     for (auto& entry : _definitions) {
       if (!entry.value().isUndefined()) {
-        // TODO remove const_cast when FixedCapacityMap in toolbox has been updated
         entry.value() = ValueDefinition::UNDEFINED;
         _dirty = true;
       }
