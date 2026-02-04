@@ -13,6 +13,37 @@ function formatValue(value) {
     }
 }
 
+function formatRelativeTime(lastUpdate, retrievedOn) {
+    try {
+        const lastUpdateTime = new Date(lastUpdate);
+        const retrievedOnTime = new Date(retrievedOn);
+        
+        // Calculate difference in milliseconds
+        const diffMs = retrievedOnTime - lastUpdateTime;
+        const diffSeconds = Math.round(diffMs / 1000);
+        
+        if (diffSeconds < 60) {
+            return diffSeconds === 1 ? '1 second ago' : `${diffSeconds} seconds ago`;
+        }
+        
+        const diffMinutes = Math.round(diffSeconds / 60);
+        if (diffMinutes < 60) {
+            return diffMinutes === 1 ? '1 minute ago' : `${diffMinutes} minutes ago`;
+        }
+        
+        const diffHours = Math.round(diffMinutes / 60);
+        if (diffHours < 24) {
+            return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
+        }
+        
+        const diffDays = Math.round(diffHours / 24);
+        return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+    } catch (_) {
+        // Fallback to the original timestamp if parsing fails
+        return lastUpdate;
+    }
+}
+
 export class DataPage {
     #client
     #data
@@ -229,6 +260,7 @@ export class DataPage {
                 }
 
                 const row = this.table.addRow();
+                const relativeTime = formatRelativeTime(datapoint.lastUpdate, this.#data.retrievedOn);
                 row.addColumns([
                     datapoint.source,
                     datapoint.id,
@@ -236,7 +268,7 @@ export class DataPage {
                     datapoint.rawValue,
                     formatValue(datapoint.value),
                     datapoint.unit,
-                    datapoint.lastUpdate,
+                    relativeTime,
                     writeCell
                 ]);
             }

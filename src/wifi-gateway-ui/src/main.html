@@ -133,6 +133,29 @@
             top: 50%;
             left: 50%;
         }
+
+        /* Override simple.css max-width to use more available space */
+        body {
+            grid-template-columns: 1fr min(95vw, 1400px) 1fr;
+        }
+
+        table {
+            width: 100%;
+        }
+
+        td, th {
+            padding: 0.35rem 0.4rem;
+            font-size: 0.95rem;
+        }
+
+        td {
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+
+        th {
+            white-space: nowrap;
+        }
     </style>
 </head>
 
