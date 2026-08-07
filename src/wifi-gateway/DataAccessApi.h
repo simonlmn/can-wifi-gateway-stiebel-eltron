@@ -378,6 +378,7 @@ private:
 
     const DataAccess::DataKey key {DeviceId{type, DeviceAddress(addressNumber.get())}, ValueId(valueIdNumber.get())};
 
+    _logger.log(iot_core::LogLevel::Info, toolbox::format(F("PUT data: body='%s'"), request.body().content().cstr()));
     auto reader = jsons::makeReader(request.body());
     auto json = reader.begin();
     auto rawValue = writeRaw ? RAW_CONVERSION.fromJson(json) : _conversionService.fromJson(json, key.second);
