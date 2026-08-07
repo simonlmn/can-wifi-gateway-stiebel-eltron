@@ -4,6 +4,7 @@
 #include <iot_core/Interfaces.h>
 #include <toolbox/String.h>
 #include <toolbox/Conversion.h>
+#include <toolbox/Event.h>
 #include <serial_transport.h>
 #include <gpiobj.h>
 #include "CanInterface.h"
@@ -23,6 +24,7 @@ private:
   iot_core::ISystem& _system;
   gpiobj::DigitalOutput& _resetPin;
   gpiobj::DigitalInput& _txEnablePin;
+  toolbox::Event<void> _resetEvent;
   bool _canReady;
   iot_core::IntervalTimer _resetInterval;
   std::function<void()> _readyHandler;
@@ -42,6 +44,7 @@ public:
     _system(system),
     _resetPin(resetPin),
     _txEnablePin(txEnablePin),
+    _resetEvent(),
     _canReady(false),
     _resetInterval(5000),
     _counters(),
@@ -71,9 +74,12 @@ public:
   }
 
   bool setMode(CanMode mode) override {
+    if (mode == _mode) {
+      return true;
+    }
     _mode = mode;
-    reset();
     _logger.log(toolbox::format(F("Set mode '%s'."), canModeToString(_mode).cstr()));
+    _resetEvent.raise();
     return true;
   }
 
@@ -92,6 +98,10 @@ public:
     _serial.loop();
 
     refillTokenBucket(); // Periodically refill to maintain budget
+
+    _resetEvent.process([this] () {
+      reset();
+    });
 
     if (!ready() && _resetInterval.elapsed()) {
       _logger.log(iot_core::LogLevel::Error, F("Timeout: resetting CAN module."));
