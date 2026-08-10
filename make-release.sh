@@ -19,7 +19,7 @@ patch=${version[2]}
 pre_release_label=${version[3]}
 last_version=$major.$minor.$patch
 
-new_target_version='0.0.0'
+new_target_version=''
 new_pre_release_label=''
 
 echo "Last version was '${last_version}'."
