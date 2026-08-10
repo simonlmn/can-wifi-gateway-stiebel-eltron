@@ -641,11 +641,11 @@
   },
   "1696": {
     "name": "compressor power",
-    "unit": "Watt",
+    "unit": "KiloWatt",
     "access": "Readable",
     "interval": 30000,
     "codec": "U16",
-    "converter": "10^-1"
+    "converter": "10^-2"
   },
   "1697": {
     "name": "compressor voltage",
